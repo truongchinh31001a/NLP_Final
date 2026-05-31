@@ -33,9 +33,30 @@ export type ExerciseOptionPreview = {
 export type ExercisePreview = {
   id: string;
   type: string;
+  topic: string;
+  difficulty: string;
   question: string;
   options: ExerciseOptionPreview[];
+  correctAnswer: string;
   explanation: string;
+  sourceChunkIds: string[];
+};
+
+export type PracticePlanPreview = {
+  topic: string;
+  difficulty: string;
+  exerciseType: string;
+  numQuestions: number;
+  focusReason: string;
+};
+
+export type ScoreResult = {
+  topic: string;
+  score: number;
+  correctCount: number;
+  totalQuestions: number;
+  weakTopicsDetected: string[];
+  recommendation: string;
 };
 
 export type DashboardSnapshot = {
@@ -45,6 +66,7 @@ export type DashboardSnapshot = {
   requestTags: string[];
   activeFocus: string;
   exercisePreview: ExercisePreview[];
+  planPreview: PracticePlanPreview;
   recommendations: Recommendation[];
   history: SessionHistoryItem[];
 };

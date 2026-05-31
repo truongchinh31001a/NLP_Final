@@ -1,4 +1,5 @@
 from app.config import AppConfig
+from app.agent.learning_agent import LearningAgent
 from app.generation.service import ExerciseGenerationService
 from app.generation.validator import ExerciseValidator
 from app.intent.parser import IntentParser
@@ -6,7 +7,7 @@ from app.personalization.service import PersonalizationService
 from app.persistence.repository import LearningRepository
 from app.recommendation.service import RecommendationService
 from app.retrieval.service import RetrievalService
-from app.schemas import GeneratedExerciseSet, PracticeRequest, SessionResult
+from app.schemas import GeneratedExerciseSet, SessionResult
 
 
 class PracticePipeline:
@@ -29,21 +30,19 @@ class PracticePipeline:
         self.generator = generator
         self.validator = validator
         self.recommendation = recommendation
+        self.agent = LearningAgent(
+            config=config,
+            repository=repository,
+            parser=parser,
+            personalization=personalization,
+            retrieval=retrieval,
+            generator=generator,
+            validator=validator,
+            recommendation=recommendation,
+        )
 
     def create_exercise_set(self, user_id: str, raw_text: str) -> GeneratedExerciseSet:
-        request: PracticeRequest = self.parser.parse(user_id=user_id, raw_text=raw_text)
-        profile = self.repository.get_profile(user_id)
-        plan = self.personalization.build_plan(request, profile)
-        chunks = self.retrieval.retrieve(plan, profile.level)
-        exercises = self.generator.generate(plan, chunks)
-        self.validator.validate(exercises, expected_count=plan.num_questions)
-
-        return GeneratedExerciseSet(
-            request=request,
-            plan=plan,
-            retrieved_chunks=chunks,
-            exercises=exercises,
-        )
+        return self.agent.create_exercise_set(user_id=user_id, raw_text=raw_text)
 
     def score_submission(
         self,
@@ -52,20 +51,9 @@ class PracticePipeline:
         total_questions: int,
         correct_count: int,
     ) -> SessionResult:
-        score = correct_count / max(total_questions, 1)
-        result = SessionResult(
+        return self.agent.score_submission(
             user_id=user_id,
             topic=topic,
-            score=score,
-            correct_count=correct_count,
             total_questions=total_questions,
-            weak_topics_detected=[topic] if score < 0.8 else [],
+            correct_count=correct_count,
         )
-        result.recommendation = self.recommendation.recommend(result)
-
-        profile = self.repository.get_profile(user_id)
-        updated_profile = self.personalization.update_profile(profile, result)
-
-        self.repository.save_profile(updated_profile)
-        self.repository.save_session_result(result)
-        return result

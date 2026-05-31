@@ -18,16 +18,24 @@ Baseline hien tai da duoc chuyen sang dung LangChain cho 3 phan:
 - `Runnable` chain cho generation pipeline.
 - `Document` + `VectorStore` + `Retriever` cho retrieval.
 
+Baseline cung da co lop `LearningAgent` co kiem soat. Agent nay khong tu do
+goi tool ben ngoai, ma chi dieu phoi cac service noi bo da duoc phe duyet:
+parse request, lay profile, lap practice plan, retrieve knowledge, generate,
+validate, score, update profile va recommend. Neu generation/validation loi,
+agent co buoc reflection va retry truoc khi tra loi.
+
 ## Luong xu ly baseline
 
 ```text
 User Request
-  -> Intent Parser
-  -> Profile Lookup
-  -> Personalization Planner
-  -> Retrieval Service
-  -> Exercise Generator
-  -> Exercise Validator
+  -> Learning Agent
+  -> Intent Parser Tool
+  -> Profile Lookup Tool
+  -> Personalization Planner Tool
+  -> Retrieval Tool
+  -> Exercise Generator Tool
+  -> Exercise Validator Tool
+  -> Reflection / Retry neu can
   -> Session Scoring
   -> Weakness Update
   -> Recommendation
@@ -69,8 +77,10 @@ app/
     service.py                  # Goi y bai hoc tiep theo
   persistence/
     repository.py               # Interface luu profile/session
+  agent/
+    learning_agent.py           # Agent dieu phoi tool co kiem soat
   orchestrator/
-    pipeline.py                 # Luong nghiep vu end-to-end
+    pipeline.py                 # Adapter giu API cu va goi LearningAgent
 chatbot.py                      # Entry point demo baseline hien tai
 frontend/
   app/                          # Next.js App Router
@@ -185,7 +195,7 @@ frontend/
 2. `persistence/repository.py`
 3. `retrieval/vector_store.py`, `retrieval/service.py`
 4. `generation/prompts.py`, `generation/service.py`, `generation/validator.py`
-5. `orchestrator/pipeline.py`
+5. `agent/learning_agent.py`, `orchestrator/pipeline.py`
 6. `app/api/main.py`
 7. `frontend/app/page.tsx`
 8. mo rong persistence va answer checking that

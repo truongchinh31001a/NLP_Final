@@ -69,6 +69,7 @@ class GeneratedExerciseSet:
     retrieved_chunks: list[KnowledgeChunk]
     exercises: list[ExerciseItem]
     prompt_snapshot: str = ""
+    agent_trace: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass(slots=True)

@@ -30,6 +30,7 @@ class GeneratePracticeResponseModel(BaseModel):
     exercises: list[GeneratePracticeExerciseModel]
     recommendation: str
     generator_backend: str
+    agent_trace: list[dict] = Field(default_factory=list)
 
 
 class SubmittedAnswerModel(BaseModel):

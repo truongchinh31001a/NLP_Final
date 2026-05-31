@@ -72,6 +72,7 @@ def generate_practice(
         exercises=[asdict(exercise) for exercise in generated.exercises],
         recommendation=preview_result.recommendation,
         generator_backend=pipeline.generator.backend_name,
+        agent_trace=generated.agent_trace,
     )
 
 

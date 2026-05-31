@@ -1,334 +1,404 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 
-import { generatePractice } from "@/lib/api";
+import { generatePractice, scorePractice } from "@/lib/api";
 import type {
   DashboardSnapshot,
   ExercisePreview,
+  PracticePlanPreview,
+  ScoreResult,
 } from "@/lib/types";
 
 type ChatWorkbenchProps = {
   snapshot: DashboardSnapshot;
 };
 
+type Screen = "chat" | "generating" | "practice" | "result";
+
+const USER_ID = "demo-user";
+
+const generationSteps = [
+  "Phan tich yeu cau",
+  "Doc ho so nguoi hoc",
+  "Tim ngu canh kien thuc",
+  "Sinh cau hoi",
+  "Kiem tra dap an",
+];
+
 export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
+  const [screen, setScreen] = useState<Screen>("chat");
   const [prompt, setPrompt] = useState(snapshot.currentPrompt);
   const [preview, setPreview] = useState<ExercisePreview[]>(
     snapshot.exercisePreview,
   );
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [status, setStatus] = useState(
-    "Connected UI preview. Try generating through the backend when it is available.",
-  );
+  const [plan, setPlan] = useState<PracticePlanPreview>(snapshot.planPreview);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [scoreResult, setScoreResult] = useState<ScoreResult | null>(null);
+  const [status, setStatus] = useState("San sang tao bai luyen tap.");
+  const [isScoring, setIsScoring] = useState(false);
   const [, startTransition] = useTransition();
 
-  const handleGeneratePreview = async () => {
-    setIsGenerating(true);
-    setStatus("Contacting backend...");
+  const answeredCount = useMemo(
+    () => preview.filter((exercise) => answers[exercise.id]).length,
+    [answers, preview],
+  );
+  const canSubmit = preview.length > 0 && answeredCount === preview.length;
+
+  const handleGenerate = async () => {
+    setScreen("generating");
+    setScoreResult(null);
+    setAnswers({});
+    setStatus("Dang goi pipeline sinh bai tap...");
 
     try {
       const response = await generatePractice({
-        userId: "demo-user",
+        userId: USER_ID,
         message: prompt,
       });
 
       startTransition(() => {
         setPreview(response.exercises);
+        setPlan(response.plan);
       });
       setStatus(
-        response.recommendation
-          ? `Backend response ready. ${response.recommendation}`
-          : `Backend response ready via ${response.generatorBackend ?? "configured generator"}.`,
+        response.recommendation ??
+          `Da sinh bai tap bang ${response.generatorBackend ?? "backend"}.`,
       );
     } catch {
       const generated = buildPreviewFromPrompt(prompt);
       startTransition(() => {
-        setPreview(generated);
+        setPreview(generated.exercises);
+        setPlan(generated.plan);
       });
-      setStatus(
-        "Backend is unavailable right now, so the UI is showing a local preview fallback.",
-      );
+      setStatus("Backend chua san sang, dang dung bo cau hoi fallback.");
     } finally {
-      setIsGenerating(false);
+      window.setTimeout(() => setScreen("practice"), 650);
+    }
+  };
+
+  const handleScorePractice = async () => {
+    setIsScoring(true);
+    setStatus("Dang cham bai...");
+
+    try {
+      const response = await scorePractice({
+        userId: USER_ID,
+        topic: plan.topic,
+        answers: preview.map((exercise) => ({
+          exerciseId: exercise.id,
+          selectedAnswer: answers[exercise.id],
+        })),
+      });
+
+      setScoreResult(response);
+      setStatus("Da cham bai va cap nhat khuyen nghi.");
+    } catch {
+      const correctCount = preview.filter(
+        (exercise) => answers[exercise.id] === exercise.correctAnswer,
+      ).length;
+      const score = correctCount / Math.max(preview.length, 1);
+      setScoreResult({
+        topic: plan.topic,
+        score,
+        correctCount,
+        totalQuestions: preview.length,
+        weakTopicsDetected: score < 0.8 ? [plan.topic] : [],
+        recommendation:
+          score < 0.8
+            ? "Nen luyen lai chu de nay voi do kho thap hon mot muc."
+            : "Co the tang do kho hoac chuyen sang bien the gan voi chu de nay.",
+      });
+      setStatus("Da cham bang fallback frontend.");
+    } finally {
+      setIsScoring(false);
+      setScreen("result");
     }
   };
 
   return (
-    <main className="shell">
-      <div className="shell__frame">
-        <header className="hero">
-          <div>
-            <div className="hero__eyebrow">
-              <span>Next.js App Router</span>
-              <span>Frontend baseline</span>
-            </div>
-            <h1 className="hero__title">
-              A study dashboard that feels <span>personal</span>, not generic.
-            </h1>
-            <p className="hero__copy">
-              This UI is designed for a Python + LangChain backend. The left
-              column shows learner state, the center column handles natural
-              language practice requests, and the right column keeps the
-              feedback loop visible after each session.
-            </p>
+    <main className="flow-shell">
+      <header className="flow-topbar">
+        <div>
+          <p className="eyebrow">Personalized English Practice</p>
+          <h1>Chatbot sinh bai tap tieng Anh</h1>
+        </div>
+        <div className="learner-pill">
+          <span>{snapshot.profile.name}</span>
+          <strong>{snapshot.profile.level}</strong>
+        </div>
+      </header>
+
+      {screen === "chat" ? (
+        <section className="chat-screen">
+          <div className="chat-thread">
+            <article className="message message--bot">
+              <span>AI</span>
+              <p>
+                Ban muon luyen chu de nao? Hay noi bang ngon ngu tu nhien,
+                minh se tao bai kiem tra phu hop voi ho so hoc tap.
+              </p>
+            </article>
+            <article className="message message--user">
+              <span>Ban</span>
+              <p>{prompt}</p>
+            </article>
           </div>
 
-          <aside className="hero__status">
-            <p className="hero__status-label">Active focus</p>
-            <p className="hero__status-value">{snapshot.activeFocus}</p>
-            <p className="hero__status-note">
-              {snapshot.recommendations[0]?.body}
-            </p>
-          </aside>
-        </header>
+          <div className="chat-composer">
+            <textarea
+              value={prompt}
+              onChange={(event) => setPrompt(event.target.value)}
+              placeholder="Vi du: I am weak at passive voice. Generate 5 medium multiple-choice questions."
+            />
+            <button
+              className="button button--primary"
+              type="button"
+              onClick={handleGenerate}
+              disabled={prompt.trim().length === 0}
+            >
+              Gui yeu cau
+            </button>
+          </div>
+        </section>
+      ) : null}
 
-        <section className="dashboard">
-          <aside className="panel profile-card">
-            <div>
-              <span className="profile-card__badge">
-                Learner profile
-              </span>
-              <h2 className="profile-card__name">{snapshot.profile.name}</h2>
-              <p className="panel__subtitle">
-                {snapshot.profile.goal}
-              </p>
-            </div>
-
-            <div className="profile-card__meta">
-              <StatChip label="Level" value={snapshot.profile.level} />
-              <StatChip
-                label="Preferred"
-                value={snapshot.profile.preferredDifficulty}
-              />
-              <StatChip
-                label="Accuracy"
-                value={`${Math.round(snapshot.profile.accuracy * 100)}%`}
-              />
-              <StatChip
-                label="Sessions"
-                value={snapshot.profile.sessionCount.toString()}
-              />
-            </div>
-
-            <div>
-              <h3 className="panel__title">Weak topics</h3>
-              <div className="weakness-list">
-                {snapshot.weakTopics.map((topic) => (
-                  <div className="weakness-row" key={topic.name}>
-                    <div className="weakness-row__top">
-                      <strong>{topic.name}</strong>
-                      <span>{Math.round(topic.weight * 100)}%</span>
-                    </div>
-                    <div className="meter">
-                      <span style={{ width: `${topic.weight * 100}%` }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </aside>
-
-          <section className="workspace">
-            <div className="prompt-card">
-              <p className="prompt-card__label">Natural language request</p>
-              <p className="prompt-card__value">{snapshot.currentPrompt}</p>
-              <div className="prompt-card__chips">
-                {snapshot.requestTags.map((tag) => (
-                  <span className="chip" key={tag}>
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <div className="panel">
-              <h2 className="panel__title">Exercise preview</h2>
-              <p className="panel__subtitle">
-                This panel prefers the Python API response and falls back to a
-                local preview only when the backend is unavailable.
-              </p>
-
-              <div className="exercise-list" style={{ marginTop: 18 }}>
-                {preview.map((exercise, index) => (
-                  <article className="exercise-card" key={exercise.id}>
-                    <div className="exercise-card__header">
-                      <div style={{ display: "flex", gap: 14 }}>
-                        <span className="exercise-card__index">
-                          {index + 1}
-                        </span>
-                        <div>
-                          <p className="exercise-card__question">
-                            {exercise.question}
-                          </p>
-                        </div>
-                      </div>
-                      <span className="exercise-card__tag">
-                        {exercise.type}
-                      </span>
-                    </div>
-
-                    {exercise.options.length > 0 ? (
-                      <div className="options">
-                        {exercise.options.map((option) => (
-                          <div
-                            className={`option${option.isCorrect ? " option--correct" : ""}`}
-                            key={option.label}
-                          >
-                            <span className="option__label">
-                              {option.label}
-                            </span>
-                            <span>{option.text}</span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : null}
-
-                    <div className="exercise-card__explanation">
-                      {exercise.explanation}
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </div>
-
-            <div className="composer">
-              <textarea
-                value={prompt}
-                onChange={(event) => setPrompt(event.target.value)}
-                placeholder="Type a learner request, for example: I am weak at passive voice, generate 5 medium questions."
-              />
-              <div className="composer__footer">
-                <span className="composer__hint">
-                  {status}
-                </span>
-                <div className="composer__actions">
-                  <button
-                    className="button button--secondary"
-                    type="button"
-                    onClick={() => setPrompt(snapshot.currentPrompt)}
-                  >
-                    Reset prompt
-                  </button>
-                  <button
-                    className="button button--primary"
-                    type="button"
-                    onClick={handleGeneratePreview}
-                    disabled={isGenerating}
-                  >
-                    {isGenerating ? "Generating..." : "Generate practice"}
-                  </button>
+      {screen === "generating" ? (
+        <section className="generation-screen">
+          <div className="generation-card">
+            <p className="eyebrow">Dang generate</p>
+            <h2>Pipeline dang tao bai kiem tra</h2>
+            <p className="muted">{status}</p>
+            <div className="generation-steps">
+              {generationSteps.map((step, index) => (
+                <div className="generation-step" key={step}>
+                  <span>{index + 1}</span>
+                  <strong>{step}</strong>
                 </div>
-              </div>
-            </div>
-          </section>
-
-          <aside className="panel">
-            <div>
-              <h2 className="panel__title">Feedback loop</h2>
-              <p className="panel__subtitle">
-                Recommendation cards and session history make the
-                personalization logic legible to the learner.
-              </p>
-            </div>
-
-            <div className="recommendation-list" style={{ marginTop: 18 }}>
-              {snapshot.recommendations.map((item) => (
-                <article className="recommendation-card" key={item.title}>
-                  <p className="recommendation-card__title">{item.title}</p>
-                  <p className="recommendation-card__body">{item.body}</p>
-                </article>
               ))}
             </div>
-
-            <div style={{ marginTop: 22 }}>
-              <h3 className="panel__title">Recent sessions</h3>
-              <div className="history-list">
-                {snapshot.history.map((item) => (
-                  <article className="history-card" key={item.id}>
-                    <p className="history-card__title">{item.topic}</p>
-                    <p className="history-card__body">{item.note}</p>
-                    <span className="history-card__score">
-                      Score {Math.round(item.score * 100)}%
-                    </span>
-                  </article>
-                ))}
-              </div>
-            </div>
-          </aside>
+          </div>
         </section>
-      </div>
+      ) : null}
+
+      {screen === "practice" ? (
+        <section className="test-screen">
+          <div className="test-header">
+            <div>
+              <p className="eyebrow">Bai kiem tra</p>
+              <h2>{formatTopic(plan.topic)}</h2>
+              <p className="muted">
+                {plan.difficulty} - {plan.exerciseType} - {status}
+              </p>
+            </div>
+            <div className="progress-pill">
+              {answeredCount}/{preview.length} cau
+            </div>
+          </div>
+
+          <div className="question-list">
+            {preview.map((exercise, index) => (
+              <QuestionCard
+                exercise={exercise}
+                index={index}
+                key={exercise.id}
+                selectedAnswer={answers[exercise.id]}
+                onSelect={(value) =>
+                  setAnswers((current) => ({
+                    ...current,
+                    [exercise.id]: value,
+                  }))
+                }
+              />
+            ))}
+          </div>
+
+          <div className="test-actions">
+            <button
+              className="button button--secondary"
+              type="button"
+              onClick={() => setScreen("chat")}
+            >
+              Sua yeu cau
+            </button>
+            <button
+              className="button button--primary"
+              type="button"
+              onClick={handleScorePractice}
+              disabled={!canSubmit || isScoring}
+            >
+              {isScoring ? "Dang cham..." : "Nop bai"}
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      {screen === "result" && scoreResult ? (
+        <section className="result-screen">
+          <div className="score-summary">
+            <p className="eyebrow">Ket qua</p>
+            <strong>{Math.round(scoreResult.score * 100)}%</strong>
+            <span>
+              {scoreResult.correctCount}/{scoreResult.totalQuestions} cau dung
+            </span>
+            <p>{scoreResult.recommendation}</p>
+          </div>
+
+          <div className="answer-review">
+            {preview.map((exercise, index) => {
+              const selected = answers[exercise.id];
+              const isCorrect = selected === exercise.correctAnswer;
+              return (
+                <article className="review-card" key={exercise.id}>
+                  <div className="review-card__top">
+                    <span>{index + 1}</span>
+                    <div>
+                      <strong>{exercise.question}</strong>
+                      <p className={isCorrect ? "answer-ok" : "answer-bad"}>
+                        Ban chon {selected}; dap an dung la{" "}
+                        {exercise.correctAnswer}
+                      </p>
+                    </div>
+                  </div>
+                  <p>{exercise.explanation}</p>
+                </article>
+              );
+            })}
+          </div>
+
+          <div className="test-actions">
+            <button
+              className="button button--secondary"
+              type="button"
+              onClick={() => setScreen("practice")}
+            >
+              Xem lai bai
+            </button>
+            <button
+              className="button button--primary"
+              type="button"
+              onClick={() => {
+                setScreen("chat");
+                setScoreResult(null);
+                setAnswers({});
+              }}
+            >
+              Tao bai moi
+            </button>
+          </div>
+        </section>
+      ) : null}
     </main>
   );
 }
 
-function StatChip({ label, value }: { label: string; value: string }) {
+function QuestionCard({
+  exercise,
+  index,
+  selectedAnswer,
+  onSelect,
+}: {
+  exercise: ExercisePreview;
+  index: number;
+  selectedAnswer?: string;
+  onSelect: (value: string) => void;
+}) {
   return (
-    <div className="stat-chip">
-      <p className="stat-chip__label">{label}</p>
-      <p className="stat-chip__value">{value}</p>
-    </div>
+    <article className="question-card">
+      <div className="question-card__top">
+        <span>{index + 1}</span>
+        <strong>{exercise.question}</strong>
+      </div>
+
+      {exercise.options.length > 0 ? (
+        <div className="option-grid">
+          {exercise.options.map((option) => (
+            <button
+              className={`answer-option${selectedAnswer === option.label ? " answer-option--selected" : ""}`}
+              key={option.label}
+              type="button"
+              onClick={() => onSelect(option.label)}
+            >
+              <span>{option.label}</span>
+              <strong>{option.text}</strong>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <input
+          className="text-answer"
+          value={selectedAnswer ?? ""}
+          onChange={(event) => onSelect(event.target.value)}
+          placeholder="Nhap cau tra loi"
+        />
+      )}
+    </article>
   );
 }
 
-function buildPreviewFromPrompt(prompt: string): ExercisePreview[] {
+function formatTopic(topic: string) {
+  return topic.replaceAll("_", " ");
+}
+
+function buildPreviewFromPrompt(prompt: string): {
+  exercises: ExercisePreview[];
+  plan: PracticePlanPreview;
+} {
   const normalized = prompt.toLowerCase();
   const topic = normalized.includes("passive")
-    ? "Passive voice"
+    ? "passive_voice"
     : normalized.includes("travel")
-      ? "Travel vocabulary"
-      : "Grammar review";
-  const type = normalized.includes("fill") || normalized.includes("dien")
-    ? "Fill blank"
-    : "MCQ";
+      ? "travel_vocabulary"
+      : "grammar_review";
+  const difficulty = normalized.includes("hard")
+    ? "hard"
+    : normalized.includes("easy")
+      ? "easy"
+      : "medium";
 
-  if (type === "Fill blank") {
-    return [
+  return {
+    plan: {
+      topic,
+      difficulty,
+      exerciseType: "grammar_mcq",
+      numQuestions: 2,
+      focusReason: "Fallback plan from frontend.",
+    },
+    exercises: [
       {
         id: "preview-1",
-        type,
-        question: `Fill in the blank: This preview focuses on ${topic.toLowerCase()} with a learner-friendly warm-up item.`,
-        options: [],
+        type: "grammar_mcq",
+        topic,
+        difficulty,
+        question: `Which option best matches a ${topic} practice request?`,
+        options: [
+          { label: "A", text: "A focused exercise for the learner weakness", isCorrect: true },
+          { label: "B", text: "A random unrelated exercise", isCorrect: false },
+          { label: "C", text: "A prompt without explanation", isCorrect: false },
+          { label: "D", text: "A question without a topic", isCorrect: false },
+        ],
+        correctAnswer: "A",
         explanation:
-          "This is a UI-only preview. Replace this generator with a real API call to the Python backend.",
+          "The correct option stays aligned with topic, difficulty, and learner profile.",
+        sourceChunkIds: [],
       },
       {
         id: "preview-2",
-        type,
-        question: `Fill in the blank: A second ${topic.toLowerCase()} item can appear here after the backend returns validated content.`,
-        options: [],
+        type: "grammar_mcq",
+        topic,
+        difficulty,
+        question: "What should happen after the learner submits answers?",
+        options: [
+          { label: "A", text: "Score the session and recommend the next step", isCorrect: true },
+          { label: "B", text: "Discard the answers", isCorrect: false },
+          { label: "C", text: "Hide the explanation", isCorrect: false },
+          { label: "D", text: "Ignore weak topics", isCorrect: false },
+        ],
+        correctAnswer: "A",
         explanation:
-          "Keep the frontend schema stable so later you can swap mock data for real LangChain output.",
+          "The project workflow ends with scoring, profile update, and recommendation.",
+        sourceChunkIds: [],
       },
-    ];
-  }
-
-  return [
-    {
-      id: "preview-1",
-      type,
-      question: `Which sentence best matches a ${topic.toLowerCase()} practice request?`,
-      options: [
-        { label: "A", text: "A validated correct option", isCorrect: true },
-        { label: "B", text: "A plausible distractor", isCorrect: false },
-        { label: "C", text: "An off-topic distractor", isCorrect: false },
-        { label: "D", text: "A grammatically broken distractor", isCorrect: false },
-      ],
-      explanation:
-        "This preview mirrors the structure expected from the backend: question, options, correct answer, and explanation.",
-    },
-    {
-      id: "preview-2",
-      type,
-      question: `How should the learner continue after a weaker ${topic.toLowerCase()} score?`,
-      options: [
-        { label: "A", text: "Stay on the same topic with easier difficulty", isCorrect: true },
-        { label: "B", text: "Jump to an unrelated hard topic", isCorrect: false },
-        { label: "C", text: "Ignore the learner profile entirely", isCorrect: false },
-        { label: "D", text: "Remove retrieval context from generation", isCorrect: false },
-      ],
-      explanation:
-        "The UI should make recommendation logic visible so the personalization loop feels intentional.",
-    },
-  ];
+    ],
+  };
 }

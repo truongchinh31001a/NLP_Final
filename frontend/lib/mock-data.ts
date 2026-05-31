@@ -23,6 +23,8 @@ export function getDashboardSnapshot(): DashboardSnapshot {
       {
         id: "exercise-1",
         type: "MCQ",
+        topic: "passive_voice",
+        difficulty: "medium",
         question:
           "Which sentence is correctly written in the passive voice for a past event?",
         options: [
@@ -47,12 +49,16 @@ export function getDashboardSnapshot(): DashboardSnapshot {
             isCorrect: false,
           },
         ],
+        correctAnswer: "A",
         explanation:
           "A uses the correct past simple passive structure: was + past participle.",
+        sourceChunkIds: ["grammar-passive-01"],
       },
       {
         id: "exercise-2",
         type: "MCQ",
+        topic: "passive_voice",
+        difficulty: "medium",
         question:
           "Why should the learner stay on passive voice for the next session?",
         options: [
@@ -77,10 +83,20 @@ export function getDashboardSnapshot(): DashboardSnapshot {
             isCorrect: false,
           },
         ],
+        correctAnswer: "A",
         explanation:
           "The recommendation engine should keep the learner near the weakness until accuracy becomes stable.",
+        sourceChunkIds: ["profile-session-18"],
       },
     ],
+    planPreview: {
+      topic: "passive_voice",
+      difficulty: "medium",
+      exerciseType: "grammar_mcq",
+      numQuestions: 5,
+      focusReason:
+        "Focused on the strongest weak topic and kept the difficulty near the learner preference.",
+    },
     recommendations: [
       {
         title: "Next practice recommendation",

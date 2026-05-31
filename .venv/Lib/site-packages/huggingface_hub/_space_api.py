@@ -61,9 +61,6 @@ class SpaceHardware(str, Enum):
     # CPU
     CPU_BASIC = "cpu-basic"
     CPU_UPGRADE = "cpu-upgrade"
-    CPU_PERFORMANCE = "cpu-performance"
-    CPU_XL = "cpu-xl"
-    SPRX8 = "sprx8"
 
     # ZeroGPU
     ZERO_A10G = "zero-a10g"
@@ -83,13 +80,6 @@ class SpaceHardware(str, Enum):
     A100_LARGE = "a100-large"
     A100X4 = "a100x4"
     A100X8 = "a100x8"
-    H200 = "h200"
-    H200X2 = "h200x2"
-    H200X4 = "h200x4"
-    H200X8 = "h200x8"
-
-    # Neuron
-    INF2X6 = "inf2x6"
 
 
 class SpaceStorage(str, Enum):
@@ -214,6 +204,7 @@ class SpaceRuntime:
     requested_hardware: SpaceHardware | None
     sleep_time: int | None
     storage: SpaceStorage | None
+    dev_mode: bool
     hot_reloading: SpaceHotReloading | None
     volumes: list[Volume] | None
     raw: dict
@@ -224,6 +215,7 @@ class SpaceRuntime:
         self.requested_hardware = data.get("hardware", {}).get("requested")
         self.sleep_time = data.get("gcTimeout")
         self.storage = data.get("storage")
+        self.dev_mode = data.get("devMode", False)
         self.hot_reloading = SpaceHotReloading(raw_hr) if (raw_hr := data.get("hotReloading")) is not None else None
         raw_volumes = data.get("volumes")
         self.volumes = [Volume(**v) for v in raw_volumes] if raw_volumes is not None else None
