@@ -1,0 +1,23 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: english-exercise-backend
+    environment:
+      CORS_ORIGINS: http://localhost:3000
+      VECTOR_STORE_BACKEND: inmemory
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+    container_name: english-exercise-frontend
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"

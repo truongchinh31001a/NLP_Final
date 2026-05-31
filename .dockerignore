@@ -1,0 +1,12 @@
+.git
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.next
+frontend/node_modules
+tmp_chroma_test
+node_modules
+frontend/.next
+frontend
