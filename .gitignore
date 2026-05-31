@@ -21,6 +21,8 @@ ENV/
 
 # Runtime data and local databases
 tmp_chroma_test/
+data/sqlite/
+data/vector_store/
 *.sqlite
 *.sqlite3
 *.db

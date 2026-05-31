@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Protocol
 
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
@@ -7,6 +7,7 @@ from langchain_core.vectorstores import InMemoryVectorStore
 
 from app.config import AppConfig
 from app.retrieval.embeddings import KeywordHashEmbeddings
+from app.retrieval.knowledge_loader import load_knowledge_documents
 from app.schemas import KnowledgeChunk
 
 
@@ -26,7 +27,7 @@ class LangChainVectorStore:
     def search(self, topic: str, level: str, limit: int) -> list[KnowledgeChunk]:
         query = f"{topic.replace('_', ' ')} {level}"
         retriever = self._vector_store.as_retriever(
-            search_kwargs={"k": max(limit * 3, limit)}
+            search_kwargs={"k": max(limit * 10, 50)}
         )
         documents = retriever.invoke(query)
         prioritized = self._prioritize_documents(documents, topic, level)
@@ -56,73 +57,7 @@ class LangChainVectorStore:
         self._seeded = True
 
     def _seed_documents(self) -> list[Document]:
-        return [
-            Document(
-                page_content=(
-                    "Passive voice is formed with be plus past participle. "
-                    "Use it when the receiver of the action is more important than the doer."
-                ),
-                metadata={
-                    "chunk_id": "grammar-passive-001",
-                    "topic": "passive_voice",
-                    "level": "beginner",
-                    "source": "seed",
-                    "category": "grammar",
-                },
-            ),
-            Document(
-                page_content=(
-                    "Past simple passive uses was or were plus past participle, "
-                    "for example: The window was broken yesterday."
-                ),
-                metadata={
-                    "chunk_id": "grammar-passive-002",
-                    "topic": "passive_voice",
-                    "level": "intermediate",
-                    "source": "seed",
-                    "category": "grammar",
-                },
-            ),
-            Document(
-                page_content=(
-                    "Relative clauses give more information about a noun. "
-                    "Who is used for people, which for things, and that for both in many cases."
-                ),
-                metadata={
-                    "chunk_id": "grammar-relative-001",
-                    "topic": "relative_clause",
-                    "level": "beginner",
-                    "source": "seed",
-                    "category": "grammar",
-                },
-            ),
-            Document(
-                page_content=(
-                    "Travel vocabulary often includes itinerary, destination, luggage, "
-                    "boarding pass, reservation, and accommodation."
-                ),
-                metadata={
-                    "chunk_id": "vocab-travel-001",
-                    "topic": "travel_vocabulary",
-                    "level": "beginner",
-                    "source": "seed",
-                    "category": "vocabulary",
-                },
-            ),
-            Document(
-                page_content=(
-                    "Conditionals describe real or unreal situations. "
-                    "Zero conditional describes facts, first conditional describes real future possibilities."
-                ),
-                metadata={
-                    "chunk_id": "grammar-conditional-001",
-                    "topic": "conditional_sentence",
-                    "level": "beginner",
-                    "source": "seed",
-                    "category": "grammar",
-                },
-            ),
-        ]
+        return load_knowledge_documents(self.config.knowledge_chunks_path)
 
     def _document_to_chunk(self, document: Document) -> KnowledgeChunk:
         metadata = dict(document.metadata)
@@ -151,5 +86,16 @@ class LangChainVectorStore:
             for doc in documents
             if doc.metadata.get("topic") == topic and doc not in exact_topic_level
         ]
+        exact_topic.sort(key=lambda doc: self._level_distance(doc, level))
         others = [doc for doc in documents if doc not in exact_topic_level + exact_topic]
         return exact_topic_level + exact_topic + others
+
+    def _level_distance(self, document: Document, target_level: str) -> int:
+        level_order = {
+            "beginner": 0,
+            "intermediate": 1,
+            "advanced": 2,
+        }
+        document_rank = level_order.get(document.metadata.get("level", ""), 0)
+        target_rank = level_order.get(target_level, 0)
+        return abs(document_rank - target_rank)

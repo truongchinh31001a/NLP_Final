@@ -1,0 +1,499 @@
+[
+  {
+    "chunk_id": "grammar_passive_001",
+    "topic_code": "passive_voice",
+    "subtopic": "passive_overview",
+    "skill": "grammar",
+    "level": "beginner",
+    "language": "english",
+    "content": "Passive voice is used when the receiver of an action is more important than the person or thing doing the action. The basic form is be + past participle.",
+    "formula": "subject + be + past participle",
+    "examples": [
+      "The room is cleaned every day.",
+      "English is spoken in many countries."
+    ],
+    "common_mistakes": [
+      "Forgetting the verb be before the past participle.",
+      "Using the base verb instead of the past participle."
+    ],
+    "source": "teacher_authored_mvp_notes"
+  },
+  {
+    "chunk_id": "grammar_passive_002",
+    "topic_code": "passive_voice",
+    "subtopic": "present_simple_passive",
+    "skill": "grammar",
+    "level": "beginner",
+    "language": "english",
+    "content": "Present simple passive describes regular actions, facts, and routines where the object receives the action. Use am, is, or are with the past participle.",
+    "formula": "subject + am/is/are + past participle",
+    "examples": [
+      "The office is cleaned every evening.",
+      "These books are used in class."
+    ],
+    "common_mistakes": [
+      "Using do or does in affirmative passive sentences.",
+      "Writing is clean instead of is cleaned."
+    ],
+    "source": "teacher_authored_mvp_notes"
+  },
+  {
+    "chunk_id": "grammar_passive_003",
+    "topic_code": "passive_voice",
+    "subtopic": "past_simple_passive",
+    "skill": "grammar",
+    "level": "beginner",
+    "language": "english",
+    "content": "Past simple passive describes completed actions in the past where the receiver of the action is the focus. Use was or were with the past participle.",
+    "formula": "subject + was/were + past participle",
+    "examples": [
+      "The window was broken yesterday.",
+      "The letters were sent this morning."
+    ],
+    "common_mistakes": [
+      "Using was or were with the base verb.",
+      "Choosing was for plural subjects."
+    ],
+    "source": "teacher_authored_mvp_notes"
+  },
+  {
+    "chunk_id": "grammar_passive_004",
+    "topic_code": "passive_voice",
+    "subtopic": "future_passive",
+    "skill": "grammar",
+    "level": "intermediate",
+    "language": "english",
+    "content": "Future passive describes actions that will happen to the subject in the future. Use will be with the past participle.",
+    "formula": "subject + will be + past participle",
+    "examples": [
+      "The results will be announced tomorrow.",
+      "The package will be delivered next week."
+    ],
+    "common_mistakes": [
+      "Omitting be after will.",
+      "Using will be with the base verb instead of the past participle."
+    ],
+    "source": "teacher_authored_mvp_notes"
+  },
+  {
+    "chunk_id": "grammar_passive_005",
+    "topic_code": "passive_voice",
+    "subtopic": "passive_with_by_agent",
+    "skill": "grammar",
+    "level": "intermediate",
+    "language": "english",
+    "content": "Use by to mention the agent in a passive sentence when the doer is important or surprising. If the doer is obvious or unimportant, the by phrase is often omitted.",
+    "formula": "subject + be + past participle + by + agent",
+    "examples": [
+      "The song was written by a famous composer.",
+      "The building was designed by a young architect."
+    ],
+    "common_mistakes": [
+      "Using from instead of by for the agent.",
+      "Adding a by phrase when the agent is not useful."
+    ],
+    "source": "teacher_authored_mvp_notes"
+  },
+  {
+    "chunk_id": "grammar_relative_001",
+    "topic_code": "relative_clause",
+    "subtopic": "relative_clause_overview",
+    "skill": "grammar",
+    "level": "beginner",
+    "language": "english",
+    "content": "A relative clause gives more information about a noun. It usually begins with a relative pronoun such as who, which, that, where, or whose.",
+    "formula": "noun + relative pronoun + clause",
+    "examples": [
+      "The man who lives next door is a doctor.",
+      "This is the book that I bought yesterday."
+    ],
+    "common_mistakes": [
+      "Using who for things.",
+      "Using which for people in basic identifying clauses."
+    ],
+    "source": "teacher_authored_mvp_notes"
+  },
+  {
+    "chunk_id": "grammar_relative_002",
+    "topic_code": "relative_clause",
+    "subtopic": "who_for_people",
+    "skill": "grammar",
+    "level": "beginner",
+    "language": "english",
+    "content": "Use who in a relative clause when the noun refers to a person and the person is the subject of the relative clause.",
+    "formula": "person + who + verb",
+    "examples": [
+      "The teacher who helped me was very kind.",
+      "A student who studies regularly usually improves."
+    ],
+    "common_mistakes": [
+      "Using which for a person.",
+      "Leaving out who when it is the subject of the relative clause."
+    ],
+    "source": "teacher_authored_mvp_notes"
+  },
+  {
+    "chunk_id": "grammar_relative_003",
+    "topic_code": "relative_clause",
+    "subtopic": "which_for_things",
+    "skill": "grammar",
+    "level": "beginner",
+    "language": "english",
+    "content": "Use which in a relative clause when the noun refers to a thing, an animal, or an idea.",
+    "formula": "thing + which + clause",
+    "examples": [
+      "The laptop which I bought is very light.",
+      "The movie which won the prize was excellent."
+    ],
+    "common_mistakes": [
+      "Using who for objects.",
+      "Confusing which with where for places."
+    ],
+    "source": "teacher_authored_mvp_notes"
+  },
+  {
+    "chunk_id": "grammar_relative_004",
+    "topic_code": "relative_clause",
+    "subtopic": "where_for_places",
+    "skill": "grammar",
+    "level": "intermediate",
+    "language": "english",
+    "content": "Use where in a relative clause when the noun refers to a place and the clause describes what happens in that place.",
+    "formula": "place + where + subject + verb",
+    "examples": [
+      "This is the cafe where we first met.",
+      "I visited the village where my grandparents lived."
+    ],
+    "common_mistakes": [
+      "Using where for time expressions.",
+      "Using where when which plus a preposition is needed."
+    ],
+    "source": "teacher_authored_mvp_notes"
+  },
+  {
+    "chunk_id": "grammar_relative_005",
+    "topic_code": "relative_clause",
+    "subtopic": "defining_relative_clause",
+    "skill": "grammar",
+    "level": "intermediate",
+    "language": "english",
+    "content": "A defining relative clause identifies exactly which person or thing we mean. It is essential to the meaning and does not use commas.",
+    "formula": "noun + relative clause without commas",
+    "examples": [
+      "The woman who called you is my manager.",
+      "The file that you need is on the desk."
+    ],
+    "common_mistakes": [
+      "Adding commas around a defining relative clause.",
+      "Removing the relative clause when it is needed to identify the noun."
+    ],
+    "source": "teacher_authored_mvp_notes"
+  },
+  {
+    "chunk_id": "grammar_conditional_001",
+    "topic_code": "conditional_sentence",
+    "subtopic": "zero_conditional",
+    "skill": "grammar",
+    "level": "beginner",
+    "language": "english",
+    "content": "Zero conditional describes facts, general truths, and regular results. Use present simple in both clauses.",
+    "formula": "if + present simple, present simple",
+    "examples": [
+      "If water reaches 100 degrees Celsius, it boils.",
+      "If people exercise regularly, they feel healthier."
+    ],
+    "common_mistakes": [
+      "Using will in the result clause for general facts.",
+      "Using past tense for a general truth."
+    ],
+    "source": "teacher_authored_mvp_notes"
+  },
+  {
+    "chunk_id": "grammar_conditional_002",
+    "topic_code": "conditional_sentence",
+    "subtopic": "first_conditional",
+    "skill": "grammar",
+    "level": "beginner",
+    "language": "english",
+    "content": "First conditional describes a real possible situation in the future and its likely result. Use present simple after if and will in the result clause.",
+    "formula": "if + present simple, will + base verb",
+    "examples": [
+      "If it rains tomorrow, we will stay home.",
+      "If you study tonight, you will pass the quiz."
+    ],
+    "common_mistakes": [
+      "Using will directly after if.",
+      "Using past tense in the if clause for a real future possibility."
+    ],
+    "source": "teacher_authored_mvp_notes"
+  },
+  {
+    "chunk_id": "grammar_conditional_003",
+    "topic_code": "conditional_sentence",
+    "subtopic": "second_conditional",
+    "skill": "grammar",
+    "level": "intermediate",
+    "language": "english",
+    "content": "Second conditional describes unreal or unlikely situations in the present or future. Use past simple in the if clause and would with the base verb in the result clause.",
+    "formula": "if + past simple, would + base verb",
+    "examples": [
+      "If I had more time, I would learn French.",
+      "If she lived closer, she would visit more often."
+    ],
+    "common_mistakes": [
+      "Using would in the if clause.",
+      "Using present simple for an unreal situation."
+    ],
+    "source": "teacher_authored_mvp_notes"
+  },
+  {
+    "chunk_id": "grammar_conditional_004",
+    "topic_code": "conditional_sentence",
+    "subtopic": "third_conditional",
+    "skill": "grammar",
+    "level": "advanced",
+    "language": "english",
+    "content": "Third conditional describes unreal past situations and imagined past results. Use past perfect in the if clause and would have with the past participle in the result clause.",
+    "formula": "if + past perfect, would have + past participle",
+    "examples": [
+      "If I had known about the meeting, I would have attended.",
+      "If they had left earlier, they would have caught the train."
+    ],
+    "common_mistakes": [
+      "Using would have in the if clause.",
+      "Using past simple instead of past perfect."
+    ],
+    "source": "teacher_authored_mvp_notes"
+  },
+  {
+    "chunk_id": "grammar_reported_001",
+    "topic_code": "reported_speech",
+    "subtopic": "reported_speech_overview",
+    "skill": "grammar",
+    "level": "beginner",
+    "language": "english",
+    "content": "Reported speech tells someone what another person said without quoting the exact words. Tenses, pronouns, and time expressions often change.",
+    "formula": "reporting verb + that + reported clause",
+    "examples": [
+      "She said that she was tired.",
+      "He told me that he liked the book."
+    ],
+    "common_mistakes": [
+      "Keeping all pronouns the same as direct speech.",
+      "Forgetting to change the tense after a past reporting verb."
+    ],
+    "source": "teacher_authored_mvp_notes"
+  },
+  {
+    "chunk_id": "grammar_reported_002",
+    "topic_code": "reported_speech",
+    "subtopic": "reported_statements",
+    "skill": "grammar",
+    "level": "intermediate",
+    "language": "english",
+    "content": "When reporting statements with a past reporting verb, present simple often changes to past simple, and present continuous often changes to past continuous.",
+    "formula": "said/told + that + backshifted tense",
+    "examples": [
+      "Direct: I work here. Reported: She said that she worked there.",
+      "Direct: I am studying. Reported: He said that he was studying."
+    ],
+    "common_mistakes": [
+      "Using told without an object.",
+      "Not changing here to there when the context changes."
+    ],
+    "source": "teacher_authored_mvp_notes"
+  },
+  {
+    "chunk_id": "grammar_reported_003",
+    "topic_code": "reported_speech",
+    "subtopic": "reported_questions",
+    "skill": "grammar",
+    "level": "intermediate",
+    "language": "english",
+    "content": "Reported questions use statement word order after the question word or after if/whether. Do not use the auxiliary question order.",
+    "formula": "asked + question word/if/whether + subject + verb",
+    "examples": [
+      "She asked where I lived.",
+      "He asked if I could help him."
+    ],
+    "common_mistakes": [
+      "Keeping question word order in reported questions.",
+      "Forgetting if or whether for yes/no questions."
+    ],
+    "source": "teacher_authored_mvp_notes"
+  },
+  {
+    "chunk_id": "grammar_tenses_001",
+    "topic_code": "tenses",
+    "subtopic": "present_simple",
+    "skill": "grammar",
+    "level": "beginner",
+    "language": "english",
+    "content": "Present simple describes habits, routines, facts, and general truths. Add s or es to the verb with he, she, and it in affirmative sentences.",
+    "formula": "subject + base verb / verb-s",
+    "examples": [
+      "She studies English every day.",
+      "The sun rises in the east."
+    ],
+    "common_mistakes": [
+      "Forgetting s or es with third person singular subjects.",
+      "Using present continuous for permanent facts."
+    ],
+    "source": "teacher_authored_mvp_notes"
+  },
+  {
+    "chunk_id": "grammar_tenses_002",
+    "topic_code": "tenses",
+    "subtopic": "present_continuous",
+    "skill": "grammar",
+    "level": "beginner",
+    "language": "english",
+    "content": "Present continuous describes actions happening now or around now. Use am, is, or are with the -ing form of the verb.",
+    "formula": "subject + am/is/are + verb-ing",
+    "examples": [
+      "I am reading a book now.",
+      "They are preparing for the test this week."
+    ],
+    "common_mistakes": [
+      "Forgetting the verb be.",
+      "Using present continuous with stative verbs too often."
+    ],
+    "source": "teacher_authored_mvp_notes"
+  },
+  {
+    "chunk_id": "grammar_tenses_003",
+    "topic_code": "tenses",
+    "subtopic": "past_simple",
+    "skill": "grammar",
+    "level": "beginner",
+    "language": "english",
+    "content": "Past simple describes completed actions in the past. Regular verbs usually end in -ed, while irregular verbs have special past forms.",
+    "formula": "subject + past verb",
+    "examples": [
+      "We visited the museum yesterday.",
+      "She bought a new notebook last week."
+    ],
+    "common_mistakes": [
+      "Using the base verb after a past time expression.",
+      "Adding -ed to irregular verbs."
+    ],
+    "source": "teacher_authored_mvp_notes"
+  },
+  {
+    "chunk_id": "grammar_tenses_004",
+    "topic_code": "tenses",
+    "subtopic": "present_perfect",
+    "skill": "grammar",
+    "level": "intermediate",
+    "language": "english",
+    "content": "Present perfect connects the past with the present. Use have or has with the past participle for experiences, recent actions, or unfinished time periods.",
+    "formula": "subject + have/has + past participle",
+    "examples": [
+      "I have visited Singapore twice.",
+      "She has finished her homework."
+    ],
+    "common_mistakes": [
+      "Using present perfect with a finished past time such as yesterday.",
+      "Using have with he, she, or it."
+    ],
+    "source": "teacher_authored_mvp_notes"
+  },
+  {
+    "chunk_id": "grammar_prep_001",
+    "topic_code": "prepositions",
+    "subtopic": "prepositions_of_time",
+    "skill": "grammar",
+    "level": "beginner",
+    "language": "english",
+    "content": "Use at for clock times, on for days and dates, and in for months, years, seasons, and longer periods.",
+    "formula": "at + time, on + day/date, in + month/year/season",
+    "examples": [
+      "The meeting starts at 9 a.m.",
+      "We have class on Monday.",
+      "She was born in 2005."
+    ],
+    "common_mistakes": [
+      "Using in with specific days.",
+      "Using on with clock times."
+    ],
+    "source": "teacher_authored_mvp_notes"
+  },
+  {
+    "chunk_id": "grammar_prep_002",
+    "topic_code": "prepositions",
+    "subtopic": "prepositions_of_place",
+    "skill": "grammar",
+    "level": "beginner",
+    "language": "english",
+    "content": "Use in for enclosed or larger areas, on for surfaces, and at for specific points or locations.",
+    "formula": "in + area/container, on + surface, at + point",
+    "examples": [
+      "The keys are in the bag.",
+      "The picture is on the wall.",
+      "I am waiting at the bus stop."
+    ],
+    "common_mistakes": [
+      "Using on for enclosed spaces.",
+      "Using in for a specific meeting point."
+    ],
+    "source": "teacher_authored_mvp_notes"
+  },
+  {
+    "chunk_id": "grammar_prep_003",
+    "topic_code": "prepositions",
+    "subtopic": "dependent_prepositions",
+    "skill": "grammar",
+    "level": "intermediate",
+    "language": "english",
+    "content": "Some adjectives, verbs, and nouns are commonly followed by fixed prepositions. These combinations should be learned as chunks.",
+    "formula": "word + dependent preposition",
+    "examples": [
+      "She is interested in science.",
+      "He depends on his team.",
+      "They are responsible for the project."
+    ],
+    "common_mistakes": [
+      "Translating prepositions directly from Vietnamese.",
+      "Using about after interested instead of in."
+    ],
+    "source": "teacher_authored_mvp_notes"
+  },
+  {
+    "chunk_id": "vocab_travel_001",
+    "topic_code": "travel_vocabulary",
+    "subtopic": "airport_vocabulary",
+    "skill": "vocabulary",
+    "level": "beginner",
+    "language": "english",
+    "content": "Airport vocabulary includes boarding pass, gate, luggage, passport, security check, and departure. These words are useful for basic travel conversations.",
+    "formula": "",
+    "examples": [
+      "Please show your boarding pass at the gate.",
+      "My luggage is too heavy."
+    ],
+    "common_mistakes": [
+      "Confusing luggage with language.",
+      "Using ticket when boarding pass is more specific."
+    ],
+    "source": "teacher_authored_mvp_notes"
+  },
+  {
+    "chunk_id": "vocab_travel_002",
+    "topic_code": "travel_vocabulary",
+    "subtopic": "hotel_vocabulary",
+    "skill": "vocabulary",
+    "level": "beginner",
+    "language": "english",
+    "content": "Hotel vocabulary includes reservation, reception, check in, check out, room key, single room, double room, and accommodation.",
+    "formula": "",
+    "examples": [
+      "I have a reservation for two nights.",
+      "What time is check-out?"
+    ],
+    "common_mistakes": [
+      "Confusing reservation with preservation.",
+      "Using house when hotel room is intended."
+    ],
+    "source": "teacher_authored_mvp_notes"
+  }
+]
