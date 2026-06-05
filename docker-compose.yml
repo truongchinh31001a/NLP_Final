@@ -1,12 +1,40 @@
 services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: english-exercise-ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
   backend:
     build:
       context: .
       dockerfile: Dockerfile.backend
     container_name: english-exercise-backend
+    depends_on:
+      ollama:
+        condition: service_started
     environment:
       CORS_ORIGINS: http://localhost:3000
+      LEARNING_REPOSITORY_BACKEND: sqlite
+      SQLITE_DB_PATH: /workspace/data/sqlite/app.db
       VECTOR_STORE_BACKEND: inmemory
+      LLM_BACKEND: ${LLM_BACKEND:-ollama}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b}
+      OLLAMA_BASE_URL: ${DOCKER_OLLAMA_BASE_URL:-http://ollama:11434}
+      GENERATION_LLM_TIMEOUT_SECONDS: ${GENERATION_LLM_TIMEOUT_SECONDS:-20}
+      REVIEW_LLM_TIMEOUT_SECONDS: ${REVIEW_LLM_TIMEOUT_SECONDS:-8}
+      ONBOARDING_LLM_TIMEOUT_SECONDS: ${ONBOARDING_LLM_TIMEOUT_SECONDS:-35}
+      PRACTICE_INTENT_LLM_TIMEOUT_SECONDS: ${PRACTICE_INTENT_LLM_TIMEOUT_SECONDS:-25}
+      SEED_FIRST_GENERATION: ${SEED_FIRST_GENERATION:-false}
+    volumes:
+      - ./data:/workspace/data
     ports:
       - "8000:8000"
 
@@ -21,3 +49,6 @@ services:
       - backend
     ports:
       - "3000:3000"
+
+volumes:
+  ollama_data:

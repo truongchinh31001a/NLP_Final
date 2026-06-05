@@ -158,6 +158,33 @@ travel_vocabulary
 "Hom nay luyen lai phan minh sai nhieu nhat"
 ```
 
+### Note can bo sung sau: topic hoc vs theme noi dung
+
+Hien tai he thong da co truong `content_theme` de ghi nho so thich nguoi dung
+nhu `anime`, nhung chua enforce manh khi sinh de. Can phan biet ro:
+
+```text
+learning_topic  -> noi dung can hoc: tenses, passive_voice, vocabulary, ...
+content_theme   -> boi canh vi du theo so thich: anime, travel, daily life, ...
+```
+
+Van de hien tai:
+
+- Prompt generation da nhan `content_theme`, nhung ket qua van phu thuoc LLM.
+- Seed-bank fallback chi uu tien theme, chua bat buoc dung theme neu khong du cau.
+- Frontend fallback moi co bo anime grammar co ban, vocabulary/theme fallback con mong.
+- Neu LLM timeout hoac backend loi, bai co the bi roi ve cau hoi chung/travel/basic.
+- Case "thich anime, tao tu vung" co the bi lech sang ngu phap hoac khong co anime vibe.
+
+Huong bo sung sau:
+
+- Tach ten field ro hon: `learning_topic` va `content_theme`.
+- Mo rong `SUPPORTED_CONTENT_THEMES` thay vi chi co `anime`.
+- Them validator kiem tra bai co bam `content_theme` hay khong.
+- Neu theme duoc user yeu cau ro, fallback khong duoc tu y roi ve theme chung ma can bao ly do.
+- Them seed exercises theo theme cho vocabulary, grammar va tung topic pho bien.
+- Luu `content_theme`, `generation_status`, `fallback_reason` vao `generation_runs`.
+
 ---
 
 ## 6. Agentic AI nang cao

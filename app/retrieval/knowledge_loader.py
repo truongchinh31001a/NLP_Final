@@ -55,6 +55,20 @@ def load_knowledge_documents(path: str | Path) -> list[Document]:
 
 
 def knowledge_record_to_document(record: dict[str, Any]) -> Document:
+    page_content = "\n".join(
+        part
+        for part in [
+            f"Topic: {record['topic_code'].replace('_', ' ')}",
+            f"Subtopic: {str(record['subtopic']).replace('_', ' ')}",
+            f"Level: {record['level']}",
+            f"Skill: {record['skill']}",
+            f"Content: {record['content']}",
+            f"Formula: {record.get('formula', '')}",
+            "Examples: " + " | ".join(record.get("examples", [])),
+            "Common mistakes: " + " | ".join(record.get("common_mistakes", [])),
+        ]
+        if part.strip()
+    )
     metadata = {
         "chunk_id": record["chunk_id"],
         "topic": record["topic_code"],
@@ -71,4 +85,4 @@ def knowledge_record_to_document(record: dict[str, Any]) -> Document:
             ensure_ascii=False,
         ),
     }
-    return Document(page_content=record["content"], metadata=metadata)
+    return Document(page_content=page_content, metadata=metadata)

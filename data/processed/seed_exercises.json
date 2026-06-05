@@ -1,0 +1,2002 @@
+[
+  {
+    "exercise_code": "seed_passive_001",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "passive_voice",
+    "subtopic": "present_simple_passive",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "grammar",
+    "question_text": "The room ____ every day.",
+    "options": [
+      { "label": "A", "text": "cleans", "is_correct": false },
+      { "label": "B", "text": "is cleaned", "is_correct": true },
+      { "label": "C", "text": "cleaned", "is_correct": false },
+      { "label": "D", "text": "cleaning", "is_correct": false }
+    ],
+    "correct_answer": "B",
+    "explanation": "Present simple passive uses am/is/are + past participle.",
+    "error_tag": "missing_be",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_passive_002",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "passive_voice",
+    "subtopic": "past_simple_passive",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "grammar",
+    "question_text": "The window ____ yesterday.",
+    "options": [
+      { "label": "A", "text": "was broken", "is_correct": true },
+      { "label": "B", "text": "broke", "is_correct": false },
+      { "label": "C", "text": "was break", "is_correct": false },
+      { "label": "D", "text": "has broken", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "Past simple passive uses was/were + past participle.",
+    "error_tag": "wrong_participle",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_passive_003",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "passive_voice",
+    "subtopic": "future_passive",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "The report ____ tomorrow morning.",
+    "options": [
+      { "label": "A", "text": "will send", "is_correct": false },
+      { "label": "B", "text": "will sent", "is_correct": false },
+      { "label": "C", "text": "will be sent", "is_correct": true },
+      { "label": "D", "text": "is send", "is_correct": false }
+    ],
+    "correct_answer": "C",
+    "explanation": "Future passive uses will be + past participle.",
+    "error_tag": "missing_be",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_passive_004",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "passive_voice",
+    "subtopic": "passive_with_by_agent",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "The song was written ____ a young composer.",
+    "options": [
+      { "label": "A", "text": "from", "is_correct": false },
+      { "label": "B", "text": "by", "is_correct": true },
+      { "label": "C", "text": "with", "is_correct": false },
+      { "label": "D", "text": "to", "is_correct": false }
+    ],
+    "correct_answer": "B",
+    "explanation": "Use by to mention the agent in a passive sentence.",
+    "error_tag": "active_passive_confusion",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_passive_005",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "passive_voice",
+    "subtopic": "active_to_passive",
+    "level": "beginner",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "Choose the passive form: They clean the office every night.",
+    "options": [
+      { "label": "A", "text": "The office cleans every night.", "is_correct": false },
+      { "label": "B", "text": "The office cleaned every night.", "is_correct": false },
+      { "label": "C", "text": "The office is clean every night.", "is_correct": false },
+      { "label": "D", "text": "The office is cleaned every night.", "is_correct": true }
+    ],
+    "correct_answer": "D",
+    "explanation": "The object becomes the subject, then use is + cleaned.",
+    "error_tag": "active_passive_confusion",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_passive_006",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "passive_voice",
+    "subtopic": "present_simple_passive_plural",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "grammar",
+    "question_text": "These emails ____ automatically.",
+    "options": [
+      { "label": "A", "text": "is sent", "is_correct": false },
+      { "label": "B", "text": "are sent", "is_correct": true },
+      { "label": "C", "text": "sent", "is_correct": false },
+      { "label": "D", "text": "are send", "is_correct": false }
+    ],
+    "correct_answer": "B",
+    "explanation": "Plural subjects use are + past participle in the present passive.",
+    "error_tag": "wrong_tense",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_passive_007",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "passive_voice",
+    "subtopic": "negative_passive",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "grammar",
+    "question_text": "The door ____ locked during the day.",
+    "options": [
+      { "label": "A", "text": "not is", "is_correct": false },
+      { "label": "B", "text": "does not", "is_correct": false },
+      { "label": "C", "text": "is not", "is_correct": true },
+      { "label": "D", "text": "not be", "is_correct": false }
+    ],
+    "correct_answer": "C",
+    "explanation": "Negative passive places not after the be verb: is not locked.",
+    "error_tag": "missing_be",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_passive_008",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "passive_voice",
+    "subtopic": "modal_passive",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "The form must ____ before Friday.",
+    "options": [
+      { "label": "A", "text": "submit", "is_correct": false },
+      { "label": "B", "text": "submitted", "is_correct": false },
+      { "label": "C", "text": "be submitted", "is_correct": true },
+      { "label": "D", "text": "be submit", "is_correct": false }
+    ],
+    "correct_answer": "C",
+    "explanation": "Modal passive uses modal + be + past participle.",
+    "error_tag": "missing_be",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_passive_009",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "passive_voice",
+    "subtopic": "present_perfect_passive",
+    "level": "intermediate",
+    "difficulty": "hard",
+    "skill": "grammar",
+    "question_text": "The documents ____ already ____.",
+    "options": [
+      { "label": "A", "text": "are / checked", "is_correct": false },
+      { "label": "B", "text": "have / checked", "is_correct": false },
+      { "label": "C", "text": "were / checking", "is_correct": false },
+      { "label": "D", "text": "have been / checked", "is_correct": true }
+    ],
+    "correct_answer": "D",
+    "explanation": "Present perfect passive uses have/has been + past participle.",
+    "error_tag": "wrong_tense",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_passive_010",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "passive_voice",
+    "subtopic": "passive_questions",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "Where ____ the keys kept?",
+    "options": [
+      { "label": "A", "text": "is", "is_correct": false },
+      { "label": "B", "text": "are", "is_correct": true },
+      { "label": "C", "text": "do", "is_correct": false },
+      { "label": "D", "text": "be", "is_correct": false }
+    ],
+    "correct_answer": "B",
+    "explanation": "Passive questions still use the correct be verb before the subject.",
+    "error_tag": "missing_be",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_tenses_001",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "tenses",
+    "subtopic": "present_simple_habits",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "grammar",
+    "question_text": "She ____ coffee every morning.",
+    "options": [
+      { "label": "A", "text": "drink", "is_correct": false },
+      { "label": "B", "text": "drinks", "is_correct": true },
+      { "label": "C", "text": "is drinking", "is_correct": false },
+      { "label": "D", "text": "drank", "is_correct": false }
+    ],
+    "correct_answer": "B",
+    "explanation": "Use present simple for habits; third-person singular adds s.",
+    "error_tag": "subject_verb_agreement",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_tenses_002",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "tenses",
+    "subtopic": "present_continuous_now",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "grammar",
+    "question_text": "Look! The children ____ in the garden.",
+    "options": [
+      { "label": "A", "text": "play", "is_correct": false },
+      { "label": "B", "text": "played", "is_correct": false },
+      { "label": "C", "text": "are playing", "is_correct": true },
+      { "label": "D", "text": "plays", "is_correct": false }
+    ],
+    "correct_answer": "C",
+    "explanation": "Use present continuous for actions happening now.",
+    "error_tag": "wrong_tense",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_tenses_003",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "tenses",
+    "subtopic": "past_simple_finished_time",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "grammar",
+    "question_text": "I ____ my homework last night.",
+    "options": [
+      { "label": "A", "text": "finish", "is_correct": false },
+      { "label": "B", "text": "finished", "is_correct": true },
+      { "label": "C", "text": "have finished", "is_correct": false },
+      { "label": "D", "text": "am finishing", "is_correct": false }
+    ],
+    "correct_answer": "B",
+    "explanation": "Use past simple with finished time expressions like last night.",
+    "error_tag": "wrong_tense",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_tenses_004",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "tenses",
+    "subtopic": "present_perfect_since",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "They ____ here since 2020.",
+    "options": [
+      { "label": "A", "text": "live", "is_correct": false },
+      { "label": "B", "text": "lived", "is_correct": false },
+      { "label": "C", "text": "have lived", "is_correct": true },
+      { "label": "D", "text": "are living", "is_correct": false }
+    ],
+    "correct_answer": "C",
+    "explanation": "Use present perfect with since to connect past and present.",
+    "error_tag": "present_perfect_confusion",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_tenses_005",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "tenses",
+    "subtopic": "past_continuous_interrupted_action",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "I ____ dinner when the phone rang.",
+    "options": [
+      { "label": "A", "text": "cook", "is_correct": false },
+      { "label": "B", "text": "was cooking", "is_correct": true },
+      { "label": "C", "text": "have cooked", "is_correct": false },
+      { "label": "D", "text": "am cooking", "is_correct": false }
+    ],
+    "correct_answer": "B",
+    "explanation": "Past continuous describes the longer action interrupted by a past simple action.",
+    "error_tag": "wrong_tense",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_tenses_006",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "tenses",
+    "subtopic": "future_going_to_plan",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "grammar",
+    "question_text": "We ____ visit our grandparents this weekend.",
+    "options": [
+      { "label": "A", "text": "are going to", "is_correct": true },
+      { "label": "B", "text": "were going", "is_correct": false },
+      { "label": "C", "text": "go", "is_correct": false },
+      { "label": "D", "text": "went to", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "Use be going to for planned future actions.",
+    "error_tag": "wrong_future_form",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_tenses_007",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "tenses",
+    "subtopic": "present_perfect_experience",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "Have you ever ____ sushi?",
+    "options": [
+      { "label": "A", "text": "eat", "is_correct": false },
+      { "label": "B", "text": "ate", "is_correct": false },
+      { "label": "C", "text": "eaten", "is_correct": true },
+      { "label": "D", "text": "eating", "is_correct": false }
+    ],
+    "correct_answer": "C",
+    "explanation": "Present perfect questions use have/has + past participle.",
+    "error_tag": "wrong_participle",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_tenses_008",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "tenses",
+    "subtopic": "past_perfect_sequence",
+    "level": "intermediate",
+    "difficulty": "hard",
+    "skill": "grammar",
+    "question_text": "By the time we arrived, the movie ____.",
+    "options": [
+      { "label": "A", "text": "starts", "is_correct": false },
+      { "label": "B", "text": "started", "is_correct": false },
+      { "label": "C", "text": "had started", "is_correct": true },
+      { "label": "D", "text": "has started", "is_correct": false }
+    ],
+    "correct_answer": "C",
+    "explanation": "Past perfect shows the action that happened before another past action.",
+    "error_tag": "past_perfect_confusion",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_tenses_009",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "tenses",
+    "subtopic": "stative_verbs",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "I ____ this answer is correct.",
+    "options": [
+      { "label": "A", "text": "am thinking", "is_correct": false },
+      { "label": "B", "text": "think", "is_correct": true },
+      { "label": "C", "text": "was thinking", "is_correct": false },
+      { "label": "D", "text": "have thinking", "is_correct": false }
+    ],
+    "correct_answer": "B",
+    "explanation": "Think meaning believe is usually used as a stative verb.",
+    "error_tag": "stative_verb_error",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_tenses_010",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "tenses",
+    "subtopic": "future_will_prediction",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "grammar",
+    "question_text": "I think it ____ rain later.",
+    "options": [
+      { "label": "A", "text": "will", "is_correct": true },
+      { "label": "B", "text": "did", "is_correct": false },
+      { "label": "C", "text": "has", "is_correct": false },
+      { "label": "D", "text": "was", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "Use will for predictions based on opinion.",
+    "error_tag": "wrong_future_form",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_relative_001",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "relative_clause",
+    "subtopic": "who_for_people",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "grammar",
+    "question_text": "The woman ____ lives next door is a doctor.",
+    "options": [
+      { "label": "A", "text": "which", "is_correct": false },
+      { "label": "B", "text": "who", "is_correct": true },
+      { "label": "C", "text": "where", "is_correct": false },
+      { "label": "D", "text": "when", "is_correct": false }
+    ],
+    "correct_answer": "B",
+    "explanation": "Use who for people in relative clauses.",
+    "error_tag": "wrong_relative_pronoun",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_relative_002",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "relative_clause",
+    "subtopic": "which_for_things",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "grammar",
+    "question_text": "This is the phone ____ I bought yesterday.",
+    "options": [
+      { "label": "A", "text": "who", "is_correct": false },
+      { "label": "B", "text": "where", "is_correct": false },
+      { "label": "C", "text": "which", "is_correct": true },
+      { "label": "D", "text": "whose", "is_correct": false }
+    ],
+    "correct_answer": "C",
+    "explanation": "Use which for things.",
+    "error_tag": "wrong_relative_pronoun",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_relative_003",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "relative_clause",
+    "subtopic": "where_for_places",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "grammar",
+    "question_text": "This is the cafe ____ we met.",
+    "options": [
+      { "label": "A", "text": "where", "is_correct": true },
+      { "label": "B", "text": "who", "is_correct": false },
+      { "label": "C", "text": "whose", "is_correct": false },
+      { "label": "D", "text": "when", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "Use where to refer to a place.",
+    "error_tag": "wrong_relative_pronoun",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_relative_004",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "relative_clause",
+    "subtopic": "whose_for_possession",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "The student ____ laptop was stolen called the police.",
+    "options": [
+      { "label": "A", "text": "who", "is_correct": false },
+      { "label": "B", "text": "whose", "is_correct": true },
+      { "label": "C", "text": "which", "is_correct": false },
+      { "label": "D", "text": "where", "is_correct": false }
+    ],
+    "correct_answer": "B",
+    "explanation": "Use whose to show possession.",
+    "error_tag": "wrong_relative_pronoun",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_relative_005",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "relative_clause",
+    "subtopic": "that_for_people_or_things",
+    "level": "beginner",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "The book ____ you recommended was excellent.",
+    "options": [
+      { "label": "A", "text": "that", "is_correct": true },
+      { "label": "B", "text": "where", "is_correct": false },
+      { "label": "C", "text": "who", "is_correct": false },
+      { "label": "D", "text": "whose", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "That can refer to things in defining relative clauses.",
+    "error_tag": "wrong_relative_pronoun",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_relative_006",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "relative_clause",
+    "subtopic": "object_relative_pronoun",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "The man ____ I saw at the station is my teacher.",
+    "options": [
+      { "label": "A", "text": "which", "is_correct": false },
+      { "label": "B", "text": "whom", "is_correct": true },
+      { "label": "C", "text": "where", "is_correct": false },
+      { "label": "D", "text": "when", "is_correct": false }
+    ],
+    "correct_answer": "B",
+    "explanation": "Whom can be used for a person as the object of a relative clause.",
+    "error_tag": "wrong_relative_pronoun",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_relative_007",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "relative_clause",
+    "subtopic": "relative_clause_word_order",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "Choose the correct sentence.",
+    "options": [
+      { "label": "A", "text": "The girl who sits near me is kind.", "is_correct": true },
+      { "label": "B", "text": "The girl who near me sits is kind.", "is_correct": false },
+      { "label": "C", "text": "The girl sits who near me is kind.", "is_correct": false },
+      { "label": "D", "text": "The girl who is kind sits near me is.", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "A relative clause follows normal clause word order after the relative pronoun.",
+    "error_tag": "relative_clause_word_order",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_relative_008",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "relative_clause",
+    "subtopic": "non_defining_relative_clause",
+    "level": "intermediate",
+    "difficulty": "hard",
+    "skill": "grammar",
+    "question_text": "My brother, ____ lives in Canada, is visiting us.",
+    "options": [
+      { "label": "A", "text": "that", "is_correct": false },
+      { "label": "B", "text": "who", "is_correct": true },
+      { "label": "C", "text": "where", "is_correct": false },
+      { "label": "D", "text": "which", "is_correct": false }
+    ],
+    "correct_answer": "B",
+    "explanation": "Use who, not that, in a non-defining relative clause about a person.",
+    "error_tag": "wrong_relative_pronoun",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_relative_009",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "relative_clause",
+    "subtopic": "omitted_relative_pronoun",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "Choose the sentence where the relative pronoun is correctly omitted.",
+    "options": [
+      { "label": "A", "text": "The movie I watched was funny.", "is_correct": true },
+      { "label": "B", "text": "The man lives next door is friendly.", "is_correct": false },
+      { "label": "C", "text": "The city I live is busy.", "is_correct": false },
+      { "label": "D", "text": "The student won the prize is absent.", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "An object relative pronoun can be omitted, but a subject relative pronoun cannot.",
+    "error_tag": "missing_relative_pronoun",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_relative_010",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "relative_clause",
+    "subtopic": "when_for_time",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "grammar",
+    "question_text": "I remember the day ____ we first met.",
+    "options": [
+      { "label": "A", "text": "where", "is_correct": false },
+      { "label": "B", "text": "who", "is_correct": false },
+      { "label": "C", "text": "when", "is_correct": true },
+      { "label": "D", "text": "whose", "is_correct": false }
+    ],
+    "correct_answer": "C",
+    "explanation": "Use when to refer to a time.",
+    "error_tag": "wrong_relative_pronoun",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_conditional_001",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "conditional_sentence",
+    "subtopic": "zero_conditional",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "grammar",
+    "question_text": "If you heat water to 100 degrees Celsius, it ____.",
+    "options": [
+      { "label": "A", "text": "boils", "is_correct": true },
+      { "label": "B", "text": "boiled", "is_correct": false },
+      { "label": "C", "text": "will boil", "is_correct": false },
+      { "label": "D", "text": "would boil", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "Zero conditional uses present simple in both clauses for facts.",
+    "error_tag": "wrong_condition_type",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_conditional_002",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "conditional_sentence",
+    "subtopic": "first_conditional",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "grammar",
+    "question_text": "If it rains tomorrow, we ____ at home.",
+    "options": [
+      { "label": "A", "text": "stay", "is_correct": false },
+      { "label": "B", "text": "stayed", "is_correct": false },
+      { "label": "C", "text": "will stay", "is_correct": true },
+      { "label": "D", "text": "would stay", "is_correct": false }
+    ],
+    "correct_answer": "C",
+    "explanation": "First conditional uses if + present simple, will + base verb.",
+    "error_tag": "wrong_condition_type",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_conditional_003",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "conditional_sentence",
+    "subtopic": "second_conditional",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "If I had more time, I ____ a new language.",
+    "options": [
+      { "label": "A", "text": "learn", "is_correct": false },
+      { "label": "B", "text": "will learn", "is_correct": false },
+      { "label": "C", "text": "would learn", "is_correct": true },
+      { "label": "D", "text": "learned", "is_correct": false }
+    ],
+    "correct_answer": "C",
+    "explanation": "Second conditional uses if + past simple, would + base verb.",
+    "error_tag": "wrong_verb_form",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_conditional_004",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "conditional_sentence",
+    "subtopic": "third_conditional",
+    "level": "intermediate",
+    "difficulty": "hard",
+    "skill": "grammar",
+    "question_text": "If she had studied harder, she ____ the exam.",
+    "options": [
+      { "label": "A", "text": "will pass", "is_correct": false },
+      { "label": "B", "text": "would pass", "is_correct": false },
+      { "label": "C", "text": "would have passed", "is_correct": true },
+      { "label": "D", "text": "passed", "is_correct": false }
+    ],
+    "correct_answer": "C",
+    "explanation": "Third conditional uses if + past perfect, would have + past participle.",
+    "error_tag": "wrong_condition_type",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_conditional_005",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "conditional_sentence",
+    "subtopic": "unless",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "You will miss the bus ____ you hurry.",
+    "options": [
+      { "label": "A", "text": "if", "is_correct": false },
+      { "label": "B", "text": "unless", "is_correct": true },
+      { "label": "C", "text": "because", "is_correct": false },
+      { "label": "D", "text": "although", "is_correct": false }
+    ],
+    "correct_answer": "B",
+    "explanation": "Unless means if not.",
+    "error_tag": "conditional_connector_error",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_conditional_006",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "conditional_sentence",
+    "subtopic": "first_conditional_if_clause",
+    "level": "beginner",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "If he ____ early, he will call us.",
+    "options": [
+      { "label": "A", "text": "arrives", "is_correct": true },
+      { "label": "B", "text": "will arrive", "is_correct": false },
+      { "label": "C", "text": "arrived", "is_correct": false },
+      { "label": "D", "text": "would arrive", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "Do not use will in the if-clause of a first conditional.",
+    "error_tag": "will_in_if_clause",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_conditional_007",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "conditional_sentence",
+    "subtopic": "mixed_conditional",
+    "level": "advanced",
+    "difficulty": "hard",
+    "skill": "grammar",
+    "question_text": "If I had saved more money, I ____ a better car now.",
+    "options": [
+      { "label": "A", "text": "will buy", "is_correct": false },
+      { "label": "B", "text": "would have bought", "is_correct": false },
+      { "label": "C", "text": "would buy", "is_correct": true },
+      { "label": "D", "text": "bought", "is_correct": false }
+    ],
+    "correct_answer": "C",
+    "explanation": "This mixed conditional connects a past condition with a present result.",
+    "error_tag": "wrong_condition_type",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_conditional_008",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "conditional_sentence",
+    "subtopic": "second_conditional_be",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "If I ____ you, I would apologize.",
+    "options": [
+      { "label": "A", "text": "am", "is_correct": false },
+      { "label": "B", "text": "was", "is_correct": false },
+      { "label": "C", "text": "were", "is_correct": true },
+      { "label": "D", "text": "will be", "is_correct": false }
+    ],
+    "correct_answer": "C",
+    "explanation": "In formal second conditional, use were with all subjects.",
+    "error_tag": "wrong_verb_form",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_conditional_009",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "conditional_sentence",
+    "subtopic": "unless_rewrite",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "Choose the sentence with the same meaning: If you do not study, you will fail.",
+    "options": [
+      { "label": "A", "text": "Unless you study, you will fail.", "is_correct": true },
+      { "label": "B", "text": "Unless you do not study, you will fail.", "is_correct": false },
+      { "label": "C", "text": "If you study, you will fail.", "is_correct": false },
+      { "label": "D", "text": "Unless you study, you will pass.", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "Unless already means if not, so do not add another negative.",
+    "error_tag": "conditional_connector_error",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_conditional_010",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "conditional_sentence",
+    "subtopic": "third_conditional_past_participle",
+    "level": "intermediate",
+    "difficulty": "hard",
+    "skill": "grammar",
+    "question_text": "If they had left earlier, they would have ____ the train.",
+    "options": [
+      { "label": "A", "text": "catch", "is_correct": false },
+      { "label": "B", "text": "caught", "is_correct": true },
+      { "label": "C", "text": "catching", "is_correct": false },
+      { "label": "D", "text": "catched", "is_correct": false }
+    ],
+    "correct_answer": "B",
+    "explanation": "Would have is followed by a past participle.",
+    "error_tag": "wrong_verb_form",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_reported_001",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "reported_speech",
+    "subtopic": "statement_backshift",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "Direct: She said, \"I am tired.\" Reported: She said that she ____ tired.",
+    "options": [
+      { "label": "A", "text": "is", "is_correct": false },
+      { "label": "B", "text": "was", "is_correct": true },
+      { "label": "C", "text": "were", "is_correct": false },
+      { "label": "D", "text": "has been", "is_correct": false }
+    ],
+    "correct_answer": "B",
+    "explanation": "In reported speech, present simple often backshifts to past simple.",
+    "error_tag": "reported_speech_backshift_error",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_reported_002",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "reported_speech",
+    "subtopic": "pronoun_change",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "Direct: Tom said, \"I like my job.\" Reported: Tom said that ____ liked ____ job.",
+    "options": [
+      { "label": "A", "text": "I / my", "is_correct": false },
+      { "label": "B", "text": "he / his", "is_correct": true },
+      { "label": "C", "text": "she / her", "is_correct": false },
+      { "label": "D", "text": "they / their", "is_correct": false }
+    ],
+    "correct_answer": "B",
+    "explanation": "Pronouns change according to the speaker and context.",
+    "error_tag": "wrong_pronoun_shift",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_reported_003",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "reported_speech",
+    "subtopic": "reported_yes_no_question",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "Direct: \"Do you speak English?\" He asked me ____ English.",
+    "options": [
+      { "label": "A", "text": "do I speak", "is_correct": false },
+      { "label": "B", "text": "if I spoke", "is_correct": true },
+      { "label": "C", "text": "if did I speak", "is_correct": false },
+      { "label": "D", "text": "that I speak", "is_correct": false }
+    ],
+    "correct_answer": "B",
+    "explanation": "Reported yes/no questions use if or whether and statement word order.",
+    "error_tag": "reported_question_word_order",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_reported_004",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "reported_speech",
+    "subtopic": "reported_wh_question",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "Direct: \"Where do you live?\" She asked me where ____.",
+    "options": [
+      { "label": "A", "text": "did I live", "is_correct": false },
+      { "label": "B", "text": "I lived", "is_correct": true },
+      { "label": "C", "text": "do I live", "is_correct": false },
+      { "label": "D", "text": "I live?", "is_correct": false }
+    ],
+    "correct_answer": "B",
+    "explanation": "Reported wh-questions use statement word order.",
+    "error_tag": "reported_question_word_order",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_reported_005",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "reported_speech",
+    "subtopic": "reported_command",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "Direct: \"Close the door,\" the teacher said. Reported: The teacher told me ____ the door.",
+    "options": [
+      { "label": "A", "text": "close", "is_correct": false },
+      { "label": "B", "text": "to close", "is_correct": true },
+      { "label": "C", "text": "closing", "is_correct": false },
+      { "label": "D", "text": "closed", "is_correct": false }
+    ],
+    "correct_answer": "B",
+    "explanation": "Reported commands often use told + object + to-infinitive.",
+    "error_tag": "reported_command_form_error",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_reported_006",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "reported_speech",
+    "subtopic": "time_expression_change",
+    "level": "intermediate",
+    "difficulty": "hard",
+    "skill": "grammar",
+    "question_text": "Direct: He said, \"I will call you tomorrow.\" Reported: He said he would call me ____.",
+    "options": [
+      { "label": "A", "text": "tomorrow", "is_correct": false },
+      { "label": "B", "text": "the next day", "is_correct": true },
+      { "label": "C", "text": "yesterday", "is_correct": false },
+      { "label": "D", "text": "now", "is_correct": false }
+    ],
+    "correct_answer": "B",
+    "explanation": "Tomorrow often changes to the next day in reported speech.",
+    "error_tag": "time_expression_shift_error",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_reported_007",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "reported_speech",
+    "subtopic": "modal_backshift",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "Direct: Anna said, \"I can swim.\" Reported: Anna said that she ____ swim.",
+    "options": [
+      { "label": "A", "text": "can", "is_correct": false },
+      { "label": "B", "text": "could", "is_correct": true },
+      { "label": "C", "text": "will", "is_correct": false },
+      { "label": "D", "text": "should", "is_correct": false }
+    ],
+    "correct_answer": "B",
+    "explanation": "Can usually backshifts to could in reported speech.",
+    "error_tag": "reported_speech_backshift_error",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_reported_008",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "reported_speech",
+    "subtopic": "say_vs_tell",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "grammar",
+    "question_text": "She ____ me that she was busy.",
+    "options": [
+      { "label": "A", "text": "said", "is_correct": false },
+      { "label": "B", "text": "told", "is_correct": true },
+      { "label": "C", "text": "spoke", "is_correct": false },
+      { "label": "D", "text": "talked", "is_correct": false }
+    ],
+    "correct_answer": "B",
+    "explanation": "Use told with an object: told me.",
+    "error_tag": "say_tell_confusion",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_reported_009",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "reported_speech",
+    "subtopic": "negative_command",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "Direct: \"Do not touch that,\" he said. Reported: He told me ____ that.",
+    "options": [
+      { "label": "A", "text": "not touch", "is_correct": false },
+      { "label": "B", "text": "not to touch", "is_correct": true },
+      { "label": "C", "text": "to not touching", "is_correct": false },
+      { "label": "D", "text": "do not touch", "is_correct": false }
+    ],
+    "correct_answer": "B",
+    "explanation": "Negative reported commands use not + to-infinitive.",
+    "error_tag": "reported_command_form_error",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_reported_010",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "reported_speech",
+    "subtopic": "no_backshift_current_truth",
+    "level": "intermediate",
+    "difficulty": "hard",
+    "skill": "grammar",
+    "question_text": "The teacher said that water ____ at 100 degrees Celsius.",
+    "options": [
+      { "label": "A", "text": "boils", "is_correct": true },
+      { "label": "B", "text": "boiled", "is_correct": false },
+      { "label": "C", "text": "would boil", "is_correct": false },
+      { "label": "D", "text": "has boiled", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "Backshift is not necessary for general truths.",
+    "error_tag": "reported_speech_backshift_error",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_preposition_001",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "prepositions",
+    "subtopic": "time_at",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "grammar",
+    "question_text": "The meeting starts ____ 9 a.m.",
+    "options": [
+      { "label": "A", "text": "on", "is_correct": false },
+      { "label": "B", "text": "in", "is_correct": false },
+      { "label": "C", "text": "at", "is_correct": true },
+      { "label": "D", "text": "by", "is_correct": false }
+    ],
+    "correct_answer": "C",
+    "explanation": "Use at for exact times.",
+    "error_tag": "preposition_time_error",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_preposition_002",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "prepositions",
+    "subtopic": "time_on",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "grammar",
+    "question_text": "My birthday is ____ Monday.",
+    "options": [
+      { "label": "A", "text": "in", "is_correct": false },
+      { "label": "B", "text": "on", "is_correct": true },
+      { "label": "C", "text": "at", "is_correct": false },
+      { "label": "D", "text": "to", "is_correct": false }
+    ],
+    "correct_answer": "B",
+    "explanation": "Use on for days and dates.",
+    "error_tag": "preposition_time_error",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_preposition_003",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "prepositions",
+    "subtopic": "time_in",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "grammar",
+    "question_text": "They moved here ____ 2021.",
+    "options": [
+      { "label": "A", "text": "at", "is_correct": false },
+      { "label": "B", "text": "on", "is_correct": false },
+      { "label": "C", "text": "in", "is_correct": true },
+      { "label": "D", "text": "from", "is_correct": false }
+    ],
+    "correct_answer": "C",
+    "explanation": "Use in for years, months, and long periods.",
+    "error_tag": "preposition_time_error",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_preposition_004",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "prepositions",
+    "subtopic": "place_at",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "grammar",
+    "question_text": "She is waiting ____ the bus stop.",
+    "options": [
+      { "label": "A", "text": "at", "is_correct": true },
+      { "label": "B", "text": "on", "is_correct": false },
+      { "label": "C", "text": "in", "is_correct": false },
+      { "label": "D", "text": "to", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "Use at for a specific point or location.",
+    "error_tag": "preposition_place_error",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_preposition_005",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "prepositions",
+    "subtopic": "place_in",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "grammar",
+    "question_text": "The keys are ____ my bag.",
+    "options": [
+      { "label": "A", "text": "on", "is_correct": false },
+      { "label": "B", "text": "at", "is_correct": false },
+      { "label": "C", "text": "in", "is_correct": true },
+      { "label": "D", "text": "from", "is_correct": false }
+    ],
+    "correct_answer": "C",
+    "explanation": "Use in when something is inside a container or space.",
+    "error_tag": "preposition_place_error",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_preposition_006",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "prepositions",
+    "subtopic": "place_on",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "grammar",
+    "question_text": "There is a picture ____ the wall.",
+    "options": [
+      { "label": "A", "text": "in", "is_correct": false },
+      { "label": "B", "text": "on", "is_correct": true },
+      { "label": "C", "text": "at", "is_correct": false },
+      { "label": "D", "text": "under", "is_correct": false }
+    ],
+    "correct_answer": "B",
+    "explanation": "Use on for something attached to a surface.",
+    "error_tag": "preposition_place_error",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_preposition_007",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "prepositions",
+    "subtopic": "dependent_preposition_interested",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "She is interested ____ learning Spanish.",
+    "options": [
+      { "label": "A", "text": "on", "is_correct": false },
+      { "label": "B", "text": "for", "is_correct": false },
+      { "label": "C", "text": "in", "is_correct": true },
+      { "label": "D", "text": "to", "is_correct": false }
+    ],
+    "correct_answer": "C",
+    "explanation": "The adjective interested is followed by in.",
+    "error_tag": "dependent_preposition_error",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_preposition_008",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "prepositions",
+    "subtopic": "dependent_preposition_good",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "He is good ____ solving problems.",
+    "options": [
+      { "label": "A", "text": "at", "is_correct": true },
+      { "label": "B", "text": "in", "is_correct": false },
+      { "label": "C", "text": "on", "is_correct": false },
+      { "label": "D", "text": "for", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "The adjective good is followed by at.",
+    "error_tag": "dependent_preposition_error",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_preposition_009",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "prepositions",
+    "subtopic": "movement_to",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "grammar",
+    "question_text": "We are going ____ the airport.",
+    "options": [
+      { "label": "A", "text": "at", "is_correct": false },
+      { "label": "B", "text": "to", "is_correct": true },
+      { "label": "C", "text": "in", "is_correct": false },
+      { "label": "D", "text": "on", "is_correct": false }
+    ],
+    "correct_answer": "B",
+    "explanation": "Use to for movement toward a destination.",
+    "error_tag": "preposition_movement_error",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_preposition_010",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "prepositions",
+    "subtopic": "during_vs_for",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "I slept ____ the flight.",
+    "options": [
+      { "label": "A", "text": "during", "is_correct": true },
+      { "label": "B", "text": "for", "is_correct": false },
+      { "label": "C", "text": "since", "is_correct": false },
+      { "label": "D", "text": "at", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "Use during to say when something happens within an event.",
+    "error_tag": "preposition_time_error",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_travel_vocab_001",
+    "exercise_type": "vocabulary_mcq",
+    "topic_code": "travel_vocabulary",
+    "subtopic": "airport_vocabulary",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "vocabulary",
+    "question_text": "Where do passengers usually check in for a flight?",
+    "options": [
+      { "label": "A", "text": "At the check-in counter", "is_correct": true },
+      { "label": "B", "text": "At the library desk", "is_correct": false },
+      { "label": "C", "text": "At the pharmacy", "is_correct": false },
+      { "label": "D", "text": "At the classroom", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "A check-in counter is where passengers confirm their flight and luggage.",
+    "error_tag": "vocabulary_meaning_confusion",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_travel_vocab_002",
+    "exercise_type": "vocabulary_mcq",
+    "topic_code": "travel_vocabulary",
+    "subtopic": "airport_vocabulary",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "vocabulary",
+    "question_text": "A boarding pass is used to ____.",
+    "options": [
+      { "label": "A", "text": "enter the plane", "is_correct": true },
+      { "label": "B", "text": "rent a car", "is_correct": false },
+      { "label": "C", "text": "buy medicine", "is_correct": false },
+      { "label": "D", "text": "order dessert", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "A boarding pass shows that a passenger can board a flight.",
+    "error_tag": "vocabulary_meaning_confusion",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_travel_vocab_003",
+    "exercise_type": "vocabulary_mcq",
+    "topic_code": "travel_vocabulary",
+    "subtopic": "hotel_vocabulary",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "vocabulary",
+    "question_text": "A reservation means ____.",
+    "options": [
+      { "label": "A", "text": "a booked room or service", "is_correct": true },
+      { "label": "B", "text": "a broken suitcase", "is_correct": false },
+      { "label": "C", "text": "a city map", "is_correct": false },
+      { "label": "D", "text": "a train delay", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "A reservation is an arrangement made in advance.",
+    "error_tag": "vocabulary_meaning_confusion",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_travel_vocab_004",
+    "exercise_type": "vocabulary_mcq",
+    "topic_code": "travel_vocabulary",
+    "subtopic": "hotel_vocabulary",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "vocabulary",
+    "question_text": "The hotel reception is the place where guests usually ____.",
+    "options": [
+      { "label": "A", "text": "check in", "is_correct": true },
+      { "label": "B", "text": "take off", "is_correct": false },
+      { "label": "C", "text": "go through security", "is_correct": false },
+      { "label": "D", "text": "board a train", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "Guests check in at hotel reception.",
+    "error_tag": "vocabulary_context_error",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_travel_vocab_005",
+    "exercise_type": "vocabulary_mcq",
+    "topic_code": "travel_vocabulary",
+    "subtopic": "transport_vocabulary",
+    "level": "beginner",
+    "difficulty": "medium",
+    "skill": "vocabulary",
+    "question_text": "A one-way ticket means you ____.",
+    "options": [
+      { "label": "A", "text": "travel to a place without a return ticket", "is_correct": true },
+      { "label": "B", "text": "travel there and back", "is_correct": false },
+      { "label": "C", "text": "miss your flight", "is_correct": false },
+      { "label": "D", "text": "carry no luggage", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "One-way means only one direction, not a return journey.",
+    "error_tag": "vocabulary_meaning_confusion",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_travel_vocab_006",
+    "exercise_type": "vocabulary_mcq",
+    "topic_code": "travel_vocabulary",
+    "subtopic": "transport_vocabulary",
+    "level": "beginner",
+    "difficulty": "medium",
+    "skill": "vocabulary",
+    "question_text": "A round-trip ticket means ____.",
+    "options": [
+      { "label": "A", "text": "a ticket for going and returning", "is_correct": true },
+      { "label": "B", "text": "a ticket for one bus stop", "is_correct": false },
+      { "label": "C", "text": "a ticket with no seat", "is_correct": false },
+      { "label": "D", "text": "a ticket bought after travel", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "Round-trip means both the outward and return journey.",
+    "error_tag": "vocabulary_meaning_confusion",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_travel_vocab_007",
+    "exercise_type": "vocabulary_mcq",
+    "topic_code": "travel_vocabulary",
+    "subtopic": "travel_problems",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "vocabulary",
+    "question_text": "If your flight is delayed, it means the flight ____.",
+    "options": [
+      { "label": "A", "text": "leaves later than planned", "is_correct": true },
+      { "label": "B", "text": "leaves earlier than planned", "is_correct": false },
+      { "label": "C", "text": "is free", "is_correct": false },
+      { "label": "D", "text": "has more seats", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "Delayed means later than the expected time.",
+    "error_tag": "vocabulary_meaning_confusion",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_travel_vocab_008",
+    "exercise_type": "vocabulary_mcq",
+    "topic_code": "travel_vocabulary",
+    "subtopic": "travel_problems",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "vocabulary",
+    "question_text": "Lost luggage means ____.",
+    "options": [
+      { "label": "A", "text": "your bags cannot be found", "is_correct": true },
+      { "label": "B", "text": "your hotel room is ready", "is_correct": false },
+      { "label": "C", "text": "your passport is new", "is_correct": false },
+      { "label": "D", "text": "your flight is early", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "Luggage refers to bags; lost luggage means the bags are missing.",
+    "error_tag": "vocabulary_meaning_confusion",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_travel_vocab_009",
+    "exercise_type": "vocabulary_mcq",
+    "topic_code": "travel_vocabulary",
+    "subtopic": "travel_documents",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "vocabulary",
+    "question_text": "A passport is mainly used to ____.",
+    "options": [
+      { "label": "A", "text": "prove your identity when traveling internationally", "is_correct": true },
+      { "label": "B", "text": "choose food on a plane", "is_correct": false },
+      { "label": "C", "text": "repair a suitcase", "is_correct": false },
+      { "label": "D", "text": "book a taxi", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "A passport is an official identity document for international travel.",
+    "error_tag": "vocabulary_meaning_confusion",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_travel_vocab_010",
+    "exercise_type": "vocabulary_mcq",
+    "topic_code": "travel_vocabulary",
+    "subtopic": "travel_documents",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "vocabulary",
+    "question_text": "A visa is ____.",
+    "options": [
+      { "label": "A", "text": "official permission to enter or stay in a country", "is_correct": true },
+      { "label": "B", "text": "a small travel bag", "is_correct": false },
+      { "label": "C", "text": "a hotel breakfast", "is_correct": false },
+      { "label": "D", "text": "a seat near the window", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "A visa gives permission to enter or stay in a country for a purpose.",
+    "error_tag": "vocabulary_meaning_confusion",
+    "source": "teacher_authored_mvp"
+  },
+  {
+    "exercise_code": "seed_passive_anime_modal_001",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "passive_voice",
+    "subtopic": "modal_passive",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "The final episode should ____ after the recap.",
+    "options": [
+      { "label": "A", "text": "be watched", "is_correct": true },
+      { "label": "B", "text": "watch", "is_correct": false },
+      { "label": "C", "text": "watched", "is_correct": false },
+      { "label": "D", "text": "be watch", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "Modal passive uses modal + be + past participle: should be watched.",
+    "error_tag": "missing_be",
+    "source": "teacher_authored_anime_theme"
+  },
+  {
+    "exercise_code": "seed_passive_anime_modal_002",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "passive_voice",
+    "subtopic": "modal_passive",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "Spoilers must ____ before the anime review is posted.",
+    "options": [
+      { "label": "A", "text": "hide", "is_correct": false },
+      { "label": "B", "text": "be hidden", "is_correct": true },
+      { "label": "C", "text": "hidden", "is_correct": false },
+      { "label": "D", "text": "be hide", "is_correct": false }
+    ],
+    "correct_answer": "B",
+    "explanation": "After must, passive voice needs be + past participle: must be hidden.",
+    "error_tag": "missing_be",
+    "source": "teacher_authored_anime_theme"
+  },
+  {
+    "exercise_code": "seed_passive_anime_modal_003",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "passive_voice",
+    "subtopic": "modal_passive",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "The character design can ____ after fan feedback.",
+    "options": [
+      { "label": "A", "text": "improved", "is_correct": false },
+      { "label": "B", "text": "be improve", "is_correct": false },
+      { "label": "C", "text": "be improved", "is_correct": true },
+      { "label": "D", "text": "improving", "is_correct": false }
+    ],
+    "correct_answer": "C",
+    "explanation": "Can be improved follows modal + be + past participle.",
+    "error_tag": "wrong_verb_form",
+    "source": "teacher_authored_anime_theme"
+  },
+  {
+    "exercise_code": "seed_passive_anime_modal_004",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "passive_voice",
+    "subtopic": "modal_passive",
+    "level": "advanced",
+    "difficulty": "hard",
+    "skill": "grammar",
+    "question_text": "The animation schedule might ____ if the studio needs more time.",
+    "options": [
+      { "label": "A", "text": "delay", "is_correct": false },
+      { "label": "B", "text": "be delayed", "is_correct": true },
+      { "label": "C", "text": "delayed", "is_correct": false },
+      { "label": "D", "text": "be delay", "is_correct": false }
+    ],
+    "correct_answer": "B",
+    "explanation": "Might be delayed is modal passive: might + be + past participle.",
+    "error_tag": "missing_be",
+    "source": "teacher_authored_anime_theme"
+  },
+  {
+    "exercise_code": "seed_passive_011",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "passive_voice",
+    "subtopic": "past_simple_passive_plural",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "grammar",
+    "question_text": "The invitations ____ last week.",
+    "options": [
+      { "label": "A", "text": "were sent", "is_correct": true },
+      { "label": "B", "text": "was sent", "is_correct": false },
+      { "label": "C", "text": "sent", "is_correct": false },
+      { "label": "D", "text": "were send", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "Plural past passive uses were + past participle.",
+    "error_tag": "wrong_be_form",
+    "source": "teacher_authored_expansion"
+  },
+  {
+    "exercise_code": "seed_passive_012",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "passive_voice",
+    "subtopic": "passive_question_past",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "When ____ the bridge built?",
+    "options": [
+      { "label": "A", "text": "did", "is_correct": false },
+      { "label": "B", "text": "was", "is_correct": true },
+      { "label": "C", "text": "has", "is_correct": false },
+      { "label": "D", "text": "were", "is_correct": false }
+    ],
+    "correct_answer": "B",
+    "explanation": "Past passive questions use was/were before the subject.",
+    "error_tag": "missing_be",
+    "source": "teacher_authored_expansion"
+  },
+  {
+    "exercise_code": "seed_tenses_011",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "tenses",
+    "subtopic": "present_simple_frequency",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "grammar",
+    "question_text": "My brother usually ____ to school by bus.",
+    "options": [
+      { "label": "A", "text": "go", "is_correct": false },
+      { "label": "B", "text": "goes", "is_correct": true },
+      { "label": "C", "text": "is going", "is_correct": false },
+      { "label": "D", "text": "went", "is_correct": false }
+    ],
+    "correct_answer": "B",
+    "explanation": "Usually signals a habit, so use present simple with third-person singular -es.",
+    "error_tag": "subject_verb_agreement",
+    "source": "teacher_authored_expansion"
+  },
+  {
+    "exercise_code": "seed_tenses_012",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "tenses",
+    "subtopic": "present_perfect_just",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "She ____ just ____ the email.",
+    "options": [
+      { "label": "A", "text": "has / sent", "is_correct": true },
+      { "label": "B", "text": "is / sending", "is_correct": false },
+      { "label": "C", "text": "did / send", "is_correct": false },
+      { "label": "D", "text": "has / send", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "Present perfect uses has/have + past participle.",
+    "error_tag": "wrong_participle",
+    "source": "teacher_authored_expansion"
+  },
+  {
+    "exercise_code": "seed_tenses_013",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "tenses",
+    "subtopic": "future_time_clause",
+    "level": "intermediate",
+    "difficulty": "hard",
+    "skill": "grammar",
+    "question_text": "I will call you when I ____ home.",
+    "options": [
+      { "label": "A", "text": "will get", "is_correct": false },
+      { "label": "B", "text": "got", "is_correct": false },
+      { "label": "C", "text": "get", "is_correct": true },
+      { "label": "D", "text": "am getting", "is_correct": false }
+    ],
+    "correct_answer": "C",
+    "explanation": "Use present simple, not will, in future time clauses after when.",
+    "error_tag": "wrong_future_form",
+    "source": "teacher_authored_expansion"
+  },
+  {
+    "exercise_code": "seed_relative_011",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "relative_clause",
+    "subtopic": "relative_pronoun_omission",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "The movie ____ we watched last night was funny.",
+    "options": [
+      { "label": "A", "text": "who", "is_correct": false },
+      { "label": "B", "text": "where", "is_correct": false },
+      { "label": "C", "text": "that", "is_correct": true },
+      { "label": "D", "text": "whose", "is_correct": false }
+    ],
+    "correct_answer": "C",
+    "explanation": "That can refer to things as the object of a defining relative clause.",
+    "error_tag": "wrong_relative_pronoun",
+    "source": "teacher_authored_expansion"
+  },
+  {
+    "exercise_code": "seed_relative_012",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "relative_clause",
+    "subtopic": "non_defining_relative_clause",
+    "level": "advanced",
+    "difficulty": "hard",
+    "skill": "grammar",
+    "question_text": "My laptop, ____ I bought last year, still works well.",
+    "options": [
+      { "label": "A", "text": "which", "is_correct": true },
+      { "label": "B", "text": "that", "is_correct": false },
+      { "label": "C", "text": "who", "is_correct": false },
+      { "label": "D", "text": "where", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "Use which, not that, in a non-defining relative clause about a thing.",
+    "error_tag": "non_defining_relative_error",
+    "source": "teacher_authored_expansion"
+  },
+  {
+    "exercise_code": "seed_relative_013",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "relative_clause",
+    "subtopic": "preposition_in_relative_clause",
+    "level": "advanced",
+    "difficulty": "hard",
+    "skill": "grammar",
+    "question_text": "The company ____ she works for is expanding.",
+    "options": [
+      { "label": "A", "text": "where", "is_correct": false },
+      { "label": "B", "text": "who", "is_correct": false },
+      { "label": "C", "text": "that", "is_correct": true },
+      { "label": "D", "text": "whose", "is_correct": false }
+    ],
+    "correct_answer": "C",
+    "explanation": "That can introduce an object relative clause; the preposition for stays after the verb.",
+    "error_tag": "relative_clause_word_order_error",
+    "source": "teacher_authored_expansion"
+  },
+  {
+    "exercise_code": "seed_conditional_011",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "conditional_sentence",
+    "subtopic": "zero_conditional",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "grammar",
+    "question_text": "If you heat water to 100 degrees Celsius, it ____.",
+    "options": [
+      { "label": "A", "text": "boils", "is_correct": true },
+      { "label": "B", "text": "will boil", "is_correct": false },
+      { "label": "C", "text": "boiled", "is_correct": false },
+      { "label": "D", "text": "would boil", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "Zero conditional uses present simple in both clauses for facts.",
+    "error_tag": "conditional_tense_error",
+    "source": "teacher_authored_expansion"
+  },
+  {
+    "exercise_code": "seed_conditional_012",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "conditional_sentence",
+    "subtopic": "first_conditional",
+    "level": "beginner",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "If it rains tomorrow, we ____ at home.",
+    "options": [
+      { "label": "A", "text": "stay", "is_correct": false },
+      { "label": "B", "text": "stayed", "is_correct": false },
+      { "label": "C", "text": "will stay", "is_correct": true },
+      { "label": "D", "text": "would stay", "is_correct": false }
+    ],
+    "correct_answer": "C",
+    "explanation": "First conditional uses if + present simple, will + base verb.",
+    "error_tag": "conditional_tense_error",
+    "source": "teacher_authored_expansion"
+  },
+  {
+    "exercise_code": "seed_conditional_013",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "conditional_sentence",
+    "subtopic": "mixed_conditional",
+    "level": "advanced",
+    "difficulty": "hard",
+    "skill": "grammar",
+    "question_text": "If I had studied medicine, I ____ a doctor now.",
+    "options": [
+      { "label": "A", "text": "will be", "is_correct": false },
+      { "label": "B", "text": "would be", "is_correct": true },
+      { "label": "C", "text": "would have been", "is_correct": false },
+      { "label": "D", "text": "am", "is_correct": false }
+    ],
+    "correct_answer": "B",
+    "explanation": "This mixed conditional connects a past unreal condition with a present result.",
+    "error_tag": "mixed_conditional_error",
+    "source": "teacher_authored_expansion"
+  },
+  {
+    "exercise_code": "seed_reported_011",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "reported_speech",
+    "subtopic": "reported_statement_backshift",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "Direct: \"I am tired.\" Reported: She said that she ____ tired.",
+    "options": [
+      { "label": "A", "text": "is", "is_correct": false },
+      { "label": "B", "text": "was", "is_correct": true },
+      { "label": "C", "text": "will be", "is_correct": false },
+      { "label": "D", "text": "has been", "is_correct": false }
+    ],
+    "correct_answer": "B",
+    "explanation": "Present simple or continuous often backshifts to past in reported speech.",
+    "error_tag": "reported_speech_backshift_error",
+    "source": "teacher_authored_expansion"
+  },
+  {
+    "exercise_code": "seed_reported_012",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "reported_speech",
+    "subtopic": "reported_wh_question",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "Direct: \"Where do you live?\" Reported: He asked me where I ____.",
+    "options": [
+      { "label": "A", "text": "live", "is_correct": false },
+      { "label": "B", "text": "do live", "is_correct": false },
+      { "label": "C", "text": "lived", "is_correct": true },
+      { "label": "D", "text": "am living", "is_correct": false }
+    ],
+    "correct_answer": "C",
+    "explanation": "Reported questions use statement word order and usually backshift the tense.",
+    "error_tag": "reported_question_word_order_error",
+    "source": "teacher_authored_expansion"
+  },
+  {
+    "exercise_code": "seed_reported_013",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "reported_speech",
+    "subtopic": "reported_request",
+    "level": "beginner",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "Direct: \"Please wait here.\" Reported: She asked me ____ there.",
+    "options": [
+      { "label": "A", "text": "wait", "is_correct": false },
+      { "label": "B", "text": "to wait", "is_correct": true },
+      { "label": "C", "text": "waiting", "is_correct": false },
+      { "label": "D", "text": "waited", "is_correct": false }
+    ],
+    "correct_answer": "B",
+    "explanation": "Reported requests use asked + object + to-infinitive.",
+    "error_tag": "reported_command_form_error",
+    "source": "teacher_authored_expansion"
+  },
+  {
+    "exercise_code": "seed_preposition_011",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "prepositions",
+    "subtopic": "time_by",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "Please submit the assignment ____ Friday.",
+    "options": [
+      { "label": "A", "text": "by", "is_correct": true },
+      { "label": "B", "text": "at", "is_correct": false },
+      { "label": "C", "text": "on", "is_correct": false },
+      { "label": "D", "text": "in", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "By means no later than a deadline.",
+    "error_tag": "preposition_time_error",
+    "source": "teacher_authored_expansion"
+  },
+  {
+    "exercise_code": "seed_preposition_012",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "prepositions",
+    "subtopic": "place_between",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "grammar",
+    "question_text": "The bank is ____ the post office and the supermarket.",
+    "options": [
+      { "label": "A", "text": "under", "is_correct": false },
+      { "label": "B", "text": "between", "is_correct": true },
+      { "label": "C", "text": "through", "is_correct": false },
+      { "label": "D", "text": "during", "is_correct": false }
+    ],
+    "correct_answer": "B",
+    "explanation": "Between means in the middle of two people, places, or things.",
+    "error_tag": "preposition_place_error",
+    "source": "teacher_authored_expansion"
+  },
+  {
+    "exercise_code": "seed_preposition_013",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "prepositions",
+    "subtopic": "dependent_preposition_afraid",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "Many children are afraid ____ the dark.",
+    "options": [
+      { "label": "A", "text": "to", "is_correct": false },
+      { "label": "B", "text": "for", "is_correct": false },
+      { "label": "C", "text": "of", "is_correct": true },
+      { "label": "D", "text": "at", "is_correct": false }
+    ],
+    "correct_answer": "C",
+    "explanation": "The adjective afraid is followed by of.",
+    "error_tag": "dependent_preposition_error",
+    "source": "teacher_authored_expansion"
+  },
+  {
+    "exercise_code": "seed_preposition_014",
+    "exercise_type": "grammar_mcq",
+    "topic_code": "prepositions",
+    "subtopic": "movement_into",
+    "level": "beginner",
+    "difficulty": "medium",
+    "skill": "grammar",
+    "question_text": "The cat jumped ____ the box.",
+    "options": [
+      { "label": "A", "text": "into", "is_correct": true },
+      { "label": "B", "text": "at", "is_correct": false },
+      { "label": "C", "text": "by", "is_correct": false },
+      { "label": "D", "text": "during", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "Into shows movement from outside to inside a place.",
+    "error_tag": "preposition_movement_error",
+    "source": "teacher_authored_expansion"
+  },
+  {
+    "exercise_code": "seed_travel_vocab_011",
+    "exercise_type": "vocabulary_mcq",
+    "topic_code": "travel_vocabulary",
+    "subtopic": "airport_vocabulary",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "vocabulary",
+    "question_text": "The gate is the place where passengers ____.",
+    "options": [
+      { "label": "A", "text": "board the plane", "is_correct": true },
+      { "label": "B", "text": "wash hotel towels", "is_correct": false },
+      { "label": "C", "text": "repair a passport", "is_correct": false },
+      { "label": "D", "text": "cook dinner", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "At an airport gate, passengers wait and board their flight.",
+    "error_tag": "vocabulary_context_error",
+    "source": "teacher_authored_expansion"
+  },
+  {
+    "exercise_code": "seed_travel_vocab_012",
+    "exercise_type": "vocabulary_mcq",
+    "topic_code": "travel_vocabulary",
+    "subtopic": "hotel_vocabulary",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "vocabulary",
+    "question_text": "A double room is usually for ____.",
+    "options": [
+      { "label": "A", "text": "two guests", "is_correct": true },
+      { "label": "B", "text": "a bus driver", "is_correct": false },
+      { "label": "C", "text": "one suitcase only", "is_correct": false },
+      { "label": "D", "text": "airport security", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "A double room is designed for two people, often with one large bed.",
+    "error_tag": "vocabulary_meaning_confusion",
+    "source": "teacher_authored_expansion"
+  },
+  {
+    "exercise_code": "seed_vocabulary_001",
+    "exercise_type": "vocabulary_mcq",
+    "topic_code": "vocabulary",
+    "subtopic": "daily_objects",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "vocabulary",
+    "question_text": "Which item do you use to write on paper?",
+    "options": [
+      { "label": "A", "text": "A pen", "is_correct": true },
+      { "label": "B", "text": "A pillow", "is_correct": false },
+      { "label": "C", "text": "A plate", "is_correct": false },
+      { "label": "D", "text": "A ticket", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "A pen is used for writing.",
+    "error_tag": "vocabulary_meaning_confusion",
+    "source": "teacher_authored_general_vocab"
+  },
+  {
+    "exercise_code": "seed_vocabulary_002",
+    "exercise_type": "vocabulary_mcq",
+    "topic_code": "vocabulary",
+    "subtopic": "daily_routines",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "vocabulary",
+    "question_text": "To wake up means to ____.",
+    "options": [
+      { "label": "A", "text": "stop sleeping", "is_correct": true },
+      { "label": "B", "text": "start cooking", "is_correct": false },
+      { "label": "C", "text": "buy clothes", "is_correct": false },
+      { "label": "D", "text": "close a window", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "Wake up means to stop sleeping and become awake.",
+    "error_tag": "vocabulary_meaning_confusion",
+    "source": "teacher_authored_general_vocab"
+  },
+  {
+    "exercise_code": "seed_vocabulary_003",
+    "exercise_type": "vocabulary_mcq",
+    "topic_code": "vocabulary",
+    "subtopic": "work_vocabulary",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "vocabulary",
+    "question_text": "A deadline is ____.",
+    "options": [
+      { "label": "A", "text": "the latest time something must be finished", "is_correct": true },
+      { "label": "B", "text": "a short holiday", "is_correct": false },
+      { "label": "C", "text": "a type of office chair", "is_correct": false },
+      { "label": "D", "text": "a person who fixes computers", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "A deadline is the final time or date by which work must be completed.",
+    "error_tag": "vocabulary_meaning_confusion",
+    "source": "teacher_authored_general_vocab"
+  },
+  {
+    "exercise_code": "seed_vocabulary_004",
+    "exercise_type": "vocabulary_mcq",
+    "topic_code": "vocabulary",
+    "subtopic": "school_vocabulary",
+    "level": "beginner",
+    "difficulty": "easy",
+    "skill": "vocabulary",
+    "question_text": "A classmate is ____.",
+    "options": [
+      { "label": "A", "text": "a person in the same class as you", "is_correct": true },
+      { "label": "B", "text": "a person who drives a taxi", "is_correct": false },
+      { "label": "C", "text": "a room in a hotel", "is_correct": false },
+      { "label": "D", "text": "a kind of breakfast", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "A classmate studies in the same class as you.",
+    "error_tag": "vocabulary_context_error",
+    "source": "teacher_authored_general_vocab"
+  },
+  {
+    "exercise_code": "seed_vocabulary_005",
+    "exercise_type": "vocabulary_mcq",
+    "topic_code": "vocabulary",
+    "subtopic": "feelings_vocabulary",
+    "level": "beginner",
+    "difficulty": "medium",
+    "skill": "vocabulary",
+    "question_text": "If someone is nervous, they feel ____.",
+    "options": [
+      { "label": "A", "text": "worried or anxious", "is_correct": true },
+      { "label": "B", "text": "very hungry", "is_correct": false },
+      { "label": "C", "text": "ready to sleep", "is_correct": false },
+      { "label": "D", "text": "too hot", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "Nervous means worried, anxious, or not relaxed.",
+    "error_tag": "vocabulary_meaning_confusion",
+    "source": "teacher_authored_general_vocab"
+  },
+  {
+    "exercise_code": "seed_vocabulary_006",
+    "exercise_type": "vocabulary_mcq",
+    "topic_code": "vocabulary",
+    "subtopic": "technology_vocabulary",
+    "level": "intermediate",
+    "difficulty": "medium",
+    "skill": "vocabulary",
+    "question_text": "To download a file means to ____.",
+    "options": [
+      { "label": "A", "text": "copy it from the internet to your device", "is_correct": true },
+      { "label": "B", "text": "delete it forever", "is_correct": false },
+      { "label": "C", "text": "print it on paper", "is_correct": false },
+      { "label": "D", "text": "lock your phone", "is_correct": false }
+    ],
+    "correct_answer": "A",
+    "explanation": "Download means to receive data from another system onto your device.",
+    "error_tag": "vocabulary_context_error",
+    "source": "teacher_authored_general_vocab"
+  }
+]

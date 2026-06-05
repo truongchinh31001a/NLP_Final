@@ -12,7 +12,13 @@ from app.schemas import KnowledgeChunk
 
 
 class VectorStore(Protocol):
-    def search(self, topic: str, level: str, limit: int) -> list[KnowledgeChunk]:
+    def search(
+        self,
+        topic: str,
+        level: str,
+        limit: int,
+        subtopic: str | None = None,
+    ) -> list[KnowledgeChunk]:
         """Return knowledge chunks that best match the topic and learner level."""
 
 
@@ -24,13 +30,20 @@ class LangChainVectorStore:
         self._vector_store = self._build_store()
         self._seed_documents_if_needed()
 
-    def search(self, topic: str, level: str, limit: int) -> list[KnowledgeChunk]:
-        query = f"{topic.replace('_', ' ')} {level}"
+    def search(
+        self,
+        topic: str,
+        level: str,
+        limit: int,
+        subtopic: str | None = None,
+    ) -> list[KnowledgeChunk]:
+        subtopic_query = f" {subtopic.replace('_', ' ')}" if subtopic else ""
+        query = f"{topic.replace('_', ' ')}{subtopic_query} {level}"
         retriever = self._vector_store.as_retriever(
             search_kwargs={"k": max(limit * 10, 50)}
         )
         documents = retriever.invoke(query)
-        prioritized = self._prioritize_documents(documents, topic, level)
+        prioritized = self._prioritize_documents(documents, topic, level, subtopic)
         return [self._document_to_chunk(doc) for doc in prioritized[:limit]]
 
     def _build_store(self) -> InMemoryVectorStore | Chroma:
@@ -75,20 +88,33 @@ class LangChainVectorStore:
         documents: list[Document],
         topic: str,
         level: str,
+        subtopic: str | None = None,
     ) -> list[Document]:
+        exact_subtopic = [
+            doc
+            for doc in documents
+            if doc.metadata.get("topic") == topic
+            and self._subtopic_matches(doc.metadata.get("subtopic"), subtopic)
+        ]
         exact_topic_level = [
             doc
             for doc in documents
             if doc.metadata.get("topic") == topic and doc.metadata.get("level") == level
+            and doc not in exact_subtopic
         ]
         exact_topic = [
             doc
             for doc in documents
-            if doc.metadata.get("topic") == topic and doc not in exact_topic_level
+            if doc.metadata.get("topic") == topic
+            and doc not in [*exact_subtopic, *exact_topic_level]
         ]
         exact_topic.sort(key=lambda doc: self._level_distance(doc, level))
-        others = [doc for doc in documents if doc not in exact_topic_level + exact_topic]
-        return exact_topic_level + exact_topic + others
+        others = [
+            doc
+            for doc in documents
+            if doc not in [*exact_subtopic, *exact_topic_level, *exact_topic]
+        ]
+        return exact_subtopic + exact_topic_level + exact_topic + others
 
     def _level_distance(self, document: Document, target_level: str) -> int:
         level_order = {
@@ -99,3 +125,12 @@ class LangChainVectorStore:
         document_rank = level_order.get(document.metadata.get("level", ""), 0)
         target_rank = level_order.get(target_level, 0)
         return abs(document_rank - target_rank)
+
+    def _subtopic_matches(self, actual: object, expected: str | None) -> bool:
+        if not expected or not isinstance(actual, str):
+            return False
+        return (
+            actual == expected
+            or actual.startswith(expected)
+            or expected.startswith(actual)
+        )

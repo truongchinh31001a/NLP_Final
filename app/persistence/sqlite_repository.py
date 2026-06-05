@@ -1,0 +1,1780 @@
+import json
+import re
+import sqlite3
+import unicodedata
+import uuid
+from contextlib import contextmanager
+from pathlib import Path
+from typing import Iterator
+
+from app.config import AppConfig
+from app.language.translation import BilingualTextNormalizer
+from app.schemas import (
+    ExerciseItem,
+    ExerciseOption,
+    GeneratedExerciseSet,
+    LearnerProfile,
+    PracticePlan,
+    PracticeReview,
+    PracticeRequest,
+    SessionResult,
+)
+
+
+class SQLiteLearningRepository:
+    def __init__(self, config: AppConfig) -> None:
+        self.db_path = Path(config.sqlite_db_path)
+        self.schema_path = Path(__file__).with_name("schema.sql")
+        self.text_normalizer = BilingualTextNormalizer()
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._init_db()
+
+    def get_profile(self, user_id: str) -> LearnerProfile:
+        with self._connect() as connection:
+            db_user_id = self._ensure_user(connection, user_id)
+            row = connection.execute(
+                """
+                SELECT
+                    u.name,
+                    p.level,
+                    p.goals_json,
+                    p.preferred_difficulty,
+                    p.preferred_num_questions,
+                    p.onboarding_completed
+                FROM user_profiles p
+                JOIN users u ON u.id = p.user_id
+                WHERE p.user_id = ?
+                """,
+                (db_user_id,),
+            ).fetchone()
+
+            if row is None:
+                connection.execute(
+                    """
+                    INSERT INTO user_profiles (user_id, level, goals_json)
+                    VALUES (?, ?, ?)
+                    """,
+                    (db_user_id, "beginner", "[]"),
+                )
+                row = connection.execute(
+                    """
+                    SELECT
+                        u.name,
+                        p.level,
+                        p.goals_json,
+                        p.preferred_difficulty,
+                        p.preferred_num_questions,
+                        p.onboarding_completed
+                    FROM user_profiles p
+                    JOIN users u ON u.id = p.user_id
+                    WHERE p.user_id = ?
+                    """,
+                    (db_user_id,),
+                ).fetchone()
+
+            topic_rows = connection.execute(
+                """
+                SELECT t.topic_code, s.accuracy, s.weakness_score
+                FROM user_topic_stats s
+                JOIN topics t ON t.id = s.topic_id
+                WHERE s.user_id = ?
+                """,
+                (db_user_id,),
+            ).fetchall()
+            subtopic_rows = connection.execute(
+                """
+                SELECT
+                    t.topic_code,
+                    s.subtopic,
+                    s.accuracy,
+                    s.weakness_score
+                FROM user_subtopic_stats s
+                JOIN topics t ON t.id = s.topic_id
+                WHERE s.user_id = ?
+                """,
+                (db_user_id,),
+            ).fetchall()
+            error_rows = connection.execute(
+                """
+                SELECT
+                    t.topic_code,
+                    s.error_tag,
+                    s.weakness_score
+                FROM user_error_stats s
+                JOIN topics t ON t.id = s.topic_id
+                WHERE s.user_id = ?
+                """,
+                (db_user_id,),
+            ).fetchall()
+
+        goals = json.loads(row["goals_json"] or "[]")
+        return LearnerProfile(
+            user_id=user_id,
+            display_name=self._sanitize_display_name(row["name"], user_id),
+            level=row["level"],
+            goals=goals,
+            preferred_difficulty=row["preferred_difficulty"],
+            preferred_num_questions=row["preferred_num_questions"],
+            onboarding_completed=bool(row["onboarding_completed"]),
+            topic_accuracy={
+                topic_row["topic_code"]: float(topic_row["accuracy"])
+                for topic_row in topic_rows
+            },
+            weak_topics={
+                topic_row["topic_code"]: float(topic_row["weakness_score"])
+                for topic_row in topic_rows
+            },
+            subtopic_accuracy={
+                self._stat_key(
+                    subtopic_row["topic_code"],
+                    subtopic_row["subtopic"],
+                ): float(subtopic_row["accuracy"])
+                for subtopic_row in subtopic_rows
+            },
+            weak_subtopics={
+                self._stat_key(
+                    subtopic_row["topic_code"],
+                    subtopic_row["subtopic"],
+                ): float(subtopic_row["weakness_score"])
+                for subtopic_row in subtopic_rows
+            },
+            error_tag_weakness={
+                self._stat_key(
+                    error_row["topic_code"],
+                    error_row["error_tag"],
+                ): float(error_row["weakness_score"])
+                for error_row in error_rows
+            },
+        )
+
+    def get_personalization_snapshot(self, user_id: str) -> dict[str, object]:
+        profile = self.get_profile(user_id)
+        with self._connect() as connection:
+            db_user_id = self._ensure_user(connection, user_id)
+            topic_rows = connection.execute(
+                """
+                SELECT
+                    t.topic_code,
+                    s.attempts_count,
+                    s.correct_count,
+                    s.accuracy,
+                    s.weakness_score,
+                    s.status,
+                    s.last_practiced_at
+                FROM user_topic_stats s
+                JOIN topics t ON t.id = s.topic_id
+                WHERE s.user_id = ?
+                ORDER BY s.weakness_score DESC, s.last_practiced_at DESC
+                """,
+                (db_user_id,),
+            ).fetchall()
+            subtopic_rows = connection.execute(
+                """
+                SELECT
+                    t.topic_code,
+                    s.subtopic,
+                    s.attempts_count,
+                    s.correct_count,
+                    s.accuracy,
+                    s.mastery_score,
+                    s.weakness_score,
+                    s.status,
+                    s.last_practiced_at
+                FROM user_subtopic_stats s
+                JOIN topics t ON t.id = s.topic_id
+                WHERE s.user_id = ?
+                ORDER BY s.weakness_score DESC, s.last_practiced_at DESC
+                """,
+                (db_user_id,),
+            ).fetchall()
+            error_rows = connection.execute(
+                """
+                SELECT
+                    t.topic_code,
+                    s.error_tag,
+                    s.attempts_count,
+                    s.incorrect_count,
+                    s.error_rate,
+                    s.weakness_score,
+                    s.status,
+                    s.last_seen_at
+                FROM user_error_stats s
+                JOIN topics t ON t.id = s.topic_id
+                WHERE s.user_id = ?
+                ORDER BY s.weakness_score DESC, s.last_seen_at DESC
+                """,
+                (db_user_id,),
+            ).fetchall()
+
+        return {
+            "user_id": user_id,
+            "display_name": profile.display_name or user_id,
+            "level": profile.level,
+            "goals": profile.goals,
+            "preferred_difficulty": profile.preferred_difficulty,
+            "preferred_num_questions": profile.preferred_num_questions,
+            "onboarding_completed": profile.onboarding_completed,
+            "topic_stats": [
+                {
+                    "code": row["topic_code"],
+                    "label": self._label_from_code(row["topic_code"]),
+                    "topic": row["topic_code"],
+                    "attempts_count": int(row["attempts_count"]),
+                    "correct_count": int(row["correct_count"]),
+                    "accuracy": float(row["accuracy"]),
+                    "weakness_score": float(row["weakness_score"]),
+                    "status": row["status"],
+                    "last_practiced_at": row["last_practiced_at"],
+                }
+                for row in topic_rows
+            ],
+            "subtopic_stats": [
+                {
+                    "code": self._stat_key(row["topic_code"], row["subtopic"]),
+                    "label": self._label_from_code(row["subtopic"]),
+                    "topic": row["topic_code"],
+                    "attempts_count": int(row["attempts_count"]),
+                    "correct_count": int(row["correct_count"]),
+                    "accuracy": float(row["accuracy"]),
+                    "mastery_score": float(row["mastery_score"]),
+                    "weakness_score": float(row["weakness_score"]),
+                    "status": row["status"],
+                    "last_practiced_at": row["last_practiced_at"],
+                }
+                for row in subtopic_rows
+            ],
+            "error_stats": [
+                {
+                    "code": self._stat_key(row["topic_code"], row["error_tag"]),
+                    "label": self._label_from_code(row["error_tag"]),
+                    "topic": row["topic_code"],
+                    "attempts_count": int(row["attempts_count"]),
+                    "incorrect_count": int(row["incorrect_count"]),
+                    "error_rate": float(row["error_rate"]),
+                    "weakness_score": float(row["weakness_score"]),
+                    "status": row["status"],
+                    "last_seen_at": row["last_seen_at"],
+                }
+                for row in error_rows
+            ],
+        }
+
+    def get_chat_resume(self, user_id: str, limit: int = 24) -> dict[str, object]:
+        with self._connect() as connection:
+            db_user_id = self._ensure_user(connection, user_id)
+            session = self._get_or_create_active_chat_session(connection, db_user_id)
+            memory_row = self._get_chat_memory_row(connection, db_user_id)
+            message_rows = connection.execute(
+                """
+                SELECT message_code, role, content, created_at
+                FROM chat_messages
+                WHERE session_id = ?
+                ORDER BY id DESC
+                LIMIT ?
+                """,
+                (int(session["id"]), limit),
+            ).fetchall()
+
+        facts = (
+            json.loads(memory_row["facts_json"] or "{}")
+            if memory_row is not None
+            else {}
+        )
+        summary = memory_row["summary_text"] if memory_row is not None else ""
+        messages = [
+            {
+                "message_id": row["message_code"],
+                "role": row["role"],
+                "content": row["content"],
+                "created_at": row["created_at"],
+            }
+            for row in reversed(message_rows)
+        ]
+        return {
+            "session_id": session["session_code"],
+            "has_history": bool(messages or summary),
+            "memory_summary": summary,
+            "extracted_facts": facts,
+            "suggested_next_question": self._build_suggested_next_question(
+                facts,
+                messages,
+            ),
+            "messages": messages,
+        }
+
+    def save_chat_message(
+        self,
+        user_id: str,
+        role: str,
+        content: str,
+        session_id: str | None = None,
+        metadata: dict[str, object] | None = None,
+        update_memory: bool = True,
+    ) -> dict[str, object]:
+        normalized_role = "assistant" if role == "bot" else role.strip().lower()
+        if normalized_role not in {"user", "assistant"}:
+            raise ValueError("Chat message role must be `user` or `assistant`.")
+
+        cleaned_content = content.strip()
+        if not cleaned_content:
+            raise ValueError("Chat message content cannot be empty.")
+
+        with self._connect() as connection:
+            db_user_id = self._ensure_user(connection, user_id)
+            session = self._get_or_create_active_chat_session(
+                connection,
+                db_user_id,
+                session_code=session_id,
+            )
+            message_code = f"msg_{uuid.uuid4().hex}"
+            metadata_json = json.dumps(metadata or {}, ensure_ascii=False)
+            connection.execute(
+                """
+                INSERT INTO chat_messages (
+                    message_code,
+                    session_id,
+                    role,
+                    content,
+                    metadata_json
+                )
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    message_code,
+                    int(session["id"]),
+                    normalized_role,
+                    cleaned_content,
+                    metadata_json,
+                ),
+            )
+            connection.execute(
+                """
+                UPDATE chat_sessions
+                SET
+                    title = COALESCE(title, ?),
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (
+                    self._make_chat_title(cleaned_content)
+                    if normalized_role == "user"
+                    else None,
+                    int(session["id"]),
+                ),
+            )
+
+            memory_row = self._get_chat_memory_row(connection, db_user_id)
+            facts = (
+                json.loads(memory_row["facts_json"] or "{}")
+                if memory_row is not None
+                else {}
+            )
+            summary = memory_row["summary_text"] if memory_row is not None else ""
+            if update_memory and normalized_role == "user":
+                facts, summary = self._update_chat_memory_from_message(
+                    connection=connection,
+                    user_id=db_user_id,
+                    session_id=int(session["id"]),
+                    content=cleaned_content,
+                )
+
+        return {
+            "session_id": session["session_code"],
+            "message": {
+                "message_id": message_code,
+                "role": normalized_role,
+                "content": cleaned_content,
+                "created_at": None,
+            },
+            "memory_summary": summary,
+            "extracted_facts": facts,
+            "suggested_next_question": self._build_suggested_next_question(
+                facts,
+                [],
+            ),
+        }
+
+    def save_profile(self, profile: LearnerProfile) -> None:
+        with self._connect() as connection:
+            db_user_id = self._ensure_user(connection, profile.user_id)
+            if profile.display_name:
+                connection.execute(
+                    """
+                    UPDATE users
+                    SET name = ?
+                    WHERE id = ?
+                    """,
+                    (profile.display_name, db_user_id),
+                )
+            connection.execute(
+                """
+                INSERT INTO user_profiles (
+                    user_id,
+                    level,
+                    goals_json,
+                    preferred_difficulty,
+                    preferred_num_questions,
+                    onboarding_completed,
+                    updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    level = excluded.level,
+                    goals_json = excluded.goals_json,
+                    preferred_difficulty = excluded.preferred_difficulty,
+                    preferred_num_questions = excluded.preferred_num_questions,
+                    onboarding_completed = excluded.onboarding_completed,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (
+                    db_user_id,
+                    profile.level,
+                    json.dumps(profile.goals, ensure_ascii=False),
+                    profile.preferred_difficulty,
+                    profile.preferred_num_questions,
+                    int(profile.onboarding_completed),
+                ),
+            )
+
+            for topic_code, accuracy in profile.topic_accuracy.items():
+                topic_id = self._ensure_topic(connection, topic_code)
+                weakness_score = profile.weak_topics.get(topic_code, 1.0 - accuracy)
+                connection.execute(
+                    """
+                    INSERT INTO user_topic_stats (
+                        user_id,
+                        topic_id,
+                        accuracy,
+                        weakness_score,
+                        status,
+                        last_practiced_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT(user_id, topic_id) DO UPDATE SET
+                        accuracy = excluded.accuracy,
+                        weakness_score = excluded.weakness_score,
+                        status = excluded.status,
+                        last_practiced_at = CURRENT_TIMESTAMP
+                    """,
+                    (
+                        db_user_id,
+                        topic_id,
+                        accuracy,
+                        weakness_score,
+                        self._status_from_accuracy(accuracy),
+                    ),
+                )
+
+    def get_generated_exercise_set(
+        self,
+        user_id: str,
+        generation_run_id: str,
+    ) -> GeneratedExerciseSet | None:
+        with self._connect() as connection:
+            run = connection.execute(
+                """
+                SELECT
+                    gr.id,
+                    gr.generation_run_id,
+                    gr.exercise_type,
+                    gr.difficulty,
+                    gr.num_questions,
+                    gr.raw_request_text,
+                    gr.prompt_snapshot,
+                    gr.agent_trace_json,
+                    t.topic_code
+                FROM generation_runs gr
+                JOIN users u ON u.id = gr.user_id
+                JOIN topics t ON t.id = gr.topic_id
+                WHERE gr.generation_run_id = ? AND u.user_code = ?
+                """,
+                (generation_run_id, user_id),
+            ).fetchone()
+
+            if run is None:
+                return None
+
+            exercise_rows = connection.execute(
+                """
+                SELECT
+                    id,
+                    session_exercise_code,
+                    client_exercise_id,
+                    exercise_type,
+                    difficulty,
+                    skill,
+                    subtopic,
+                    error_tag,
+                    question_text,
+                    correct_answer,
+                    explanation,
+                    source_chunk_ids_json
+                FROM session_exercises
+                WHERE generation_run_id = ?
+                ORDER BY display_order, id
+                """,
+                (int(run["id"]),),
+            ).fetchall()
+
+            exercises: list[ExerciseItem] = []
+            for exercise_row in exercise_rows:
+                option_rows = connection.execute(
+                    """
+                    SELECT option_label, option_text, is_correct
+                    FROM session_exercise_options
+                    WHERE session_exercise_id = ?
+                    ORDER BY id
+                    """,
+                    (int(exercise_row["id"]),),
+                ).fetchall()
+                exercises.append(
+                    ExerciseItem(
+                        exercise_id=exercise_row["client_exercise_id"]
+                        or exercise_row["session_exercise_code"],
+                        exercise_type=exercise_row["exercise_type"],
+                        topic=run["topic_code"],
+                        difficulty=exercise_row["difficulty"],
+                        skill=exercise_row["skill"] or self._skill_for_topic(
+                            run["topic_code"]
+                        ),
+                        subtopic=exercise_row["subtopic"],
+                        error_tag=exercise_row["error_tag"],
+                        question_text=exercise_row["question_text"],
+                        options=[
+                            ExerciseOption(
+                                label=option_row["option_label"],
+                                text=option_row["option_text"],
+                                is_correct=bool(option_row["is_correct"]),
+                            )
+                            for option_row in option_rows
+                        ],
+                        correct_answer=exercise_row["correct_answer"],
+                        explanation=exercise_row["explanation"] or "",
+                        source_chunk_ids=json.loads(
+                            exercise_row["source_chunk_ids_json"] or "[]"
+                        ),
+                    )
+                )
+
+        request = PracticeRequest(
+            user_id=user_id,
+            raw_text=run["raw_request_text"],
+            topic=run["topic_code"],
+            difficulty=run["difficulty"],
+            exercise_type=run["exercise_type"],
+            num_questions=int(run["num_questions"]),
+        )
+        plan = PracticePlan(
+            user_id=user_id,
+            topic=run["topic_code"],
+            difficulty=run["difficulty"],
+            exercise_type=run["exercise_type"],
+            num_questions=int(run["num_questions"]),
+            focus_reason="Loaded from persisted SQLite generation run.",
+        )
+        return GeneratedExerciseSet(
+            request=request,
+            plan=plan,
+            retrieved_chunks=[],
+            exercises=exercises,
+            generation_run_id=run["generation_run_id"],
+            prompt_snapshot=run["prompt_snapshot"] or "",
+            agent_trace=json.loads(run["agent_trace_json"] or "[]"),
+        )
+
+    def save_generated_exercise_set(
+        self,
+        generated: GeneratedExerciseSet,
+        generator_backend: str,
+    ) -> str:
+        generation_run_id = f"gen_{uuid.uuid4().hex}"
+        with self._connect() as connection:
+            db_user_id = self._ensure_user(connection, generated.request.user_id)
+            topic_id = self._ensure_topic(connection, generated.plan.topic)
+            retrieved_chunk_ids = [chunk.chunk_id for chunk in generated.retrieved_chunks]
+            model_name = generator_backend.split(":", maxsplit=1)[-1]
+
+            cursor = connection.execute(
+                """
+                INSERT INTO generation_runs (
+                    generation_run_id,
+                    user_id,
+                    topic_id,
+                    exercise_type,
+                    difficulty,
+                    num_questions,
+                    raw_request_text,
+                    prompt_snapshot,
+                    retrieved_chunk_ids_json,
+                    agent_trace_json,
+                    generator_backend,
+                    model_name
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    generation_run_id,
+                    db_user_id,
+                    topic_id,
+                    generated.plan.exercise_type,
+                    generated.plan.difficulty,
+                    generated.plan.num_questions,
+                    generated.request.raw_text,
+                    generated.prompt_snapshot,
+                    json.dumps(retrieved_chunk_ids, ensure_ascii=False),
+                    json.dumps(generated.agent_trace, ensure_ascii=False),
+                    generator_backend,
+                    model_name,
+                ),
+            )
+            db_generation_run_id = int(cursor.lastrowid)
+
+            for display_order, exercise in enumerate(generated.exercises, start=1):
+                exercise_cursor = connection.execute(
+                    """
+                    INSERT INTO session_exercises (
+                        session_exercise_code,
+                        client_exercise_id,
+                        generation_run_id,
+                        topic_id,
+                        exercise_type,
+                        difficulty,
+                        skill,
+                        subtopic,
+                        error_tag,
+                        question_text,
+                        correct_answer,
+                        explanation,
+                        source_chunk_ids_json,
+                        display_order
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        f"{generation_run_id}_q{display_order}",
+                        exercise.exercise_id,
+                        db_generation_run_id,
+                        topic_id,
+                        exercise.exercise_type,
+                        exercise.difficulty,
+                        exercise.skill or self._skill_for_topic(exercise.topic),
+                        exercise.subtopic,
+                        exercise.error_tag,
+                        exercise.question_text,
+                        exercise.correct_answer,
+                        exercise.explanation,
+                        json.dumps(exercise.source_chunk_ids, ensure_ascii=False),
+                        display_order,
+                    ),
+                )
+                db_session_exercise_id = int(exercise_cursor.lastrowid)
+
+                for option in exercise.options:
+                    connection.execute(
+                        """
+                        INSERT INTO session_exercise_options (
+                            session_exercise_id,
+                            option_label,
+                            option_text,
+                            is_correct
+                        )
+                        VALUES (?, ?, ?, ?)
+                        """,
+                        (
+                            db_session_exercise_id,
+                            option.label,
+                            option.text,
+                            int(option.is_correct),
+                        ),
+                    )
+
+        generated.generation_run_id = generation_run_id
+        return generation_run_id
+
+    def save_session_result(
+        self,
+        result: SessionResult,
+        generation_run_id: str | None = None,
+        selected_answers: dict[str, str] | None = None,
+    ) -> str:
+        session_code = f"sess_{uuid.uuid4().hex}"
+        with self._connect() as connection:
+            db_user_id = self._ensure_user(connection, result.user_id)
+            topic_id = self._ensure_topic(connection, result.topic)
+            latest_generation_run = (
+                self._get_generation_run_by_public_id(
+                    connection,
+                    user_id=db_user_id,
+                    generation_run_id=generation_run_id,
+                )
+                if generation_run_id
+                else self._get_latest_generation_run(
+                    connection,
+                    user_id=db_user_id,
+                    topic_id=topic_id,
+                )
+            )
+
+            if generation_run_id and latest_generation_run is None:
+                raise LookupError(f"Generation run not found: {generation_run_id}")
+
+            generation_run_db_id = (
+                int(latest_generation_run["id"])
+                if latest_generation_run is not None
+                else None
+            )
+            if latest_generation_run is not None:
+                topic_id = int(latest_generation_run["topic_id"])
+            difficulty = (
+                str(latest_generation_run["difficulty"])
+                if latest_generation_run is not None
+                else "unknown"
+            )
+
+            connection.execute(
+                """
+                INSERT INTO practice_sessions (
+                    session_code,
+                    user_id,
+                    topic_id,
+                    generation_run_id,
+                    difficulty,
+                    total_questions,
+                    correct_count,
+                    accuracy,
+                    recommendation_text,
+                    started_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """,
+                (
+                    session_code,
+                    db_user_id,
+                    topic_id,
+                    generation_run_db_id,
+                    difficulty,
+                    result.total_questions,
+                    result.correct_count,
+                    result.score,
+                    result.recommendation,
+                ),
+            )
+            db_session_id = int(connection.execute("SELECT last_insert_rowid()").fetchone()[0])
+
+            if selected_answers is not None and generation_run_db_id is not None:
+                self._save_user_answers(
+                    connection=connection,
+                    user_id=db_user_id,
+                    session_id=db_session_id,
+                    generation_run_db_id=generation_run_db_id,
+                    selected_answers=selected_answers,
+                )
+
+            existing = connection.execute(
+                """
+                SELECT attempts_count, correct_count
+                FROM user_topic_stats
+                WHERE user_id = ? AND topic_id = ?
+                """,
+                (db_user_id, topic_id),
+            ).fetchone()
+            attempts_count = result.total_questions
+            correct_count = result.correct_count
+            if existing is not None:
+                attempts_count += int(existing["attempts_count"])
+                correct_count += int(existing["correct_count"])
+
+            accuracy = correct_count / max(attempts_count, 1)
+            connection.execute(
+                """
+                INSERT INTO user_topic_stats (
+                    user_id,
+                    topic_id,
+                    attempts_count,
+                    correct_count,
+                    accuracy,
+                    weakness_score,
+                    status,
+                    last_practiced_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(user_id, topic_id) DO UPDATE SET
+                    attempts_count = excluded.attempts_count,
+                    correct_count = excluded.correct_count,
+                    accuracy = excluded.accuracy,
+                    weakness_score = excluded.weakness_score,
+                    status = excluded.status,
+                    last_practiced_at = CURRENT_TIMESTAMP
+                """,
+                (
+                    db_user_id,
+                    topic_id,
+                    attempts_count,
+                    correct_count,
+                    accuracy,
+                    1.0 - accuracy,
+                    self._status_from_accuracy(accuracy),
+                ),
+            )
+        return session_code
+
+    def save_practice_review(
+        self,
+        user_id: str,
+        session_code: str,
+        review: PracticeReview,
+    ) -> str:
+        with self._connect() as connection:
+            db_user_id = self._ensure_user(connection, user_id)
+            session_row = connection.execute(
+                """
+                SELECT id
+                FROM practice_sessions
+                WHERE session_code = ? AND user_id = ?
+                """,
+                (session_code, db_user_id),
+            ).fetchone()
+            if session_row is None:
+                raise LookupError(f"Practice session not found: {session_code}")
+
+            connection.execute(
+                """
+                INSERT INTO practice_reviews (
+                    review_code,
+                    user_id,
+                    session_id,
+                    evaluator,
+                    summary_text,
+                    strengths_json,
+                    weaknesses_json,
+                    next_steps_json,
+                    next_practice_prompt,
+                    raw_response
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(session_id) DO UPDATE SET
+                    evaluator = excluded.evaluator,
+                    summary_text = excluded.summary_text,
+                    strengths_json = excluded.strengths_json,
+                    weaknesses_json = excluded.weaknesses_json,
+                    next_steps_json = excluded.next_steps_json,
+                    next_practice_prompt = excluded.next_practice_prompt,
+                    raw_response = excluded.raw_response,
+                    created_at = CURRENT_TIMESTAMP
+                """,
+                (
+                    review.review_code,
+                    db_user_id,
+                    int(session_row["id"]),
+                    review.evaluator,
+                    review.summary,
+                    json.dumps(review.strengths, ensure_ascii=False),
+                    json.dumps(review.weaknesses, ensure_ascii=False),
+                    json.dumps(review.next_steps, ensure_ascii=False),
+                    review.next_practice_prompt,
+                    review.raw_response,
+                ),
+            )
+        return review.review_code
+
+    def _get_or_create_active_chat_session(
+        self,
+        connection: sqlite3.Connection,
+        user_id: int,
+        session_code: str | None = None,
+    ) -> sqlite3.Row:
+        if session_code:
+            row = connection.execute(
+                """
+                SELECT id, session_code, title, status, created_at, updated_at
+                FROM chat_sessions
+                WHERE user_id = ? AND session_code = ?
+                """,
+                (user_id, session_code),
+            ).fetchone()
+            if row is not None:
+                return row
+
+        row = connection.execute(
+            """
+            SELECT id, session_code, title, status, created_at, updated_at
+            FROM chat_sessions
+            WHERE user_id = ? AND status = 'active'
+            ORDER BY updated_at DESC, id DESC
+            LIMIT 1
+            """,
+            (user_id,),
+        ).fetchone()
+        if row is not None:
+            return row
+
+        new_session_code = f"chat_{uuid.uuid4().hex}"
+        cursor = connection.execute(
+            """
+            INSERT INTO chat_sessions (session_code, user_id)
+            VALUES (?, ?)
+            """,
+            (new_session_code, user_id),
+        )
+        return connection.execute(
+            """
+            SELECT id, session_code, title, status, created_at, updated_at
+            FROM chat_sessions
+            WHERE id = ?
+            """,
+            (int(cursor.lastrowid),),
+        ).fetchone()
+
+    def _get_chat_memory_row(
+        self,
+        connection: sqlite3.Connection,
+        user_id: int,
+    ) -> sqlite3.Row | None:
+        return connection.execute(
+            """
+            SELECT summary_text, facts_json, last_session_id, updated_at
+            FROM chat_memory_summaries
+            WHERE user_id = ?
+            """,
+            (user_id,),
+        ).fetchone()
+
+    def _update_chat_memory_from_message(
+        self,
+        connection: sqlite3.Connection,
+        user_id: int,
+        session_id: int,
+        content: str,
+    ) -> tuple[dict[str, object], str]:
+        memory_row = self._get_chat_memory_row(connection, user_id)
+        current_facts = (
+            json.loads(memory_row["facts_json"] or "{}")
+            if memory_row is not None
+            else {}
+        )
+        extracted_facts = self._extract_chat_facts(content)
+        extracted_facts["last_user_request"] = content[:500]
+        merged_facts = self._merge_chat_facts(current_facts, extracted_facts)
+        summary = self._build_chat_memory_summary(merged_facts)
+
+        connection.execute(
+            """
+            INSERT INTO chat_memory_summaries (
+                user_id,
+                summary_text,
+                facts_json,
+                last_session_id,
+                updated_at
+            )
+            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(user_id) DO UPDATE SET
+                summary_text = excluded.summary_text,
+                facts_json = excluded.facts_json,
+                last_session_id = excluded.last_session_id,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (
+                user_id,
+                summary,
+                json.dumps(merged_facts, ensure_ascii=False),
+                session_id,
+            ),
+        )
+        self._sync_profile_from_chat_facts(connection, user_id, merged_facts)
+        return merged_facts, summary
+
+    def _extract_chat_facts(self, content: str) -> dict[str, object]:
+        normalized = self._normalize_for_matching(content)
+        facts: dict[str, object] = {}
+
+        display_name = self._extract_display_name(content)
+        if display_name:
+            facts["display_name"] = display_name
+
+        level = self._extract_level(normalized)
+        if level:
+            facts["level"] = level
+
+        difficulty = self._extract_difficulty(normalized)
+        if difficulty:
+            facts["preferred_difficulty"] = difficulty
+
+        question_count = self._extract_question_count(normalized)
+        if question_count:
+            facts["preferred_num_questions"] = question_count
+
+        goals = self._extract_goals(normalized)
+        if goals:
+            facts["goals"] = goals
+
+        content_themes = self._extract_content_themes(normalized)
+        if content_themes:
+            facts["content_themes"] = content_themes
+            facts["preferred_content_theme"] = content_themes[0]
+
+        mentioned_topics = self._extract_topics(normalized)
+        if mentioned_topics:
+            facts["recent_topics"] = mentioned_topics
+            facts["last_topic_requested"] = mentioned_topics[0]
+
+        if self._has_weakness_marker(normalized) and mentioned_topics:
+            facts["weak_topics"] = mentioned_topics
+
+        return facts
+
+    def _merge_chat_facts(
+        self,
+        current_facts: dict[str, object],
+        extracted_facts: dict[str, object],
+    ) -> dict[str, object]:
+        merged = dict(current_facts)
+        list_keys = {"content_themes", "goals", "weak_topics", "recent_topics"}
+        for key, value in extracted_facts.items():
+            if value in (None, "", []):
+                continue
+            if key in list_keys:
+                existing = merged.get(key, [])
+                existing_values = existing if isinstance(existing, list) else []
+                incoming_values = value if isinstance(value, list) else [value]
+                merged[key] = self._merge_unique_strings(
+                    existing_values,
+                    incoming_values,
+                )
+            else:
+                merged[key] = value
+        return merged
+
+    def _sync_profile_from_chat_facts(
+        self,
+        connection: sqlite3.Connection,
+        user_id: int,
+        facts: dict[str, object],
+    ) -> None:
+        connection.execute(
+            """
+            INSERT INTO user_profiles (user_id, level, goals_json)
+            VALUES (?, ?, ?)
+            ON CONFLICT(user_id) DO NOTHING
+            """,
+            (user_id, str(facts.get("level") or "beginner"), "[]"),
+        )
+
+        if facts.get("display_name"):
+            connection.execute(
+                """
+                UPDATE users
+                SET name = ?
+                WHERE id = ?
+                """,
+                (str(facts["display_name"]), user_id),
+            )
+
+        profile_row = connection.execute(
+            """
+            SELECT
+                level,
+                goals_json,
+                preferred_difficulty,
+                preferred_num_questions,
+                onboarding_completed
+            FROM user_profiles
+            WHERE user_id = ?
+            """,
+            (user_id,),
+        ).fetchone()
+
+        existing_goals = json.loads(profile_row["goals_json"] or "[]")
+        goals = self._merge_unique_strings(
+            existing_goals,
+            self._as_string_list(facts.get("goals")),
+        )
+        has_complete_memory = all(
+            [
+                facts.get("display_name"),
+                facts.get("level") or profile_row["level"],
+                goals,
+                facts.get("weak_topics"),
+                facts.get("preferred_difficulty")
+                or profile_row["preferred_difficulty"],
+                facts.get("preferred_num_questions")
+                or profile_row["preferred_num_questions"],
+            ]
+        )
+
+        connection.execute(
+            """
+            UPDATE user_profiles
+            SET
+                level = ?,
+                goals_json = ?,
+                preferred_difficulty = COALESCE(?, preferred_difficulty),
+                preferred_num_questions = COALESCE(?, preferred_num_questions),
+                onboarding_completed = CASE
+                    WHEN ? THEN 1
+                    ELSE onboarding_completed
+                END,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE user_id = ?
+            """,
+            (
+                str(facts.get("level") or profile_row["level"] or "beginner"),
+                json.dumps(goals, ensure_ascii=False),
+                facts.get("preferred_difficulty"),
+                facts.get("preferred_num_questions"),
+                int(has_complete_memory),
+                user_id,
+            ),
+        )
+
+        for topic_code in self._as_string_list(facts.get("weak_topics")):
+            normalized_topic = self._normalize_topic_code(topic_code)
+            topic_id = self._ensure_topic(connection, normalized_topic)
+            connection.execute(
+                """
+                INSERT INTO user_topic_stats (
+                    user_id,
+                    topic_id,
+                    attempts_count,
+                    correct_count,
+                    accuracy,
+                    weakness_score,
+                    status,
+                    last_practiced_at
+                )
+                VALUES (?, ?, 0, 0, 0.25, 0.75, 'chat_reported', CURRENT_TIMESTAMP)
+                ON CONFLICT(user_id, topic_id) DO UPDATE SET
+                    weakness_score = MAX(weakness_score, excluded.weakness_score),
+                    status = excluded.status,
+                    last_practiced_at = CURRENT_TIMESTAMP
+                """,
+                (user_id, topic_id),
+            )
+
+    def _build_chat_memory_summary(self, facts: dict[str, object]) -> str:
+        parts: list[str] = []
+        if facts.get("display_name"):
+            parts.append(f"name={facts['display_name']}")
+        if facts.get("level"):
+            parts.append(f"level={facts['level']}")
+        if facts.get("goals"):
+            parts.append(f"goals={', '.join(self._as_string_list(facts.get('goals')))}")
+        if facts.get("weak_topics"):
+            parts.append(
+                "weak_topics="
+                + ", ".join(self._as_string_list(facts.get("weak_topics")))
+            )
+        if facts.get("preferred_difficulty"):
+            parts.append(f"preferred_difficulty={facts['preferred_difficulty']}")
+        if facts.get("preferred_num_questions"):
+            parts.append(f"preferred_num_questions={facts['preferred_num_questions']}")
+        if facts.get("preferred_content_theme"):
+            parts.append(f"preferred_content_theme={facts['preferred_content_theme']}")
+        if facts.get("content_themes"):
+            parts.append(
+                "content_themes="
+                + ", ".join(self._as_string_list(facts.get("content_themes")))
+            )
+        if facts.get("last_topic_requested"):
+            parts.append(f"last_topic={facts['last_topic_requested']}")
+        if facts.get("last_user_request"):
+            parts.append(f"last_request={facts['last_user_request']}")
+        return "; ".join(parts)
+
+    def _build_suggested_next_question(
+        self,
+        facts: dict[str, object],
+        messages: list[dict[str, object]],
+    ) -> str:
+        if not facts.get("display_name"):
+            return "Minh nen goi ban la gi de luu vao bo nho hoc tap?"
+        if not facts.get("level"):
+            return "Trinh do hien tai cua ban la beginner, intermediate hay advanced?"
+        if not facts.get("goals"):
+            return "Muc tieu hoc chinh cua ban la gi: giao tiep, thi cu, ngu phap hay tu vung?"
+        if not facts.get("weak_topics"):
+            return "Ban hay sai nhat phan nao de minh uu tien bai luyen tiep theo?"
+        if not facts.get("preferred_num_questions"):
+            return "Moi lan luyen ban muon mac dinh bao nhieu cau?"
+        if facts.get("last_topic_requested"):
+            topic = self._label_from_code(str(facts["last_topic_requested"]))
+            return f"Lan truoc ban dang quan tam {topic}. Ban muon luyen tiep chu de nay khong?"
+        if messages:
+            return "Minh da tai lai doan chat gan day. Ban muon tiep tuc tu noi dung cu hay doi chu de?"
+        return "Ban muon luyen chu de nao hom nay?"
+
+    def _extract_display_name(self, content: str) -> str | None:
+        normalized = self._normalize_for_matching(content)
+        patterns = [
+            r"(?:tên tôi là|ten toi la|tôi tên là|toi ten la|mình tên là|minh ten la|mình tên|minh ten|tên mình là|ten minh la|tên em là|ten em la|tên anh là|ten anh la|tên chị là|ten chi la|gọi mình là|goi minh la|gọi tôi là|goi toi la|gọi em là|goi em la|gọi anh là|goi anh la|gọi chị là|goi chi la|gọi là|goi la|mình là|minh la|tôi là|toi la|em là|em la|anh là|anh la|chị là|chi la|call me|my name is|i am|i'm)\s+([^\n,.;!?]{1,40})",
+        ]
+        for source in [content, normalized]:
+            for pattern in patterns:
+                match = re.search(pattern, source, re.IGNORECASE)
+                if not match:
+                    continue
+                candidate = self._clean_display_name_candidate(match.group(1))
+                candidate_key = self._normalize_for_matching(candidate)
+                if candidate and candidate_key not in {
+                    "beginner",
+                    "intermediate",
+                    "advanced",
+                    "easy",
+                    "medium",
+                    "hard",
+                    "co ban",
+                    "khong biet",
+                    "chua biet",
+                }:
+                    return candidate.title()
+        return None
+
+    def _sanitize_display_name(self, raw_name: str | None, fallback: str) -> str:
+        if not raw_name:
+            return fallback
+        return self._extract_display_name(raw_name) or raw_name
+
+    def _clean_display_name_candidate(self, raw_candidate: str) -> str:
+        candidate = re.split(r"[,.;!?\n]", raw_candidate, maxsplit=1)[0]
+        candidate = " ".join(candidate.strip(" .,!?:;").split())
+        candidate = re.sub(
+            r"\s+(?:cũng được|cung duoc|được|duoc|đi|di|nhé|nhe|nha|ạ|a|ha|với|voi|thôi|thoi)$",
+            "",
+            candidate,
+            flags=re.IGNORECASE,
+        ).strip()
+        candidate = re.sub(r"^(?:là|la)\s+", "", candidate, flags=re.IGNORECASE)
+        return candidate[:40]
+
+    def _extract_level(self, normalized: str) -> str | None:
+        if any(token in normalized for token in ["advanced", "nang cao", "gioi"]):
+            return "advanced"
+        if any(
+            token in normalized
+            for token in ["intermediate", "trung cap", "trung binh", "vua"]
+        ):
+            return "intermediate"
+        if any(
+            token in normalized
+            for token in ["beginner", "moi bat dau", "co ban", "mat goc"]
+        ):
+            return "beginner"
+        return None
+
+    def _extract_difficulty(self, normalized: str) -> str | None:
+        if any(token in normalized for token in ["hard", "muc kho", "do kho kho"]):
+            return "hard"
+        if any(
+            token in normalized
+            for token in ["medium", "muc vua", "do kho vua", "muc trung binh"]
+        ):
+            return "medium"
+        if any(token in normalized for token in ["easy", "muc de", "do kho de"]):
+            return "easy"
+        return None
+
+    def _extract_question_count(self, normalized: str) -> int | None:
+        match = re.search(
+            r"\b(\d{1,2})\s*(?:cau|questions?|items?|bai)\b",
+            normalized,
+        )
+        if not match:
+            return None
+        return max(1, min(int(match.group(1)), 20))
+
+    def _extract_goals(self, normalized: str) -> list[str]:
+        goal_map = {
+            "daily_communication": ["giao tiep", "communication", "speaking"],
+            "exam_preparation": ["toeic", "ielts", "thi", "kiem tra", "exam"],
+            "grammar_foundation": ["ngu phap", "grammar"],
+            "topic_vocabulary": ["tu vung", "vocabulary"],
+            "travel_english": ["du lich", "travel", "san bay", "khach san"],
+            "work_english": ["cong viec", "work", "business"],
+            "writing_practice": ["viet", "writing"],
+            "listening_practice": ["nghe", "listening"],
+        }
+        return [
+            goal
+            for goal, keywords in goal_map.items()
+            if any(self._contains_keyword(normalized, keyword) for keyword in keywords)
+        ]
+
+    def _extract_content_themes(self, normalized: str) -> list[str]:
+        theme_map = {
+            "anime": ["anime", "manga", "otaku", "anime character", "episode"],
+        }
+        return [
+            theme
+            for theme, keywords in theme_map.items()
+            if any(self._contains_keyword(normalized, keyword) for keyword in keywords)
+        ]
+
+    def _extract_topics(self, normalized: str) -> list[str]:
+        topic_map = {
+            "passive_voice": ["passive", "bi dong", "cau bi dong"],
+            "relative_clause": ["relative", "quan he", "menh de quan he"],
+            "conditional_sentence": ["conditional", "dieu kien", "cau dieu kien"],
+            "reported_speech": ["reported", "gian tiep", "tuong thuat"],
+            "tenses": ["tense", "thi hien tai", "thi qua khu", "thi tuong lai"],
+            "prepositions": ["preposition", "gioi tu"],
+            "travel_vocabulary": ["travel", "du lich", "san bay", "khach san"],
+            "vocabulary": ["vocabulary", "tu vung"],
+            "listening": ["listening", "nghe"],
+            "writing": ["writing", "viet"],
+        }
+        topics: list[str] = []
+        for topic_code, keywords in topic_map.items():
+            if any(self._contains_keyword(normalized, keyword) for keyword in keywords):
+                topics.append(topic_code)
+        return topics
+
+    def _contains_keyword(self, normalized: str, keyword: str) -> bool:
+        return bool(re.search(rf"(?<!\w){re.escape(keyword)}(?!\w)", normalized))
+
+    def _has_weakness_marker(self, normalized: str) -> bool:
+        return any(
+            marker in normalized
+            for marker in [
+                "hay sai",
+                "thuong sai",
+                "yeu",
+                "kho",
+                "loi",
+                "quen",
+                "confuse",
+                "weak",
+                "mistake",
+                "struggle",
+            ]
+        )
+
+    def _normalize_for_matching(self, value: str) -> str:
+        normalized = value.replace("\u0111", "d").replace("\u0110", "D")
+        normalized = unicodedata.normalize("NFD", normalized)
+        normalized = "".join(
+            character
+            for character in normalized
+            if unicodedata.category(character) != "Mn"
+        )
+        return normalized.lower().strip()
+
+    def _normalize_topic_code(self, topic: str) -> str:
+        normalized = self._normalize_for_matching(topic)
+        normalized = normalized.replace("-", "_").replace(" ", "_")
+        aliases = {
+            "passive": "passive_voice",
+            "bi_dong": "passive_voice",
+            "relative": "relative_clause",
+            "quan_he": "relative_clause",
+            "conditional": "conditional_sentence",
+            "dieu_kien": "conditional_sentence",
+            "travel": "travel_vocabulary",
+            "du_lich": "travel_vocabulary",
+            "tu_vung": "vocabulary",
+        }
+        return aliases.get(normalized, normalized)
+
+    def _merge_unique_strings(
+        self,
+        existing_values: list[object],
+        incoming_values: list[object],
+    ) -> list[str]:
+        merged: list[str] = []
+        seen: set[str] = set()
+        for value in [*existing_values, *incoming_values]:
+            normalized = str(value).strip()
+            if not normalized or normalized in seen:
+                continue
+            seen.add(normalized)
+            merged.append(normalized)
+        return merged
+
+    def _as_string_list(self, value: object) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, list):
+            return [str(item) for item in value if str(item).strip()]
+        if isinstance(value, tuple):
+            return [str(item) for item in value if str(item).strip()]
+        return [str(value)] if str(value).strip() else []
+
+    def _make_chat_title(self, content: str) -> str:
+        normalized = " ".join(content.split())
+        if len(normalized) <= 64:
+            return normalized
+        return f"{normalized[:61]}..."
+
+    def _init_db(self) -> None:
+        schema = self.schema_path.read_text(encoding="utf-8")
+        with self._connect() as connection:
+            connection.executescript(schema)
+            self._ensure_column(
+                connection,
+                table_name="session_exercises",
+                column_name="client_exercise_id",
+                column_definition="TEXT",
+            )
+            self._ensure_column(
+                connection,
+                table_name="session_exercises",
+                column_name="skill",
+                column_definition="TEXT NOT NULL DEFAULT 'grammar'",
+            )
+            self._ensure_column(
+                connection,
+                table_name="session_exercises",
+                column_name="subtopic",
+                column_definition="TEXT",
+            )
+            self._ensure_column(
+                connection,
+                table_name="session_exercises",
+                column_name="error_tag",
+                column_definition="TEXT",
+            )
+            self._ensure_column(
+                connection,
+                table_name="seed_exercises",
+                column_name="subtopic",
+                column_definition="TEXT",
+            )
+            self._ensure_column(
+                connection,
+                table_name="seed_exercises",
+                column_name="error_tag",
+                column_definition="TEXT",
+            )
+            self._ensure_column(
+                connection,
+                table_name="user_profiles",
+                column_name="preferred_num_questions",
+                column_definition="INTEGER",
+            )
+            self._ensure_column(
+                connection,
+                table_name="user_profiles",
+                column_name="onboarding_completed",
+                column_definition="INTEGER NOT NULL DEFAULT 0",
+            )
+
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
+        connection = sqlite3.connect(self.db_path)
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA foreign_keys = ON")
+        try:
+            yield connection
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+
+    def _ensure_user(self, connection: sqlite3.Connection, user_code: str) -> int:
+        connection.execute(
+            """
+            INSERT INTO users (user_code)
+            VALUES (?)
+            ON CONFLICT(user_code) DO NOTHING
+            """,
+            (user_code,),
+        )
+        row = connection.execute(
+            "SELECT id FROM users WHERE user_code = ?",
+            (user_code,),
+        ).fetchone()
+        return int(row["id"])
+
+    def _ensure_topic(self, connection: sqlite3.Connection, topic_code: str) -> int:
+        connection.execute(
+            """
+            INSERT INTO topics (topic_code, name, skill)
+            VALUES (?, ?, ?)
+            ON CONFLICT(topic_code) DO NOTHING
+            """,
+            (
+                topic_code,
+                topic_code.replace("_", " ").title(),
+                self._skill_for_topic(topic_code),
+            ),
+        )
+        row = connection.execute(
+            "SELECT id FROM topics WHERE topic_code = ?",
+            (topic_code,),
+        ).fetchone()
+        return int(row["id"])
+
+    def _get_latest_generation_run(
+        self,
+        connection: sqlite3.Connection,
+        user_id: int,
+        topic_id: int,
+    ) -> sqlite3.Row | None:
+        return connection.execute(
+            """
+            SELECT id, topic_id, difficulty
+            FROM generation_runs
+            WHERE user_id = ? AND topic_id = ?
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (user_id, topic_id),
+        ).fetchone()
+
+    def _get_generation_run_by_public_id(
+        self,
+        connection: sqlite3.Connection,
+        user_id: int,
+        generation_run_id: str,
+    ) -> sqlite3.Row | None:
+        return connection.execute(
+            """
+            SELECT id, topic_id, difficulty
+            FROM generation_runs
+            WHERE user_id = ? AND generation_run_id = ?
+            """,
+            (user_id, generation_run_id),
+        ).fetchone()
+
+    def _save_user_answers(
+        self,
+        connection: sqlite3.Connection,
+        user_id: int,
+        session_id: int,
+        generation_run_db_id: int,
+        selected_answers: dict[str, str],
+    ) -> None:
+        exercise_rows = connection.execute(
+            """
+            SELECT
+                id,
+                client_exercise_id,
+                session_exercise_code,
+                topic_id,
+                subtopic,
+                error_tag,
+                correct_answer
+            FROM session_exercises
+            WHERE generation_run_id = ?
+            ORDER BY display_order, id
+            """,
+            (generation_run_db_id,),
+        ).fetchall()
+
+        for exercise_row in exercise_rows:
+            exercise_id = (
+                exercise_row["client_exercise_id"]
+                or exercise_row["session_exercise_code"]
+            )
+            selected_answer = selected_answers.get(exercise_id)
+            is_correct = self._answers_match(
+                selected_answer,
+                exercise_row["correct_answer"],
+            )
+            exercise_error_tag = exercise_row["error_tag"]
+            connection.execute(
+                """
+                INSERT INTO user_answers (
+                    session_id,
+                    session_exercise_id,
+                    selected_answer,
+                    is_correct,
+                    error_tag
+                )
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    session_id,
+                    int(exercise_row["id"]),
+                    selected_answer,
+                    int(is_correct),
+                    None if is_correct else exercise_error_tag or "incorrect_answer",
+                ),
+            )
+            self._update_subtopic_stats(
+                connection=connection,
+                user_id=user_id,
+                topic_id=int(exercise_row["topic_id"]),
+                subtopic=exercise_row["subtopic"],
+                is_correct=is_correct,
+            )
+            self._update_error_stats(
+                connection=connection,
+                user_id=user_id,
+                topic_id=int(exercise_row["topic_id"]),
+                error_tag=exercise_error_tag,
+                is_correct=is_correct,
+            )
+
+    def _update_subtopic_stats(
+        self,
+        connection: sqlite3.Connection,
+        user_id: int,
+        topic_id: int,
+        subtopic: str | None,
+        is_correct: bool,
+    ) -> None:
+        if not subtopic:
+            return
+
+        existing = connection.execute(
+            """
+            SELECT attempts_count, correct_count
+            FROM user_subtopic_stats
+            WHERE user_id = ? AND topic_id = ? AND subtopic = ?
+            """,
+            (user_id, topic_id, subtopic),
+        ).fetchone()
+        attempts_count = 1
+        correct_count = int(is_correct)
+        if existing is not None:
+            attempts_count += int(existing["attempts_count"])
+            correct_count += int(existing["correct_count"])
+
+        accuracy = correct_count / max(attempts_count, 1)
+        confidence = min(attempts_count / 5, 1.0)
+        mastery_score = accuracy * confidence
+        weakness_score = 1.0 - mastery_score
+
+        connection.execute(
+            """
+            INSERT INTO user_subtopic_stats (
+                user_id,
+                topic_id,
+                subtopic,
+                attempts_count,
+                correct_count,
+                accuracy,
+                mastery_score,
+                weakness_score,
+                status,
+                last_practiced_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(user_id, topic_id, subtopic) DO UPDATE SET
+                attempts_count = excluded.attempts_count,
+                correct_count = excluded.correct_count,
+                accuracy = excluded.accuracy,
+                mastery_score = excluded.mastery_score,
+                weakness_score = excluded.weakness_score,
+                status = excluded.status,
+                last_practiced_at = CURRENT_TIMESTAMP
+            """,
+            (
+                user_id,
+                topic_id,
+                subtopic,
+                attempts_count,
+                correct_count,
+                accuracy,
+                mastery_score,
+                weakness_score,
+                self._status_from_accuracy(accuracy),
+            ),
+        )
+
+    def _update_error_stats(
+        self,
+        connection: sqlite3.Connection,
+        user_id: int,
+        topic_id: int,
+        error_tag: str | None,
+        is_correct: bool,
+    ) -> None:
+        if not error_tag:
+            return
+
+        existing = connection.execute(
+            """
+            SELECT attempts_count, incorrect_count
+            FROM user_error_stats
+            WHERE user_id = ? AND topic_id = ? AND error_tag = ?
+            """,
+            (user_id, topic_id, error_tag),
+        ).fetchone()
+        attempts_count = 1
+        incorrect_count = 0 if is_correct else 1
+        if existing is not None:
+            attempts_count += int(existing["attempts_count"])
+            incorrect_count += int(existing["incorrect_count"])
+
+        error_rate = incorrect_count / max(attempts_count, 1)
+        connection.execute(
+            """
+            INSERT INTO user_error_stats (
+                user_id,
+                topic_id,
+                error_tag,
+                attempts_count,
+                incorrect_count,
+                error_rate,
+                weakness_score,
+                status,
+                last_seen_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(user_id, topic_id, error_tag) DO UPDATE SET
+                attempts_count = excluded.attempts_count,
+                incorrect_count = excluded.incorrect_count,
+                error_rate = excluded.error_rate,
+                weakness_score = excluded.weakness_score,
+                status = excluded.status,
+                last_seen_at = CURRENT_TIMESTAMP
+            """,
+            (
+                user_id,
+                topic_id,
+                error_tag,
+                attempts_count,
+                incorrect_count,
+                error_rate,
+                error_rate,
+                self._status_from_error_rate(error_rate),
+            ),
+        )
+
+    def _ensure_column(
+        self,
+        connection: sqlite3.Connection,
+        table_name: str,
+        column_name: str,
+        column_definition: str,
+    ) -> None:
+        columns = {
+            row["name"]
+            for row in connection.execute(f"PRAGMA table_info({table_name})").fetchall()
+        }
+        if column_name not in columns:
+            connection.execute(
+                f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_definition}"
+            )
+
+    def _stat_key(self, topic_code: str, detail_code: str) -> str:
+        return f"{topic_code}:{detail_code}"
+
+    def _label_from_code(self, code: str | None) -> str:
+        if not code:
+            return "Unknown"
+        return str(code).replace("_", " ").title()
+
+    def _answers_match(self, selected_answer: str | None, correct_answer: str) -> bool:
+        return self.text_normalizer.answers_match(selected_answer, correct_answer)
+
+    def _skill_for_topic(self, topic_code: str) -> str:
+        if "vocabulary" in topic_code:
+            return "vocabulary"
+        return "grammar"
+
+    def _status_from_accuracy(self, accuracy: float) -> str:
+        if accuracy < 0.6:
+            return "weak"
+        if accuracy < 0.8:
+            return "needs_practice"
+        return "can_increase_difficulty"
+
+    def _status_from_error_rate(self, error_rate: float) -> str:
+        if error_rate >= 0.5:
+            return "active_error"
+        if error_rate >= 0.2:
+            return "watch"
+        return "improving"

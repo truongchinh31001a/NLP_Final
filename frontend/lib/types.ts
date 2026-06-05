@@ -3,6 +3,7 @@ export type LearnerProfile = {
   goal: string;
   level: string;
   preferredDifficulty: string;
+  preferredNumQuestions?: number | null;
   accuracy: number;
   sessionCount: number;
 };
@@ -35,6 +36,9 @@ export type ExercisePreview = {
   type: string;
   topic: string;
   difficulty: string;
+  skill?: string;
+  subtopic?: string | null;
+  errorTag?: string | null;
   question: string;
   options: ExerciseOptionPreview[];
   correctAnswer: string;
@@ -48,6 +52,7 @@ export type PracticePlanPreview = {
   exerciseType: string;
   numQuestions: number;
   focusReason: string;
+  contentTheme?: string | null;
 };
 
 export type ScoreResult = {
@@ -57,6 +62,90 @@ export type ScoreResult = {
   totalQuestions: number;
   weakTopicsDetected: string[];
   recommendation: string;
+  generationRunId?: string;
+  sessionCode?: string;
+  practiceReview?: PracticeReview | null;
+};
+
+export type PracticeReview = {
+  reviewCode: string;
+  evaluator: string;
+  summary: string;
+  strengths: string[];
+  weaknesses: string[];
+  nextSteps: string[];
+  nextPracticePrompt: string;
+};
+
+export type PersistedChatMessage = {
+  messageId: string;
+  role: "user" | "assistant";
+  content: string;
+  createdAt?: string | null;
+};
+
+export type ChatMemoryResume = {
+  sessionId: string;
+  hasHistory: boolean;
+  memorySummary: string;
+  extractedFacts: Record<string, unknown>;
+  suggestedNextQuestion: string;
+  messages: PersistedChatMessage[];
+};
+
+export type PersonalizationTopicStat = {
+  code: string;
+  label: string;
+  topic: string;
+  attemptsCount: number;
+  correctCount: number;
+  accuracy: number;
+  weaknessScore: number;
+  status?: string | null;
+  lastPracticedAt?: string | null;
+};
+
+export type PersonalizationSubtopicStat = {
+  code: string;
+  label: string;
+  topic: string;
+  attemptsCount: number;
+  correctCount: number;
+  accuracy: number;
+  masteryScore: number;
+  weaknessScore: number;
+  status?: string | null;
+  lastPracticedAt?: string | null;
+};
+
+export type PersonalizationErrorStat = {
+  code: string;
+  label: string;
+  topic: string;
+  attemptsCount: number;
+  incorrectCount: number;
+  errorRate: number;
+  weaknessScore: number;
+  status?: string | null;
+  lastSeenAt?: string | null;
+};
+
+export type PersonalizationSnapshot = {
+  userId: string;
+  displayName: string;
+  level: string;
+  goals: string[];
+  preferredDifficulty?: string | null;
+  preferredNumQuestions?: number | null;
+  onboardingCompleted: boolean;
+  topicStats: PersonalizationTopicStat[];
+  subtopicStats: PersonalizationSubtopicStat[];
+  errorStats: PersonalizationErrorStat[];
+  nextPlan: PracticePlanPreview & {
+    targetSubtopic?: string | null;
+    targetErrorTag?: string | null;
+    learnerSummary?: string;
+  };
 };
 
 export type DashboardSnapshot = {

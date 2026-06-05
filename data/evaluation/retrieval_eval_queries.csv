@@ -1,0 +1,36 @@
+query,expected_topic,expected_level,notes
+present simple passive am is are past participle,passive_voice,beginner,present passive form
+was were past participle passive sentence,passive_voice,beginner,past passive form
+modal passive must be submitted,passive_voice,intermediate,modal passive
+passive by agent written by composer,passive_voice,intermediate,by agent
+active to passive transformation object becomes subject,passive_voice,intermediate,transformation
+who relative pronoun for people,relative_clause,beginner,who for people
+which relative pronoun for things,relative_clause,beginner,which for things
+whose possession relative clause,relative_clause,intermediate,whose possession
+non defining relative clause commas not that,relative_clause,intermediate,non-defining clauses
+object relative pronoun omitted movie I watched,relative_clause,intermediate,omitted object pronoun
+zero conditional facts present simple,conditional_sentence,beginner,zero conditional
+first conditional if present simple will,conditional_sentence,beginner,first conditional
+second conditional if I were you would,conditional_sentence,intermediate,second conditional
+third conditional would have past participle,conditional_sentence,advanced,third conditional
+unless means if not condition,conditional_sentence,intermediate,unless
+reported speech statement backshift was,reported_speech,intermediate,reported statements
+reported yes no question if whether statement order,reported_speech,intermediate,yes no questions
+reported command told me to close,reported_speech,intermediate,reported commands
+say versus tell reported speech object,reported_speech,beginner,say and tell
+reported speech tomorrow the next day,reported_speech,intermediate,time expression shift
+present simple habits third person s, tenses,beginner,present simple
+present continuous action happening now, tenses,beginner,present continuous
+past simple finished time yesterday, tenses,beginner,past simple
+present perfect since for experience, tenses,intermediate,present perfect
+past perfect before another past action, tenses,intermediate,past perfect
+prepositions of time at on in,prepositions,beginner,time prepositions
+prepositions of place in on at,prepositions,beginner,place prepositions
+interested in good at dependent prepositions,prepositions,intermediate,dependent prepositions
+during versus for flight two hours,prepositions,intermediate,during for
+by deadline until continuing time,prepositions,intermediate,by until
+airport boarding pass gate luggage passport,travel_vocabulary,beginner,airport words
+hotel reservation reception check in check out,travel_vocabulary,beginner,hotel words
+one way round trip ticket platform fare,travel_vocabulary,beginner,transport words
+flight delayed cancelled lost luggage,travel_vocabulary,intermediate,travel problems
+passport visa itinerary travel documents,travel_vocabulary,beginner,travel documents

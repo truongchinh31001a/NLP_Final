@@ -14,7 +14,12 @@ class LangChainModelFactory:
         self.config = config
 
     def build_generation_runnable(self) -> Runnable[Any, Any]:
-        if os.getenv("OPENAI_API_KEY"):
+        backend = self._resolve_backend()
+
+        if backend == "ollama":
+            return self._build_ollama_runnable()
+
+        if backend == "openai":
             return ChatOpenAI(
                 model=self.config.openai_model,
                 temperature=self.config.openai_temperature,
@@ -23,9 +28,42 @@ class LangChainModelFactory:
         return RunnableLambda(self._fallback_json_response)
 
     def get_backend_name(self) -> str:
-        if os.getenv("OPENAI_API_KEY"):
+        backend = self._resolve_backend()
+        if backend == "ollama":
+            return f"langchain-ollama:{self.config.ollama_model}"
+        if backend == "openai":
             return f"langchain-openai:{self.config.openai_model}"
         return "langchain-fallback:runnable-lambda"
+
+    def _resolve_backend(self) -> str:
+        requested = self.config.llm_backend.strip().lower()
+        if requested in {"fallback", "local", "seed"}:
+            return "fallback"
+        if requested in {"ollama", "openai"}:
+            return requested
+        if requested != "auto":
+            raise ValueError(
+                "Unsupported LLM_BACKEND. Use auto, openai, ollama, or fallback."
+            )
+        if os.getenv("OPENAI_API_KEY"):
+            return "openai"
+        return "fallback"
+
+    def _build_ollama_runnable(self) -> Runnable[Any, Any]:
+        try:
+            from langchain_ollama import ChatOllama
+        except ImportError as exc:
+            raise RuntimeError(
+                "LLM_BACKEND=ollama requires the `langchain-ollama` package. "
+                "Install dependencies with `pip install -r requirements.txt`."
+            ) from exc
+
+        return ChatOllama(
+            model=self.config.ollama_model,
+            base_url=self.config.ollama_base_url,
+            temperature=self.config.ollama_temperature,
+            format="json",
+        )
 
     def _fallback_json_response(self, prompt_value: Any) -> str:
         prompt_text = (

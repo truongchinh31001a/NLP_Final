@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Sans, Space_Grotesk } from "next/font/google";
 
+import "antd/dist/reset.css";
 import "./globals.css";
 
 const headingFont = Space_Grotesk({

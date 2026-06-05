@@ -13,4 +13,5 @@ class RetrievalService:
             topic=plan.topic,
             level=learner_level,
             limit=self.config.retrieval_top_k,
+            subtopic=plan.target_subtopic,
         )
