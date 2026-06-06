@@ -1,11 +1,14 @@
 import os
+from collections import Counter
 from dataclasses import asdict
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.schemas import (
     ChatMemoryResponseModel,
+    ChromaDebugResponseModel,
     GeneratePracticeRequestModel,
     GeneratePracticeResponseModel,
     HealthResponseModel,
@@ -22,6 +25,7 @@ from app.api.schemas import (
     UserProfileResponseModel,
 )
 from app.bootstrap import build_baseline_pipeline
+from app.retrieval.knowledge_loader import load_knowledge_chunk_records
 from app.schemas import PracticeRequest, SessionResult, SubmittedAnswer
 
 app = FastAPI(
@@ -52,6 +56,11 @@ def healthcheck() -> HealthResponseModel:
         status="ok",
         generator_backend=pipeline.generator.backend_name,
     )
+
+
+@app.get("/api/debug/chroma", response_model=ChromaDebugResponseModel)
+def debug_chroma() -> ChromaDebugResponseModel:
+    return ChromaDebugResponseModel(**_build_chroma_debug_snapshot())
 
 
 @app.post("/api/practice/generate", response_model=GeneratePracticeResponseModel)
@@ -251,6 +260,126 @@ def _clean_list(values: list[str]) -> list[str]:
             seen.add(normalized)
             cleaned.append(normalized)
     return cleaned
+
+
+def _build_chroma_debug_snapshot() -> dict:
+    config = pipeline.config
+    persist_directory = str(Path(config.chroma_persist_directory))
+    raw_knowledge_path = str(Path(config.knowledge_chunks_path))
+    ingest_command = (
+        "python scripts/ingest_knowledge_chunks.py "
+        f"--persist-dir {persist_directory} "
+        f"--collection {config.chroma_collection_name}"
+    )
+    raw_knowledge_count = _safe_raw_knowledge_count(config.knowledge_chunks_path)
+    base_snapshot = {
+        "configured_backend": config.vector_store_backend,
+        "using_chroma_backend": config.vector_store_backend.lower() == "chroma",
+        "collection_name": config.chroma_collection_name,
+        "persist_directory": persist_directory,
+        "raw_knowledge_path": raw_knowledge_path,
+        "raw_knowledge_count": raw_knowledge_count,
+        "ingest_command": ingest_command,
+        "topic_counts": {},
+        "level_counts": {},
+        "sample_chunks": [],
+        "total_chunks": 0,
+    }
+
+    try:
+        from langchain_chroma import Chroma
+
+        from app.retrieval.embeddings import KeywordHashEmbeddings
+
+        vector_store = Chroma(
+            collection_name=config.chroma_collection_name,
+            embedding_function=KeywordHashEmbeddings(),
+            persist_directory=persist_directory,
+        )
+        payload = vector_store.get(include=["metadatas", "documents"])
+    except Exception as exc:  # pragma: no cover - defensive debug endpoint
+        return {
+            **base_snapshot,
+            "is_available": False,
+            "status_message": "Khong doc duoc Chroma collection.",
+            "error": str(exc),
+        }
+
+    ids = payload.get("ids") or []
+    metadatas = payload.get("metadatas") or []
+    documents = payload.get("documents") or []
+    topic_counts = Counter(
+        str(metadata.get("topic") or metadata.get("topic_code") or "unknown")
+        for metadata in metadatas
+        if isinstance(metadata, dict)
+    )
+    level_counts = Counter(
+        str(metadata.get("level") or "unknown")
+        for metadata in metadatas
+        if isinstance(metadata, dict)
+    )
+    sample_chunks = [
+        _chroma_debug_chunk(
+            chunk_id=str(chunk_id),
+            metadata=metadata if isinstance(metadata, dict) else {},
+            document=str(document or ""),
+        )
+        for chunk_id, metadata, document in list(zip(ids, metadatas, documents))[:8]
+    ]
+
+    is_available = bool(ids)
+    status_message = (
+        "Chroma collection da co du lieu."
+        if is_available
+        else "Chroma collection dang rong. Hay chay ingest command truoc khi demo."
+    )
+    return {
+        **base_snapshot,
+        "is_available": is_available,
+        "status_message": status_message,
+        "total_chunks": len(ids),
+        "topic_counts": dict(sorted(topic_counts.items())),
+        "level_counts": dict(sorted(level_counts.items())),
+        "sample_chunks": sample_chunks,
+        "error": None,
+    }
+
+
+def _safe_raw_knowledge_count(path: str) -> int:
+    try:
+        return len(load_knowledge_chunk_records(path))
+    except Exception:
+        return 0
+
+
+def _chroma_debug_chunk(
+    *,
+    chunk_id: str,
+    metadata: dict,
+    document: str,
+) -> dict:
+    preview = " ".join(document.split())
+    return {
+        "chunk_id": str(metadata.get("chunk_id") or chunk_id),
+        "topic": str(metadata.get("topic") or metadata.get("topic_code") or "unknown"),
+        "subtopic": (
+            str(metadata.get("subtopic"))
+            if metadata.get("subtopic") is not None
+            else None
+        ),
+        "level": str(metadata.get("level") or "unknown"),
+        "skill": (
+            str(metadata.get("skill"))
+            if metadata.get("skill") is not None
+            else None
+        ),
+        "source": (
+            str(metadata.get("source"))
+            if metadata.get("source") is not None
+            else None
+        ),
+        "content_preview": preview[:220],
+    }
 
 
 def _normalize_level(level: str) -> str:

@@ -236,11 +236,16 @@ export function PersonalizationDashboard() {
               luyen tiep theo cho nguoi hoc.
             </Typography.Paragraph>
           </div>
-          <Link href="/">
-            <Button icon={<ArrowLeftOutlined />} size="large">
-              Quay lai chatbot
-            </Button>
-          </Link>
+          <Space wrap>
+            <Link href="/debug/chroma">
+              <Button size="large">Xem Chroma</Button>
+            </Link>
+            <Link href="/">
+              <Button icon={<ArrowLeftOutlined />} size="large">
+                Quay lai chatbot
+              </Button>
+            </Link>
+          </Space>
         </header>
 
         {isLoading ? (

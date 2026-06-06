@@ -134,12 +134,16 @@ class SeedExerciseBank:
         plan: PracticePlan,
     ) -> tuple[int, int, int, int, str]:
         return (
+            self._topic_distance(record.topic_code, plan.topic),
             self._subtopic_distance(record.subtopic, plan.target_subtopic),
             self._content_theme_distance(record, plan.content_theme),
             0 if record.difficulty == plan.difficulty else 1,
             self._difficulty_distance(record.difficulty, plan.difficulty),
             record.exercise_code,
         )
+
+    def _topic_distance(self, actual: str, expected: str) -> int:
+        return 0 if actual == expected else 1
 
     def _difficulty_distance(self, actual: str, expected: str) -> int:
         order = {"easy": 0, "medium": 1, "hard": 2}

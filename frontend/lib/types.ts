@@ -148,6 +148,33 @@ export type PersonalizationSnapshot = {
   };
 };
 
+export type ChromaDebugChunk = {
+  chunkId: string;
+  topic: string;
+  subtopic?: string | null;
+  level: string;
+  skill?: string | null;
+  source?: string | null;
+  contentPreview: string;
+};
+
+export type ChromaDebugSnapshot = {
+  configuredBackend: string;
+  usingChromaBackend: boolean;
+  collectionName: string;
+  persistDirectory: string;
+  isAvailable: boolean;
+  statusMessage: string;
+  totalChunks: number;
+  topicCounts: Record<string, number>;
+  levelCounts: Record<string, number>;
+  sampleChunks: ChromaDebugChunk[];
+  rawKnowledgePath: string;
+  rawKnowledgeCount: number;
+  ingestCommand: string;
+  error?: string | null;
+};
+
 export type DashboardSnapshot = {
   profile: LearnerProfile;
   weakTopics: WeakTopic[];

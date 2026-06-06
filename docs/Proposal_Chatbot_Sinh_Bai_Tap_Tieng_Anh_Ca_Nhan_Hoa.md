@@ -29,6 +29,31 @@ Phiên bản hiện tại của dự án được định hướng triển khai 
 - `LangChain` cho orchestration của retrieval và generation
 - `SQLite` cho dữ liệu có cấu trúc
 - `Chroma` cho vector store
+- `Ollama` cho LLM local trong môi trường Docker
+
+---
+
+### 1.1. Cập nhật trạng thái triển khai hiện tại
+
+Tính đến bản cập nhật hiện tại, dự án đã vượt qua mức prototype ban đầu và có thể chạy như một MVP end-to-end:
+
+- Frontend `Next.js` có giao diện chatbot, màn hình làm bài, kết quả, typing indicator, scroll trong khung chat và trang xem cá nhân hóa.
+- Backend `FastAPI` có API generate bài, chấm bài, onboarding, lưu chat memory, resume chat và snapshot cá nhân hóa.
+- LLM local được tích hợp bằng `Ollama`, hiện dùng model `llama3.1:8b` trong Docker.
+- Pipeline có hybrid intent extraction: rule-based + LLM interpreter cho tiếng Việt/tiếng Anh.
+- Có SQLite persistence cho user profile, generation runs, practice sessions, answers, practice reviews, chat sessions và chat memory summaries.
+- Có deep personalization ở mức topic, subtopic và error tag.
+- Có knowledge base và seed exercise bank trong `data/processed`.
+- Có script chuyển đổi VNHSGE English dataset thành seed exercises có lọc, giúp mở rộng seed bank từ 100 lên 190 câu.
+- Có fallback seed/frontend để demo vẫn tiếp tục khi LLM timeout hoặc backend chưa phản hồi ổn.
+- Có trang `/personalization` dùng Ant Design để hiển thị profile, weak topics, weak subtopics, frequent errors và next plan.
+
+Một số giới hạn còn lại được ghi nhận để phát triển sau MVP:
+
+- Người dùng hiện vẫn chủ yếu dùng `demo-user`, chưa có login/user selector thật.
+- `content_theme` như anime đã được nhận diện nhưng chưa enforce mạnh trong mọi trường hợp fallback.
+- Evaluation tự động và test suite vẫn cần bổ sung thêm.
+- Docker đang dùng vector store in-memory cho demo; Chroma là hướng lưu vector store ổn định hơn về sau.
 
 ---
 
@@ -75,11 +100,19 @@ Phiên bản MVP tập trung vào:
 - Cá nhân hóa theo learner profile
 - Phân tích lỗi sai ở mức topic / subtopic
 - Đề xuất bài luyện tiếp theo
+- Chat onboarding để thu thập thông tin ban đầu theo kiểu hội thoại
+- Lưu lịch sử chat và rút trích một số thông tin học tập từ hội thoại
+- Sinh/chấm bài bằng backend thật, có lưu generated exercise snapshot
+- Trang xem trạng thái cá nhân hóa của người học
 
 ### 4.2. Các phần chưa triển khai trong MVP
 
 Các phần sau được xem là future work:
 
+- Login hoặc user selector thay cho `demo-user`
+- Evaluation tự động đầy đủ cho retrieval, generation và personalization
+- Enforce mạnh `content_theme` trong mọi trường hợp sinh đề/fallback
+- Tách model LLM theo tác vụ, ví dụ model nhỏ cho chat/intent và model lớn hơn cho generation
 - Speaking practice
 - Pronunciation assessment
 - Essay writing correction
@@ -168,28 +201,34 @@ Tạo bài luyện vocabulary chủ đề business mức intermediate.
 Hệ thống phân tích yêu cầu để trích xuất:
 
 - topic
+- target subtopic nếu người dùng nói rõ như quá khứ đơn, bị động với modal
 - difficulty
 - số lượng câu hỏi
 - loại bài
 - mục tiêu học tập
+- content theme hoặc sở thích ngữ cảnh, ví dụ anime
 
 Ví dụ:
 
 ```json
 {
   "intent": "generate_exercise",
-  "topic": "passive_voice",
+  "topic": "tenses",
+  "target_subtopic": "past_simple_finished_time",
   "num_questions": 10,
   "difficulty": "easy",
+  "exercise_type": "grammar_mcq",
+  "content_theme": "anime",
   "goal": "grammar_practice"
 }
 ```
 
 Hướng triển khai MVP:
 
-- rule-based keyword mapping
-- regex
-- có thể mở rộng bằng LLM parser hoặc classifier về sau
+- rule-based keyword mapping và regex cho các tín hiệu rõ ràng
+- bilingual normalization để xử lý cả tiếng Việt và tiếng Anh
+- Ollama-based intent interpreter để đọc đoạn chat, hiểu ngữ cảnh gần đây và trích xuất intent linh hoạt hơn
+- dùng memory từ các đoạn chat trước để bổ sung sở thích ổn định như số câu, độ khó, mục tiêu hoặc content theme
 
 ### 7.3. User Profile Retrieval
 
@@ -225,6 +264,8 @@ Nếu là người dùng mới, hệ thống có thể:
 
 - dùng một bài test ngắn để gán level ban đầu
 - hoặc dùng default level trong MVP nếu chưa có placement test đầy đủ
+- hỏi onboarding theo dạng hội thoại để thu thập tên gọi, trình độ ước lượng, mục tiêu, điểm yếu, độ khó và số câu mong muốn
+- nếu người dùng không rõ trình độ, hệ thống giữ nhịp dễ trước rồi điều chỉnh dựa trên kết quả làm bài
 
 ### 7.5. Topic and Difficulty Selection
 
@@ -460,26 +501,28 @@ Công nghệ đề xuất:
 
 ## 9. Tech Stack
 
-| Module | Công nghệ đề xuất |
+| Module | Công nghệ sử dụng / đề xuất |
 |---|---|
-| Chatbot UI | Next.js |
+| Chatbot UI | Next.js App Router |
+| UI Components | Ant Design cho trang personalization, CSS custom cho chatbot |
 | Backend API | Python / FastAPI |
 | Orchestration | LangChain |
-| Intent Extraction | Rule-based + regex |
+| Intent Extraction | Hybrid rule-based + regex + Ollama intent interpreter |
+| Chat Memory | SQLite chat sessions, chat messages, memory summaries |
 | User Profile Storage | SQLite |
 | Knowledge Base Format | Markdown / JSON / SQLite |
 | Chunking | LangChain RecursiveCharacterTextSplitter |
 | Embedding Backend | sentence-transformers hoặc Ollama embeddings |
-| Vector Database | Chroma |
-| Semantic Retrieval | LangChain Retriever + Chroma |
+| Vector Database | In-memory vector store cho demo, Chroma cho hướng mở rộng |
+| Semantic Retrieval | LangChain retriever |
 | Generation | LangChain prompt chain + LLM backend |
-| LLM Backend | OpenAI hoặc Ollama/local model |
+| LLM Backend | Ollama/local model, hiện dùng `llama3.1:8b`; OpenAI vẫn có thể cấu hình |
 | Validation | Pydantic + Python rules |
 | Answer Checking | Python logic |
 | Error Analysis | Python + SQLite |
 | Recommendation | Rule-based recommendation |
 | Evaluation | Pandas + Matplotlib |
-| Demo | Next.js + FastAPI + Docker |
+| Demo | Next.js + FastAPI + Ollama + Docker Compose |
 
 ---
 
@@ -493,6 +536,16 @@ Dữ liệu của hệ thống gồm 4 nhóm chính:
 3. User Learning Data
 4. Evaluation Data
 ```
+
+Trạng thái dữ liệu MVP hiện tại:
+
+- `data/processed/knowledge_chunks.json`: 120 knowledge chunks.
+- `data/processed/seed_exercises.json`: 190 seed exercises, gồm 100 seed tự xây và 90 seed được convert có lọc từ VNHSGE English.
+- `data/processed/seed_exercises_from_vnhsge.json`: file trung gian chứa các câu đã convert từ raw dataset.
+- `scripts/convert_vnhsge_english_seed.py`: script đọc `data/raw/Dataset/VNHSGE-E/JSON format/eval/English`, bỏ câu pronunciation/stress/reading thiếu context, parse A/B/C/D và map metadata.
+- Các topic đã có dữ liệu: `tenses`, `passive_voice`, `relative_clause`, `conditional_sentence`, `reported_speech`, `prepositions`, `vocabulary`, `travel_vocabulary`.
+- Seed exercises có metadata `subtopic`, `difficulty`, `skill`, `exercise_type`, `error_tag`, options, correct answer và explanation.
+- Có một số seed theo content theme `anime`, nhưng theme này chưa được enforce mạnh trong mọi fallback.
 
 Thiết kế dữ liệu phải phục vụ đồng thời:
 
@@ -525,7 +578,7 @@ Knowledge Base dùng để:
 
 ### 11.3. Data MVP chốt
 
-Làm trước 6 topic:
+MVP hiện đã có knowledge chunks cho các topic:
 
 ```text
 1. Tenses
@@ -534,17 +587,21 @@ Làm trước 6 topic:
 4. Conditionals
 5. Reported Speech
 6. Prepositions
+7. Vocabulary
+8. Travel Vocabulary
 ```
 
-Mỗi topic:
-
-- 15-25 grammar chunks
-- 30-50 exercise samples
-
-Tổng MVP:
+Quy mô hiện tại:
 
 - khoảng 120 grammar chunks
-- khoảng 300 bài tập mẫu
+- khoảng 190 bài tập mẫu
+- có metadata theo topic, subtopic, level, skill và source
+
+Hướng bổ sung sau MVP:
+
+- tăng seed bank lên 200-300 câu
+- bổ sung thêm seed theo theme/sở thích như anime, daily life, business
+- mở rộng thêm vocabulary theo nhiều domain ngoài travel
 
 ### 11.4. Grammar chunk format
 
@@ -591,6 +648,7 @@ Exercise Bank dùng để:
 - Perfect English Grammar
 - All Things Grammar
 - các bộ bài tập grammar public khác
+- VNHSGE English dataset trong `data/raw/Dataset`, dùng sau bước lọc/convert để bổ sung seed exercises
 
 ### 12.3. Exercise format
 
@@ -602,6 +660,8 @@ Exercise Bank dùng để:
   "subtopic": "present_simple_passive",
   "level": "beginner",
   "difficulty": "easy",
+  "skill": "grammar",
+  "error_tag": "missing_be",
   "question_text": "The room ____ every day.",
   "options": [
     { "label": "A", "text": "cleans", "is_correct": false },
@@ -611,7 +671,7 @@ Exercise Bank dùng để:
   ],
   "correct_answer": "B",
   "explanation": "Present simple passive uses am/is/are + V3.",
-  "source": "perfect_english_grammar"
+  "source": "teacher_authored_seed"
 }
 ```
 
@@ -693,6 +753,16 @@ accuracy < 0.60         -> weak
 accuracy >= 0.80        -> can increase difficulty
 ```
 
+Trong bản hiện tại, user learning data đã được mở rộng theo hướng cá nhân hóa sâu hơn:
+
+- `user_topic_stats`: theo dõi accuracy và weakness theo topic.
+- `user_subtopic_stats`: theo dõi mastery/weakness theo subtopic cụ thể.
+- `user_error_stats`: theo dõi các lỗi thường gặp qua `error_tag`.
+- `practice_reviews`: lưu nhận xét sau mỗi bài, strengths, weaknesses, next steps và next practice prompt.
+- `chat_sessions`, `chat_messages`, `chat_memory_summaries`: lưu hội thoại và rút trích một số facts như mục tiêu, điểm yếu, sở thích theme.
+
+Nhờ vậy, yêu cầu như `luyện tiếp` có thể được planner chuyển thành bài luyện dựa trên điểm yếu thật thay vì chọn topic ngẫu nhiên.
+
 ---
 
 ## 14. Evaluation Data
@@ -737,6 +807,13 @@ Public grammar sources
 -> embed chunks
 -> store in Chroma
 -> store chunk metadata, exercise bank and user logs in SQLite
+
+VNHSGE English JSON
+-> parse question/options/answer/explanation
+-> filter out pronunciation, stress and reading questions without standalone context
+-> map topic, subtopic, skill, exercise_type and error_tag
+-> write seed_exercises_from_vnhsge.json
+-> merge into seed_exercises.json
 ```
 
 Mermaid:
@@ -752,6 +829,11 @@ flowchart TD
 
     E --> H[(SQLite)]
     H --> I[Knowledge Metadata / Exercise Bank / User Logs]
+
+    J[VNHSGE English JSON] --> K[Convert And Filter Seed Exercises]
+    K --> L[seed_exercises_from_vnhsge.json]
+    L --> M[seed_exercises.json]
+    M --> H
 ```
 
 ---
@@ -761,7 +843,8 @@ flowchart TD
 Hệ thống sử dụng:
 
 - `SQLite` để lưu dữ liệu có cấu trúc
-- `Chroma` để lưu embedding và metadata retrieval
+- vector store để lưu embedding và metadata retrieval
+- bản Docker hiện tại dùng in-memory vector store cho demo; `Chroma` là hướng lưu vector store bền vững hơn khi mở rộng
 
 ### 16.1. Nguyên tắc thiết kế
 
@@ -769,6 +852,8 @@ Hệ thống sử dụng:
 - dùng khóa ổn định như `chunk_id`, `exercise_code`, `generation_run_id`
 - tách `seed exercises` và `generated session exercises`
 - lưu trace của mỗi lần generate
+- lưu snapshot bài đã sinh để chấm lại đúng nội dung user đã thấy
+- lưu chat memory riêng với learning profile để vừa giữ hội thoại vừa tránh làm bẩn stats học tập
 
 ### 16.2. Các bảng chính đề xuất
 
@@ -784,6 +869,12 @@ Hệ thống sử dụng:
 - `session_exercise_options`
 - `user_answers`
 - `user_topic_stats`
+- `user_subtopic_stats`
+- `user_error_stats`
+- `practice_reviews`
+- `chat_sessions`
+- `chat_messages`
+- `chat_memory_summaries`
 - `evaluation_records`
 
 ### 16.3. Giải thích các bảng quan trọng
@@ -795,13 +886,25 @@ Hệ thống sử dụng:
 : lưu bài tập mẫu để tham khảo format, distractor và evaluation baseline.
 
 `generation_runs`
-: lưu request gốc, prompt snapshot, retrieved chunk ids, generator backend.
+: lưu request gốc, prompt snapshot, retrieved chunk ids, agent trace, generator backend và model name.
 
 `session_exercises`
 : lưu đúng các bài đã sinh trong từng phiên để chấm bài và trace output.
 
 `user_topic_stats`
 : lưu accuracy, weakness score và trạng thái luyện tập theo từng topic.
+
+`user_subtopic_stats`
+: lưu mastery score, weakness score và accuracy theo từng subtopic.
+
+`user_error_stats`
+: lưu tỷ lệ lỗi theo `error_tag`, ví dụ `missing_be`, `wrong_tense`, `vocabulary_meaning_confusion`.
+
+`practice_reviews`
+: lưu phần đánh giá sau khi người dùng nộp bài, gồm strengths, weaknesses, next steps và gợi ý bài luyện tiếp.
+
+`chat_memory_summaries`
+: lưu tóm tắt hội thoại và facts rút trích được từ chat để khi mở lại chatbot có thể hỏi tiếp theo ngữ cảnh cũ.
 
 ---
 
@@ -865,49 +968,28 @@ Metadata cần nhất quán để retrieval và trace hoạt động ổn địn
 
 ## 19. Roadmap phát triển
 
-### Tuần 1: Khảo sát và chuẩn bị dữ liệu
+### Giai đoạn đã hoàn thành cho MVP
 
-- Chốt 6 topic MVP
-- Thu thập grammar materials
-- Tạo 100-200 grammar chunks
-- Chuẩn hóa metadata
+- Xây dựng frontend `Next.js` cho chatbot, làm bài, chấm bài và trang cá nhân hóa.
+- Xây dựng backend `FastAPI` với API generate, score, onboarding, chat memory và personalization snapshot.
+- Tích hợp `Ollama` local model trong Docker Compose.
+- Thiết kế SQLite schema và repository cho profile, session, generated snapshots, answers, review và chat memory.
+- Xây knowledge base MVP gồm 120 chunks và seed bank gồm 190 exercises.
+- Bổ sung metadata `skill`, `subtopic`, `error_tag` vào generated/session exercises.
+- Chấm bài và cập nhật topic stats, subtopic stats, error stats.
+- Tạo practice review sau khi user nộp bài.
+- Bổ sung conversational onboarding và hybrid intent interpreter cho tiếng Việt/tiếng Anh.
 
-### Tuần 2: Xây Knowledge Base và Retrieval
+### Giai đoạn cần làm nếu mở rộng sau MVP
 
-- Implement cleaning và chunking
-- Gắn metadata chuẩn
-- Tạo vector store bằng Chroma
-- Test semantic retrieval qua LangChain
-
-### Tuần 3: Xây Exercise Generation Pipeline
-
-- Thiết kế prompt chain
-- Tích hợp LLM backend qua LangChain
-- Sinh MCQ và fill-in-the-blank
-- Validate output
-
-### Tuần 4: Xây Personalization Module
-
-- Thiết kế SQLite schema
-- Lưu user profile và session data
-- Theo dõi topic stats
-- Rule-based recommendation
-
-### Tuần 5: Xây Chatbot UI / Demo
-
-- Next.js interface
-- FastAPI endpoints
-- Hiển thị bài tập
-- Chấm bài
-- Hiển thị feedback và recommendation
-
-### Tuần 6: Evaluation và hoàn thiện báo cáo
-
-- Human evaluation
-- Test retrieval
-- Test personalization
-- Viết báo cáo
-- Chuẩn bị slide bảo vệ
+- Thêm user selector/login để thay `demo-user`.
+- Tách model Ollama theo tác vụ: model nhỏ cho chat/intent, model lớn hơn cho generation/review.
+- Enforce `content_theme` trong generator, validator và fallback.
+- Mở rộng seed bank theo nhiều theme như anime, daily life, business, exam prep.
+- Chuyển vector store demo sang Chroma persistent nếu cần chạy lâu dài.
+- Bổ sung test suite cho parser, repository, personalization, scoring và API.
+- Bổ sung evaluation scripts cho retrieval, generation quality và personalization quality.
+- Viết demo checklist, báo cáo kết quả và chuẩn bị slide bảo vệ.
 
 ---
 
@@ -915,6 +997,11 @@ Metadata cần nhất quán để retrieval và trace hoạt động ổn địn
 
 Các hướng mở rộng:
 
+- User management, login hoặc multi-user selector
+- Tách LLM model theo tác vụ để tối ưu tốc độ và chất lượng
+- Enforce theme/sở thích nội dung như anime, business, daily life trong toàn bộ generation pipeline
+- Tích hợp Chroma persistent thay cho vector store in-memory trong demo
+- Evaluation tự động cho retrieval, generation và personalization
 - Fine-tune mô hình sinh bài tập trên exercise dataset
 - Speaking practice
 - Pronunciation assessment
@@ -973,4 +1060,6 @@ Fine-tune được xem là future work nếu có:
 
 Hệ thống không chỉ sinh bài tập đơn thuần mà còn có khả năng theo dõi quá trình học, phân tích lỗi sai và đề xuất bài luyện tiếp theo. Đây là điểm khác biệt quan trọng so với các hệ thống tạo bài tập truyền thống.
 
-MVP của đề tài nên tập trung vào grammar và vocabulary exercises, sử dụng knowledge base tự xây dựng từ các nguồn public, Chroma cho retrieval, LangChain cho orchestration, LLM backend linh hoạt cho generation, và SQLite cho lưu trữ learner profile cùng session data.
+MVP hiện tại đã tập trung vào grammar và vocabulary exercises, sử dụng knowledge base/seed bank tự xây dựng, LangChain cho orchestration, Ollama cho LLM local, FastAPI cho backend, Next.js cho giao diện và SQLite cho lưu trữ learner profile, session data, generated snapshots, practice review và chat memory.
+
+Các phần còn lại như user login, evaluation tự động, Chroma persistent, enforce content theme và tối ưu model theo từng tác vụ được xem là hướng mở rộng sau MVP. Với trạng thái hiện tại, dự án đã có đủ cơ sở để demo một hệ thống NLP/RAG cá nhân hóa hoàn chỉnh ở mức đồ án: người dùng trò chuyện, hệ thống hiểu nhu cầu, sinh bài, chấm bài, lưu lịch sử, phân tích điểm yếu và đề xuất bước luyện tiếp theo.

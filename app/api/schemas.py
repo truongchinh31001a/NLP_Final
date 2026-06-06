@@ -221,3 +221,30 @@ class PersonalizationSnapshotResponseModel(BaseModel):
 class HealthResponseModel(BaseModel):
     status: str
     generator_backend: str
+
+
+class ChromaDebugChunkModel(BaseModel):
+    chunk_id: str
+    topic: str
+    subtopic: str | None = None
+    level: str
+    skill: str | None = None
+    source: str | None = None
+    content_preview: str
+
+
+class ChromaDebugResponseModel(BaseModel):
+    configured_backend: str
+    using_chroma_backend: bool
+    collection_name: str
+    persist_directory: str
+    is_available: bool
+    status_message: str
+    total_chunks: int
+    topic_counts: dict[str, int]
+    level_counts: dict[str, int]
+    sample_chunks: list[ChromaDebugChunkModel]
+    raw_knowledge_path: str
+    raw_knowledge_count: int
+    ingest_command: str
+    error: str | None = None

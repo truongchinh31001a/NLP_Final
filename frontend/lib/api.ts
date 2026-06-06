@@ -1,5 +1,6 @@
 import type {
   ChatMemoryResume,
+  ChromaDebugSnapshot,
   ExercisePreview,
   PersonalizationSnapshot,
 } from "@/lib/types";
@@ -239,6 +240,31 @@ export type SaveChatMessageResponse = {
   memory_summary: string;
   extracted_facts: Record<string, unknown>;
   suggested_next_question: string;
+};
+
+export type ChromaDebugResponse = {
+  configured_backend: string;
+  using_chroma_backend: boolean;
+  collection_name: string;
+  persist_directory: string;
+  is_available: boolean;
+  status_message: string;
+  total_chunks: number;
+  topic_counts: Record<string, number>;
+  level_counts: Record<string, number>;
+  sample_chunks: Array<{
+    chunk_id: string;
+    topic: string;
+    subtopic?: string | null;
+    level: string;
+    skill?: string | null;
+    source?: string | null;
+    content_preview: string;
+  }>;
+  raw_knowledge_path: string;
+  raw_knowledge_count: number;
+  ingest_command: string;
+  error?: string | null;
 };
 
 export async function generatePractice(
@@ -593,6 +619,40 @@ export async function saveChatMessage(
     suggested_next_question: data.suggested_next_question,
     messages: [data.message],
   });
+}
+
+export async function getChromaDebugSnapshot(): Promise<ChromaDebugSnapshot> {
+  const response = await fetch(`${API_BASE_URL}/api/debug/chroma`);
+
+  if (!response.ok) {
+    throw new Error("Failed to load Chroma debug snapshot.");
+  }
+
+  const data = (await response.json()) as ChromaDebugResponse;
+  return {
+    configuredBackend: data.configured_backend,
+    usingChromaBackend: data.using_chroma_backend,
+    collectionName: data.collection_name,
+    persistDirectory: data.persist_directory,
+    isAvailable: data.is_available,
+    statusMessage: data.status_message,
+    totalChunks: data.total_chunks,
+    topicCounts: data.topic_counts,
+    levelCounts: data.level_counts,
+    sampleChunks: data.sample_chunks.map((chunk) => ({
+      chunkId: chunk.chunk_id,
+      topic: chunk.topic,
+      subtopic: chunk.subtopic,
+      level: chunk.level,
+      skill: chunk.skill,
+      source: chunk.source,
+      contentPreview: chunk.content_preview,
+    })),
+    rawKnowledgePath: data.raw_knowledge_path,
+    rawKnowledgeCount: data.raw_knowledge_count,
+    ingestCommand: data.ingest_command,
+    error: data.error,
+  };
 }
 
 function mapChatResume(data: ChatMemoryResumeResponse): ChatMemoryResume {

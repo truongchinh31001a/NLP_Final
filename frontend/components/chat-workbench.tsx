@@ -728,6 +728,9 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
           <Link className="learner-pill__link" href="/personalization">
             Xem cá nhân hóa
           </Link>
+          <Link className="learner-pill__link" href="/debug/chroma">
+            Xem Chroma
+          </Link>
         </div>
       </header>
 

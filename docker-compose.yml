@@ -23,7 +23,7 @@ services:
       CORS_ORIGINS: http://localhost:3000
       LEARNING_REPOSITORY_BACKEND: sqlite
       SQLITE_DB_PATH: /workspace/data/sqlite/app.db
-      VECTOR_STORE_BACKEND: inmemory
+      VECTOR_STORE_BACKEND: ${VECTOR_STORE_BACKEND:-chroma}
       LLM_BACKEND: ${LLM_BACKEND:-ollama}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b}
