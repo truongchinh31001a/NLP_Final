@@ -24,7 +24,6 @@ SUPPORTED_TOPICS = {
 
 SUPPORTED_DIFFICULTIES = {"easy", "medium", "hard"}
 SUPPORTED_EXERCISE_TYPES = {"grammar_mcq", "vocabulary_mcq", "fill_blank", "mcq"}
-SUPPORTED_CONTENT_THEMES = {"anime"}
 
 
 @dataclass(slots=True)
@@ -200,6 +199,12 @@ class PracticeIntentInterpreter:
             )
 
         request = self._merge_requests(rule_request, llm.request)
+        request = self._apply_continuation_context(
+            request=request,
+            rule_request=rule_request,
+            message=message,
+            profile_context=profile_context,
+        )
         request = self._apply_memory_preferences(
             request=request,
             message=message,
@@ -374,6 +379,41 @@ class PracticeIntentInterpreter:
 
         return self._with_content_theme(request, content_theme)
 
+    def _apply_continuation_context(
+        self,
+        *,
+        request: PracticeRequest,
+        rule_request: PracticeRequest,
+        message: str,
+        profile_context: dict[str, Any],
+    ) -> PracticeRequest:
+        normalized = self.text_normalizer.normalize_for_matching(message)
+        if self._has_specific_focus(rule_request) or not self._is_continue_signal(
+            normalized,
+        ):
+            return request
+
+        topic = self._memory_topic(profile_context)
+        if not topic:
+            return request
+
+        target_subtopic = request.target_subtopic
+        if request.topic != topic:
+            target_subtopic = None
+
+        return PracticeRequest(
+            user_id=request.user_id,
+            raw_text=request.raw_text,
+            processing_text=request.processing_text,
+            detected_language=request.detected_language,
+            topic=topic,
+            difficulty=request.difficulty,
+            exercise_type=None,
+            num_questions=request.num_questions,
+            target_subtopic=target_subtopic,
+            content_theme=request.content_theme,
+        )
+
     def _with_content_theme(
         self,
         request: PracticeRequest,
@@ -496,6 +536,23 @@ class PracticeIntentInterpreter:
         if isinstance(content_themes, list):
             for theme in content_themes:
                 normalized = self._normalize_content_theme(theme)
+                if normalized:
+                    return normalized
+        return None
+
+    def _memory_topic(self, profile_context: dict[str, Any]) -> str | None:
+        facts = profile_context.get("chat_extracted_facts")
+        if not isinstance(facts, dict):
+            return None
+
+        last_topic = self._normalize_topic(facts.get("last_topic_requested"))
+        if last_topic:
+            return last_topic
+
+        recent_topics = facts.get("recent_topics")
+        if isinstance(recent_topics, list):
+            for topic in recent_topics:
+                normalized = self._normalize_topic(topic)
                 if normalized:
                     return normalized
         return None

@@ -18,11 +18,6 @@ def build_generation_prompt(format_instructions: str) -> ChatPromptTemplate:
                     "every exercise should include skill, subtopic, and error_tag metadata; "
                     "question_text and explanation must be non-empty. "
                     "Return JSON only.\n\n"
-                    "If content_theme is not 'none', wrap questions in that generic context "
-                    "while preserving the grammar/vocabulary target. For anime themes, use "
-                    "generic anime/manga/studio/episode/character contexts and avoid naming "
-                    "specific copyrighted franchises or characters. "
-                    "Do not let the theme replace the requested learning topic.\n\n"
                     "{format_instructions}"
                 ),
             ),

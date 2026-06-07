@@ -407,10 +407,10 @@ class OnboardingInterpreter:
         if not trimmed:
             return ""
         patterns = [
-            r"^(?:cứ\s+)?(?:gọi|goi)\s+(?:(?:mình|minh|tôi|toi|em|anh|chị|chi|bạn|ban)\s+)?(?:là|la)\s+(.+)$",
-            r"^(?:tên|ten)\s+(?:(?:mình|minh|tôi|toi|em|anh|chị|chi|bạn|ban)\s+)?(?:là|la)?\s*(.+)$",
-            r"^(?:mình|minh|tôi|toi|em|anh|chị|chi)\s+(?:là|la)\s+(.+)$",
-            r"^(?:call me|my name is|i am|i'm)\s+(.+)$",
+            r"(?:^|[\s,.;!?])(?:cứ\s+)?(?:gọi|goi)\s+(?:(?:mình|minh|tôi|toi|em|anh|chị|chi|bạn|ban)\s+)?(?:là|la)\s+(.+)$",
+            r"(?:^|[\s,.;!?])(?:tên|ten)\s+(?:(?:mình|minh|tôi|toi|em|anh|chị|chi|bạn|ban)\s+)?(?:là|la)?\s*(.+)$",
+            r"(?:^|[\s,.;!?])(?:mình|minh|tôi|toi|em|anh|chị|chi)\s+(?:là|la)\s+(.+)$",
+            r"(?:^|[\s,.;!?])(?:call me|my name is|i am|i'm)\s+(.+)$",
         ]
         for pattern in patterns:
             match = re.search(pattern, trimmed, re.IGNORECASE)
@@ -436,7 +436,7 @@ class OnboardingInterpreter:
 
     def _is_usable_display_name(self, candidate: str) -> bool:
         normalized = self._normalize_text(candidate)
-        return bool(candidate) and normalized not in {
+        return bool(candidate) and len(candidate.split()) <= 6 and normalized not in {
             "beginner",
             "intermediate",
             "advanced",

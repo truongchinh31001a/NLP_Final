@@ -1782,10 +1782,10 @@ function parseDisplayName(answer: string) {
   }
 
   const patterns = [
-    /^(?:cứ\s+)?(?:gọi|goi)\s+(?:(?:mình|minh|tôi|toi|em|anh|chị|chi|bạn|ban)\s+)?(?:là|la)\s+(.+)$/iu,
-    /^(?:tên|ten)\s+(?:(?:mình|minh|tôi|toi|em|anh|chị|chi|bạn|ban)\s+)?(?:là|la)?\s*(.+)$/iu,
-    /^(?:mình|minh|tôi|toi|em|anh|chị|chi)\s+(?:là|la)\s+(.+)$/iu,
-    /^(?:call me|my name is|i am|i'm)\s+(.+)$/iu,
+    /(?:^|[\s,.;!?])(?:cứ\s+)?(?:gọi|goi)\s+(?:(?:mình|minh|tôi|toi|em|anh|chị|chi|bạn|ban)\s+)?(?:là|la)\s+(.+)$/iu,
+    /(?:^|[\s,.;!?])(?:tên|ten)\s+(?:(?:mình|minh|tôi|toi|em|anh|chị|chi|bạn|ban)\s+)?(?:là|la)?\s*(.+)$/iu,
+    /(?:^|[\s,.;!?])(?:mình|minh|tôi|toi|em|anh|chị|chi)\s+(?:là|la)\s+(.+)$/iu,
+    /(?:^|[\s,.;!?])(?:call me|my name is|i am|i'm)\s+(.+)$/iu,
   ];
 
   for (const pattern of patterns) {
@@ -1817,8 +1817,10 @@ function cleanupDisplayNameCandidate(value: string) {
 
 function isUsableDisplayName(candidate: string) {
   const normalized = normalizeText(candidate);
+  const wordCount = candidate.split(/\s+/).filter(Boolean).length;
   return (
     Boolean(candidate) &&
+    wordCount <= 6 &&
     ![
       "beginner",
       "intermediate",
