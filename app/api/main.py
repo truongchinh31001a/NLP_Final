@@ -4,15 +4,22 @@ from dataclasses import asdict
 from pathlib import Path
 from time import perf_counter
 
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.schemas import (
+    AcceptRecommendationRequestModel,
+    ActivitySubmitResponseModel,
     AuthTokenRequestModel,
     AuthTokenResponseModel,
     ChatMemoryResponseModel,
+    ConversationDetailResponseModel,
+    ConversationListResponseModel,
+    ConversationMessageTurnResponseModel,
+    ConversationRouteResponseModel,
     ChatSessionListResponseModel,
     ChromaDebugResponseModel,
+    CreateConversationRequestModel,
     GeneratePracticeRequestModel,
     GeneratePracticeResponseModel,
     HealthResponseModel,
@@ -22,20 +29,31 @@ from app.api.schemas import (
     InterpretPracticeResponseModel,
     MetricsResponseModel,
     PersonalizationSnapshotResponseModel,
+    RecommendationAcceptResponseModel,
+    RecommendationListResponseModel,
     SaveChatMessageRequestModel,
     SaveChatMessageResponseModel,
     ScorePracticeRequestModel,
     ScorePracticeResponseModel,
+    SendConversationMessageRequestModel,
+    SubmitActivityRequestModel,
     UpdateUserProfileRequestModel,
     UserProfileResponseModel,
     WorkflowGraphResponseModel,
 )
 from app.auth.service import AuthContext, AuthService
+from app.activities.practice_service import PracticeActivitySubmission
 from app.bootstrap import build_baseline_pipeline
+from app.conversation.schemas import ConversationRoute, ConversationTurnResult
 from app.observability.metrics import metrics_registry
 from app.observability.tracing import get_tracer, setup_tracing
 from app.retrieval.knowledge_loader import load_knowledge_chunk_records
-from app.schemas import PracticeRequest, SessionResult, SubmittedAnswer
+from app.schemas import (
+    ActivityRecommendation,
+    PendingClarification,
+    PracticeRequest,
+    SubmittedAnswer,
+)
 
 app = FastAPI(
     title="Personalized English Exercise Chatbot API",
@@ -128,53 +146,198 @@ def debug_chroma() -> ChromaDebugResponseModel:
     return ChromaDebugResponseModel(**_build_chroma_debug_snapshot())
 
 
+@app.post("/api/conversations", response_model=ConversationDetailResponseModel)
+def create_conversation(
+    payload: CreateConversationRequestModel,
+    authorization: str | None = Header(default=None),
+) -> ConversationDetailResponseModel:
+    _authorize_user(payload.user_id, authorization)
+    return ConversationDetailResponseModel(
+        **pipeline.create_conversation(payload.user_id),
+    )
+
+
+@app.get("/api/conversations", response_model=ConversationListResponseModel)
+def list_conversations(
+    user_id: str = Query(min_length=1),
+    limit: int = Query(default=20, ge=1, le=50),
+    authorization: str | None = Header(default=None),
+) -> ConversationListResponseModel:
+    _authorize_user(user_id, authorization)
+    return ConversationListResponseModel(
+        **pipeline.list_conversations(user_id, limit=limit),
+    )
+
+
+@app.get(
+    "/api/conversations/{conversation_id}",
+    response_model=ConversationDetailResponseModel,
+)
+def get_conversation(
+    conversation_id: str,
+    user_id: str = Query(min_length=1),
+    limit: int = Query(default=24, ge=1, le=100),
+    authorization: str | None = Header(default=None),
+) -> ConversationDetailResponseModel:
+    _authorize_user(user_id, authorization)
+    try:
+        return ConversationDetailResponseModel(
+            **pipeline.get_conversation(
+                user_id,
+                conversation_id,
+                limit=limit,
+            ),
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post(
+    "/api/conversations/{conversation_id}/messages",
+    response_model=ConversationMessageTurnResponseModel,
+)
+def send_conversation_message(
+    conversation_id: str,
+    payload: SendConversationMessageRequestModel,
+    authorization: str | None = Header(default=None),
+) -> ConversationMessageTurnResponseModel:
+    _authorize_user(payload.user_id, authorization)
+    try:
+        result = pipeline.handle_conversation_message(
+            user_id=payload.user_id,
+            conversation_id=conversation_id,
+            message=payload.message,
+            metadata=payload.metadata,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return _conversation_turn_response(result)
+
+
+@app.get("/api/recommendations", response_model=RecommendationListResponseModel)
+def list_recommendations(
+    user_id: str = Query(min_length=1),
+    limit: int = Query(default=5, ge=1, le=20),
+    authorization: str | None = Header(default=None),
+) -> RecommendationListResponseModel:
+    _authorize_user(user_id, authorization)
+    return RecommendationListResponseModel(
+        recommendations=[
+            _recommendation_payload(recommendation)
+            for recommendation in pipeline.list_recommendations(
+                user_id=user_id,
+                limit=limit,
+            )
+        ],
+    )
+
+
+@app.post(
+    "/api/recommendations/{recommendation_id}/accept",
+    response_model=RecommendationAcceptResponseModel,
+)
+def accept_recommendation(
+    recommendation_id: str,
+    payload: AcceptRecommendationRequestModel,
+    authorization: str | None = Header(default=None),
+) -> RecommendationAcceptResponseModel:
+    _authorize_user(payload.user_id, authorization)
+    try:
+        recommendation, generated = pipeline.accept_recommendation(
+            user_id=payload.user_id,
+            recommendation_id=recommendation_id,
+            conversation_id=payload.conversation_id,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return RecommendationAcceptResponseModel(
+        recommendation=_recommendation_payload(recommendation),
+        activity=_practice_generation_activity_payload(generated),
+        ui_action="practice.start",
+    )
+
+
 @app.post("/api/practice/generate", response_model=GeneratePracticeResponseModel)
 def generate_practice(
     payload: GeneratePracticeRequestModel,
+    response: Response,
     authorization: str | None = Header(default=None),
 ) -> GeneratePracticeResponseModel:
     _authorize_user(payload.user_id, authorization)
+    _set_legacy_endpoint_headers(
+        response,
+        "Use POST /api/conversations/{conversation_id}/messages for new practice turns "
+        "or POST /api/recommendations/{recommendation_id}/accept for continuations.",
+    )
     request_overrides = _practice_request_overrides(payload)
-    generated = pipeline.create_exercise_set(
-        user_id=payload.user_id,
-        raw_text=payload.message,
-        request_overrides=request_overrides,
-    )
-
-    preview_result = SessionResult(
-        user_id=payload.user_id,
-        topic=generated.plan.topic,
-        total_questions=max(len(generated.exercises), 1),
-        correct_count=max(len(generated.exercises) - 1, 0),
-        score=max(len(generated.exercises) - 1, 0)
-        / max(len(generated.exercises), 1),
-    )
-    profile = pipeline.repository.get_profile(payload.user_id)
-    preview_result.recommendation = pipeline.recommendation.recommend(
-        preview_result,
-        profile=profile,
-        generated=generated,
-    )
+    try:
+        practice_activity = pipeline.create_practice_activity(
+            user_id=payload.user_id,
+            raw_text=payload.message,
+            conversation_id=payload.conversation_id,
+            request_overrides=request_overrides,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    generated = practice_activity.generated
 
     return GeneratePracticeResponseModel(
+        activity_id=practice_activity.activity.activity_id,
         generation_run_id=generated.generation_run_id,
         request=asdict(generated.request),
         plan=asdict(generated.plan),
         exercises=[asdict(exercise) for exercise in generated.exercises],
-        recommendation=preview_result.recommendation,
+        recommendation=practice_activity.recommendation,
         generator_backend=pipeline.generator.backend_name,
         agent_trace=generated.agent_trace,
     )
 
 
+@app.post(
+    "/api/activities/{activity_id}/submit",
+    response_model=ActivitySubmitResponseModel,
+)
+def submit_activity(
+    activity_id: str,
+    payload: SubmitActivityRequestModel,
+    authorization: str | None = Header(default=None),
+) -> ActivitySubmitResponseModel:
+    _authorize_user(payload.user_id, authorization)
+    try:
+        submission = pipeline.submit_practice_activity(
+            user_id=payload.user_id,
+            activity_id=activity_id,
+            answers=[
+                SubmittedAnswer(
+                    exercise_id=answer.exercise_id,
+                    selected_answer=answer.selected_answer,
+                )
+                for answer in payload.answers
+            ],
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return _activity_submit_response(submission)
+
+
 @app.post("/api/practice/score", response_model=ScorePracticeResponseModel)
 def score_practice(
     payload: ScorePracticeRequestModel,
+    response: Response,
     authorization: str | None = Header(default=None),
 ) -> ScorePracticeResponseModel:
     _authorize_user(payload.user_id, authorization)
+    _set_legacy_endpoint_headers(
+        response,
+        "Use POST /api/activities/{activity_id}/submit. This endpoint resolves "
+        "activity_id from generation_run_id when compatibility data exists.",
+    )
     try:
-        result = pipeline.score_submission(
+        result = pipeline.score_legacy_submission(
             user_id=payload.user_id,
             generation_run_id=payload.generation_run_id,
             answers=[
@@ -410,6 +573,103 @@ def _authorize_user(
         return auth_service.authorize(user_id, authorization)
     except PermissionError as exc:
         raise HTTPException(status_code=401, detail=str(exc)) from exc
+
+
+def _conversation_turn_response(
+    result: ConversationTurnResult,
+) -> ConversationMessageTurnResponseModel:
+    return ConversationMessageTurnResponseModel(
+        conversation_id=result.conversation_id,
+        message=result.message,
+        intent=result.intent,
+        assistant_reply=result.assistant_reply,
+        pending_clarification=_pending_clarification_payload(
+            result.pending_clarification,
+        ),
+        activity=result.activity,
+        ui_action=result.ui_action,
+        assistant_message=result.assistant_message,
+        route=_conversation_route_response(result.route),
+    )
+
+
+def _practice_generation_activity_payload(
+    practice_activity,
+) -> dict:
+    generated = practice_activity.generated
+    return {
+        **asdict(practice_activity.activity),
+        "request": asdict(generated.request),
+        "plan": asdict(generated.plan),
+        "exercises": [asdict(exercise) for exercise in generated.exercises],
+        "recommendation": practice_activity.recommendation,
+        "next_activity_suggestion": None,
+    }
+
+
+def _recommendation_payload(recommendation: ActivityRecommendation) -> dict:
+    return asdict(recommendation)
+
+
+def _activity_submit_response(
+    submission: PracticeActivitySubmission,
+) -> ActivitySubmitResponseModel:
+    result_payload = asdict(submission.result)
+    exercises = [asdict(exercise) for exercise in submission.generated.exercises]
+    activity_payload = {
+        **asdict(submission.activity),
+        "request": asdict(submission.generated.request),
+        "plan": asdict(submission.generated.plan),
+        "exercises": exercises,
+        "result": result_payload,
+        "recommendation": submission.result.recommendation,
+        "next_activity_suggestion": submission.next_activity_suggestion,
+    }
+    return ActivitySubmitResponseModel(
+        activity=activity_payload,
+        result=result_payload,
+        exercises=exercises,
+        answers=[
+            {"exercise_id": exercise_id, "selected_answer": selected_answer}
+            for exercise_id, selected_answer in submission.selected_answers.items()
+        ],
+        next_activity_suggestion=submission.next_activity_suggestion,
+        ui_action="practice.result",
+    )
+
+
+def _pending_clarification_payload(
+    clarification: PendingClarification | None,
+) -> dict | None:
+    if clarification is None:
+        return None
+    return {
+        "pending_intent": clarification.pending_intent,
+        "missing_fields": clarification.missing_fields,
+        "collected_slots": clarification.collected_slots,
+        "question": clarification.question,
+    }
+
+
+def _conversation_route_response(
+    route: ConversationRoute | None,
+) -> ConversationRouteResponseModel | None:
+    if route is None:
+        return None
+    return ConversationRouteResponseModel(
+        intent=route.intent,
+        confidence=route.confidence,
+        source=route.source,
+        reason=route.reason,
+        slots=route.slots,
+        needs_clarification=route.needs_clarification,
+        clarification_question=route.clarification_question,
+    )
+
+
+def _set_legacy_endpoint_headers(response: Response, message: str) -> None:
+    response.headers["Deprecation"] = "true"
+    response.headers["Warning"] = f'299 - "{message}"'
 
 
 def _build_chroma_debug_snapshot() -> dict:

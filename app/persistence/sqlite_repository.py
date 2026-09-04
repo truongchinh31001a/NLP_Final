@@ -18,6 +18,9 @@ from app.schemas import (
     ExerciseOption,
     GeneratedExerciseSet,
     LearnerProfile,
+    LearningActivity,
+    LearningActivityStatus,
+    LearningActivityType,
     PracticePlan,
     PracticeReview,
     PracticeRequest,
@@ -353,7 +356,7 @@ class SQLiteLearningRepository:
             memory_row = self._get_chat_memory_row(connection, db_user_id)
             message_rows = connection.execute(
                 """
-                SELECT message_code, role, content, created_at
+                SELECT message_code, role, content, metadata_json, created_at
                 FROM chat_messages
                 WHERE session_id = ?
                 ORDER BY id DESC
@@ -373,6 +376,7 @@ class SQLiteLearningRepository:
                 "message_id": row["message_code"],
                 "role": row["role"],
                 "content": row["content"],
+                "metadata": self._json_object(row["metadata_json"]),
                 "created_at": row["created_at"],
             }
             for row in reversed(message_rows)
@@ -509,7 +513,7 @@ class SQLiteLearningRepository:
             )
             message_row = connection.execute(
                 """
-                SELECT message_code, role, content, created_at
+                SELECT message_code, role, content, metadata_json, created_at
                 FROM chat_messages
                 WHERE message_code = ?
                 """,
@@ -537,6 +541,7 @@ class SQLiteLearningRepository:
                 "message_id": message_row["message_code"],
                 "role": message_row["role"],
                 "content": message_row["content"],
+                "metadata": self._json_object(message_row["metadata_json"]),
                 "created_at": message_row["created_at"],
             },
             "memory_summary": summary,
@@ -546,6 +551,69 @@ class SQLiteLearningRepository:
                 [],
             ),
         }
+
+    def merge_chat_memory_facts(
+        self,
+        user_id: str,
+        facts: dict[str, object],
+        session_id: str | None = None,
+    ) -> dict[str, object]:
+        cleaned_facts = {
+            key: value
+            for key, value in facts.items()
+            if value not in (None, "", [])
+        }
+        if not cleaned_facts:
+            return self.get_chat_resume(user_id, session_id=session_id)
+
+        with self._connect() as connection:
+            db_user_id = self._ensure_user(connection, user_id)
+            session = (
+                self._get_chat_session_by_code(connection, db_user_id, session_id)
+                if session_id
+                else self._get_or_create_active_chat_session(connection, db_user_id)
+            )
+            if session is None:
+                raise LookupError("Chat session not found.")
+            memory_row = self._get_chat_memory_row(connection, db_user_id)
+            current_facts = (
+                json.loads(memory_row["facts_json"] or "{}")
+                if memory_row is not None
+                else {}
+            )
+            merged_facts = self._merge_chat_facts(current_facts, cleaned_facts)
+            summary = self._build_chat_memory_summary(merged_facts)
+            connection.execute(
+                """
+                INSERT INTO chat_memory_summaries (
+                    user_id,
+                    summary_text,
+                    facts_json,
+                    last_session_id,
+                    updated_at
+                )
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    summary_text = excluded.summary_text,
+                    facts_json = excluded.facts_json,
+                    last_session_id = excluded.last_session_id,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (
+                    db_user_id,
+                    summary,
+                    json.dumps(merged_facts, ensure_ascii=False),
+                    int(session["id"]),
+                ),
+            )
+            self._sync_profile_from_chat_facts(
+                connection,
+                db_user_id,
+                merged_facts,
+            )
+            resolved_session_id = str(session["session_code"])
+
+        return self.get_chat_resume(user_id, session_id=resolved_session_id)
 
     def save_profile(self, profile: LearnerProfile) -> None:
         with self._connect() as connection:
@@ -662,6 +730,307 @@ class SQLiteLearningRepository:
                     ),
                 )
 
+    def create_learning_activity(self, activity: LearningActivity) -> LearningActivity:
+        with self._connect() as connection:
+            db_user_id = self._ensure_user(connection, activity.learner_id)
+            conversation = self._get_chat_session_by_code(
+                connection,
+                db_user_id,
+                activity.conversation_id,
+            )
+            if conversation is None:
+                raise LookupError("Chat session not found.")
+
+            activity_code = activity.activity_id or f"activity_{uuid.uuid4().hex}"
+            cursor = connection.execute(
+                """
+                INSERT INTO learning_activities (
+                    activity_code,
+                    conversation_id,
+                    user_id,
+                    activity_type,
+                    status,
+                    target_skills_json,
+                    difficulty,
+                    metadata_json,
+                    created_at,
+                    started_at,
+                    submitted_at,
+                    completed_at,
+                    updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP), ?, ?, ?, CURRENT_TIMESTAMP)
+                """,
+                (
+                    activity_code,
+                    int(conversation["id"]),
+                    db_user_id,
+                    self._activity_type_value(activity.type),
+                    self._activity_status_value(activity.status),
+                    json.dumps(activity.target_skills, ensure_ascii=False),
+                    activity.difficulty,
+                    json.dumps(activity.metadata, ensure_ascii=False),
+                    activity.created_at,
+                    activity.started_at,
+                    activity.submitted_at,
+                    activity.completed_at,
+                ),
+            )
+            db_activity_id = int(cursor.lastrowid)
+            self._sync_active_activity(connection, int(conversation["id"]), db_activity_id, activity.status)
+            self._record_activity_event(
+                connection,
+                db_activity_id,
+                "CREATED",
+                activity.status,
+            )
+            row = self._get_activity_row_by_db_id(connection, db_user_id, db_activity_id)
+
+        return self._activity_from_row(row)
+
+    def get_learning_activity(
+        self,
+        user_id: str,
+        activity_id: str,
+    ) -> LearningActivity | None:
+        with self._connect() as connection:
+            db_user_id = self._ensure_user(connection, user_id)
+            row = self._get_activity_row_by_code(
+                connection,
+                db_user_id,
+                activity_id,
+            )
+        return self._activity_from_row(row) if row is not None else None
+
+    def update_learning_activity_status(
+        self,
+        user_id: str,
+        activity_id: str,
+        status: LearningActivityStatus,
+    ) -> LearningActivity:
+        with self._connect() as connection:
+            db_user_id = self._ensure_user(connection, user_id)
+            row = self._get_activity_row_by_code(connection, db_user_id, activity_id)
+            if row is None:
+                raise LookupError(f"Learning activity not found: {activity_id}")
+
+            started_sql = (
+                "COALESCE(started_at, CURRENT_TIMESTAMP)"
+                if status == LearningActivityStatus.IN_PROGRESS
+                else "started_at"
+            )
+            submitted_sql = (
+                "COALESCE(submitted_at, CURRENT_TIMESTAMP)"
+                if status == LearningActivityStatus.SUBMITTED
+                else "submitted_at"
+            )
+            completed_sql = (
+                "COALESCE(completed_at, CURRENT_TIMESTAMP)"
+                if self._is_terminal_activity_status(status)
+                else "completed_at"
+            )
+            connection.execute(
+                f"""
+                UPDATE learning_activities
+                SET
+                    status = ?,
+                    started_at = {started_sql},
+                    submitted_at = {submitted_sql},
+                    completed_at = {completed_sql},
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (status.value, int(row["id"])),
+            )
+            self._sync_active_activity(
+                connection,
+                int(row["conversation_db_id"]),
+                int(row["id"]),
+                status,
+            )
+            self._record_activity_event(
+                connection,
+                int(row["id"]),
+                "STATUS_CHANGED",
+                status,
+            )
+            updated = self._get_activity_row_by_db_id(connection, db_user_id, int(row["id"]))
+
+        return self._activity_from_row(updated)
+
+    def attach_generated_exercise_set_to_activity(
+        self,
+        user_id: str,
+        activity_id: str,
+        generation_run_id: str,
+    ) -> LearningActivity:
+        with self._connect() as connection:
+            db_user_id = self._ensure_user(connection, user_id)
+            activity_row = self._get_activity_row_by_code(
+                connection,
+                db_user_id,
+                activity_id,
+            )
+            if activity_row is None:
+                raise LookupError(f"Learning activity not found: {activity_id}")
+            generation_row = self._get_generation_run_by_public_id(
+                connection,
+                db_user_id,
+                generation_run_id,
+            )
+            if generation_row is None:
+                raise LookupError(f"Generation run not found: {generation_run_id}")
+
+            connection.execute(
+                """
+                UPDATE learning_activities
+                SET generation_run_id = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (int(generation_row["id"]), int(activity_row["id"])),
+            )
+            connection.execute(
+                """
+                UPDATE generation_runs
+                SET activity_id = ?
+                WHERE id = ?
+                """,
+                (int(activity_row["id"]), int(generation_row["id"])),
+            )
+            self._record_activity_event(
+                connection,
+                int(activity_row["id"]),
+                "GENERATED_SET_ATTACHED",
+                self._status_from_value(activity_row["status"]),
+                {"generation_run_id": generation_run_id},
+            )
+            row = self._get_activity_row_by_db_id(
+                connection,
+                db_user_id,
+                int(activity_row["id"]),
+            )
+
+        return self._activity_from_row(row)
+
+    def attach_session_result_to_activity(
+        self,
+        user_id: str,
+        activity_id: str,
+        session_code: str,
+    ) -> LearningActivity:
+        with self._connect() as connection:
+            db_user_id = self._ensure_user(connection, user_id)
+            activity_row = self._get_activity_row_by_code(
+                connection,
+                db_user_id,
+                activity_id,
+            )
+            if activity_row is None:
+                raise LookupError(f"Learning activity not found: {activity_id}")
+            session_row = connection.execute(
+                """
+                SELECT id
+                FROM practice_sessions
+                WHERE session_code = ? AND user_id = ?
+                """,
+                (session_code, db_user_id),
+            ).fetchone()
+            if session_row is None:
+                raise LookupError(f"Practice session not found: {session_code}")
+
+            connection.execute(
+                """
+                UPDATE learning_activities
+                SET
+                    practice_session_id = ?,
+                    status = ?,
+                    submitted_at = COALESCE(submitted_at, CURRENT_TIMESTAMP),
+                    completed_at = COALESCE(completed_at, CURRENT_TIMESTAMP),
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (
+                    int(session_row["id"]),
+                    LearningActivityStatus.COMPLETED.value,
+                    int(activity_row["id"]),
+                ),
+            )
+            connection.execute(
+                """
+                UPDATE practice_sessions
+                SET activity_id = ?
+                WHERE id = ?
+                """,
+                (int(activity_row["id"]), int(session_row["id"])),
+            )
+            self._sync_active_activity(
+                connection,
+                int(activity_row["conversation_db_id"]),
+                int(activity_row["id"]),
+                LearningActivityStatus.COMPLETED,
+            )
+            self._record_activity_event(
+                connection,
+                int(activity_row["id"]),
+                "SESSION_RESULT_ATTACHED",
+                LearningActivityStatus.COMPLETED,
+                {"session_code": session_code},
+            )
+            row = self._get_activity_row_by_db_id(
+                connection,
+                db_user_id,
+                int(activity_row["id"]),
+            )
+
+        return self._activity_from_row(row)
+
+    def get_latest_learning_activity(
+        self,
+        user_id: str,
+        conversation_id: str,
+        statuses: list[LearningActivityStatus] | None = None,
+    ) -> LearningActivity | None:
+        with self._connect() as connection:
+            db_user_id = self._ensure_user(connection, user_id)
+            conversation = self._get_chat_session_by_code(
+                connection,
+                db_user_id,
+                conversation_id,
+            )
+            if conversation is None:
+                raise LookupError("Chat session not found.")
+
+            status_values = [status.value for status in statuses or []]
+            status_clause = ""
+            params: list[object] = [db_user_id, int(conversation["id"])]
+            if status_values:
+                placeholders = ",".join("?" for _ in status_values)
+                status_clause = f"AND la.status IN ({placeholders})"
+                params.extend(status_values)
+            rows = connection.execute(
+                f"""
+                SELECT
+                    la.*,
+                    u.user_code,
+                    la.conversation_id AS conversation_db_id,
+                    cs.session_code AS conversation_code,
+                    gr.generation_run_id AS public_generation_run_id,
+                    ps.session_code AS practice_session_code
+                FROM learning_activities la
+                JOIN users u ON u.id = la.user_id
+                JOIN chat_sessions cs ON cs.id = la.conversation_id
+                LEFT JOIN generation_runs gr ON gr.id = la.generation_run_id
+                LEFT JOIN practice_sessions ps ON ps.id = la.practice_session_id
+                WHERE la.user_id = ? AND la.conversation_id = ?
+                {status_clause}
+                ORDER BY la.updated_at DESC, la.id DESC
+                LIMIT 1
+                """,
+                params,
+            ).fetchall()
+
+        return self._activity_from_row(rows[0]) if rows else None
+
     def get_generated_exercise_set(
         self,
         user_id: str,
@@ -673,6 +1042,7 @@ class SQLiteLearningRepository:
                 SELECT
                     gr.id,
                     gr.generation_run_id,
+                    la.activity_code,
                     gr.exercise_type,
                     gr.difficulty,
                     gr.num_questions,
@@ -683,6 +1053,7 @@ class SQLiteLearningRepository:
                 FROM generation_runs gr
                 JOIN users u ON u.id = gr.user_id
                 JOIN topics t ON t.id = gr.topic_id
+                LEFT JOIN learning_activities la ON la.id = gr.activity_id
                 WHERE gr.generation_run_id = ? AND u.user_code = ?
                 """,
                 (generation_run_id, user_id),
@@ -789,6 +1160,7 @@ class SQLiteLearningRepository:
             plan=plan,
             retrieved_chunks=[],
             exercises=exercises,
+            activity_id=run["activity_code"],
             generation_run_id=run["generation_run_id"],
             prompt_snapshot=run["prompt_snapshot"] or "",
             agent_trace=json.loads(run["agent_trace_json"] or "[]"),
@@ -805,11 +1177,23 @@ class SQLiteLearningRepository:
             topic_id = self._ensure_topic(connection, generated.plan.topic)
             retrieved_chunk_ids = [chunk.chunk_id for chunk in generated.retrieved_chunks]
             model_name = generator_backend.split(":", maxsplit=1)[-1]
+            activity_row = None
+            if generated.activity_id:
+                activity_row = self._get_activity_row_by_code(
+                    connection,
+                    db_user_id,
+                    generated.activity_id,
+                )
+                if activity_row is None:
+                    raise LookupError(
+                        f"Learning activity not found: {generated.activity_id}"
+                    )
 
             cursor = connection.execute(
                 """
                 INSERT INTO generation_runs (
                     generation_run_id,
+                    activity_id,
                     user_id,
                     topic_id,
                     exercise_type,
@@ -822,10 +1206,11 @@ class SQLiteLearningRepository:
                     generator_backend,
                     model_name
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     generation_run_id,
+                    int(activity_row["id"]) if activity_row is not None else None,
                     db_user_id,
                     topic_id,
                     generated.plan.exercise_type,
@@ -900,6 +1285,23 @@ class SQLiteLearningRepository:
                         ),
                     )
 
+            if activity_row is not None:
+                connection.execute(
+                    """
+                    UPDATE learning_activities
+                    SET generation_run_id = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                    """,
+                    (db_generation_run_id, int(activity_row["id"])),
+                )
+                self._record_activity_event(
+                    connection,
+                    int(activity_row["id"]),
+                    "GENERATED_SET_ATTACHED",
+                    self._status_from_value(activity_row["status"]),
+                    {"generation_run_id": generation_run_id},
+                )
+
         generated.generation_run_id = generation_run_id
         return generation_run_id
 
@@ -909,6 +1311,7 @@ class SQLiteLearningRepository:
         generation_run_id: str | None = None,
         selected_answers: dict[str, str] | None = None,
         answer_diagnoses: list[AnswerDiagnosis] | None = None,
+        activity_id: str | None = None,
     ) -> str:
         session_code = f"sess_{uuid.uuid4().hex}"
         with self._connect() as connection:
@@ -943,11 +1346,36 @@ class SQLiteLearningRepository:
                 if latest_generation_run is not None
                 else "unknown"
             )
+            activity_row = None
+            activity_code = activity_id or result.activity_id
+            if activity_code is None and latest_generation_run is not None:
+                generation_activity_id = latest_generation_run["activity_id"]
+                if generation_activity_id is not None:
+                    activity_row = self._get_activity_row_by_db_id(
+                        connection,
+                        db_user_id,
+                        int(generation_activity_id),
+                    )
+                    activity_code = (
+                        str(activity_row["activity_code"])
+                        if activity_row is not None
+                        else None
+                    )
+            elif activity_code is not None:
+                activity_row = self._get_activity_row_by_code(
+                    connection,
+                    db_user_id,
+                    activity_code,
+                )
+                if activity_row is None:
+                    raise LookupError(f"Learning activity not found: {activity_code}")
+            result.activity_id = activity_code
 
             connection.execute(
                 """
                 INSERT INTO practice_sessions (
                     session_code,
+                    activity_id,
                     user_id,
                     topic_id,
                     generation_run_id,
@@ -958,10 +1386,11 @@ class SQLiteLearningRepository:
                     recommendation_text,
                     started_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 """,
                 (
                     session_code,
+                    int(activity_row["id"]) if activity_row is not None else None,
                     db_user_id,
                     topic_id,
                     generation_run_db_id,
@@ -973,6 +1402,7 @@ class SQLiteLearningRepository:
                 ),
             )
             db_session_id = int(connection.execute("SELECT last_insert_rowid()").fetchone()[0])
+            result.session_code = session_code
 
             if selected_answers is not None and generation_run_db_id is not None:
                 self._save_user_answers(
@@ -1030,7 +1460,170 @@ class SQLiteLearningRepository:
                     self._status_from_accuracy(accuracy),
                 ),
             )
+
+            if activity_row is not None:
+                connection.execute(
+                    """
+                    UPDATE learning_activities
+                    SET
+                        practice_session_id = ?,
+                        status = ?,
+                        submitted_at = COALESCE(submitted_at, CURRENT_TIMESTAMP),
+                        completed_at = COALESCE(completed_at, CURRENT_TIMESTAMP),
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                    """,
+                    (
+                        db_session_id,
+                        LearningActivityStatus.COMPLETED.value,
+                        int(activity_row["id"]),
+                    ),
+                )
+                self._sync_active_activity(
+                    connection,
+                    int(activity_row["conversation_db_id"]),
+                    int(activity_row["id"]),
+                    LearningActivityStatus.COMPLETED,
+                )
+                self._record_activity_event(
+                    connection,
+                    int(activity_row["id"]),
+                    "SESSION_RESULT_ATTACHED",
+                    LearningActivityStatus.COMPLETED,
+                    {"session_code": session_code},
+                )
         return session_code
+
+    def get_session_result(
+        self,
+        user_id: str,
+        session_code: str,
+    ) -> SessionResult | None:
+        with self._connect() as connection:
+            db_user_id = self._ensure_user(connection, user_id)
+            session_row = connection.execute(
+                """
+                SELECT
+                    ps.id,
+                    ps.session_code,
+                    la.activity_code,
+                    gr.generation_run_id,
+                    t.topic_code,
+                    ps.total_questions,
+                    ps.correct_count,
+                    ps.accuracy,
+                    ps.recommendation_text
+                FROM practice_sessions ps
+                JOIN topics t ON t.id = ps.topic_id
+                LEFT JOIN learning_activities la ON la.id = ps.activity_id
+                LEFT JOIN generation_runs gr ON gr.id = ps.generation_run_id
+                WHERE ps.user_id = ? AND ps.session_code = ?
+                """,
+                (db_user_id, session_code),
+            ).fetchone()
+            if session_row is None:
+                return None
+
+            diagnosis_rows = connection.execute(
+                """
+                SELECT
+                    COALESCE(se.client_exercise_id, se.session_exercise_code)
+                        AS exercise_id,
+                    ad.error_type,
+                    ad.skill_code,
+                    ad.topic_code,
+                    ad.subtopic,
+                    ad.subtype,
+                    ad.severity,
+                    ad.mastery_impact,
+                    ad.explanation,
+                    ad.evidence_json,
+                    ua.selected_answer,
+                    ua.is_correct
+                FROM answer_diagnoses ad
+                JOIN user_answers ua ON ua.id = ad.user_answer_id
+                JOIN session_exercises se ON se.id = ad.session_exercise_id
+                WHERE ad.session_id = ?
+                ORDER BY ad.id
+                """,
+                (int(session_row["id"]),),
+            ).fetchall()
+            review_row = connection.execute(
+                """
+                SELECT
+                    review_code,
+                    evaluator,
+                    summary_text,
+                    strengths_json,
+                    weaknesses_json,
+                    next_steps_json,
+                    next_practice_prompt,
+                    raw_response
+                FROM practice_reviews
+                WHERE user_id = ? AND session_id = ?
+                """,
+                (db_user_id, int(session_row["id"])),
+            ).fetchone()
+
+        diagnoses = []
+        for row in diagnosis_rows:
+            evidence = self._json_object(row["evidence_json"])
+            if row["selected_answer"] is not None:
+                evidence.setdefault("selected_answer", row["selected_answer"])
+            diagnoses.append(
+                AnswerDiagnosis(
+                    exercise_id=row["exercise_id"],
+                    is_correct=bool(row["is_correct"]),
+                    error_type=row["error_type"],
+                    skill_id=row["skill_code"],
+                    topic=row["topic_code"],
+                    subtopic=row["subtopic"],
+                    subtype=row["subtype"],
+                    severity=float(row["severity"] or 0.0),
+                    mastery_impact=float(row["mastery_impact"] or 0.0),
+                    explanation=row["explanation"] or "",
+                    evidence=evidence,
+                )
+            )
+        review = None
+        if review_row is not None:
+            review = PracticeReview(
+                review_code=review_row["review_code"],
+                evaluator=review_row["evaluator"],
+                summary=review_row["summary_text"],
+                strengths=[
+                    str(item)
+                    for item in self._json_value(review_row["strengths_json"], [])
+                ],
+                weaknesses=[
+                    str(item)
+                    for item in self._json_value(review_row["weaknesses_json"], [])
+                ],
+                next_steps=[
+                    str(item)
+                    for item in self._json_value(review_row["next_steps_json"], [])
+                ],
+                next_practice_prompt=review_row["next_practice_prompt"] or "",
+                raw_response=review_row["raw_response"] or "",
+            )
+        return SessionResult(
+            user_id=user_id,
+            topic=session_row["topic_code"],
+            score=float(session_row["accuracy"]),
+            correct_count=int(session_row["correct_count"]),
+            total_questions=int(session_row["total_questions"]),
+            weak_topics_detected=(
+                [session_row["topic_code"]]
+                if float(session_row["accuracy"]) < 0.8
+                else []
+            ),
+            recommendation=session_row["recommendation_text"] or "",
+            activity_id=session_row["activity_code"],
+            generation_run_id=session_row["generation_run_id"] or "",
+            session_code=session_row["session_code"],
+            answer_diagnoses=diagnoses,
+            practice_review=review,
+        )
 
     def save_practice_review(
         self,
@@ -1218,11 +1811,19 @@ class SQLiteLearningRepository:
         if level:
             facts["level"] = level
 
-        difficulty = self._extract_difficulty(normalized)
+        difficulty = (
+            self._extract_difficulty(normalized)
+            if self._has_preference_scope(normalized)
+            else None
+        )
         if difficulty:
             facts["preferred_difficulty"] = difficulty
 
-        question_count = self._extract_question_count(normalized)
+        question_count = (
+            self._extract_question_count(normalized)
+            if self._has_preference_scope(normalized)
+            else None
+        )
         if question_count:
             facts["preferred_num_questions"] = question_count
 
@@ -1311,19 +1912,6 @@ class SQLiteLearningRepository:
             existing_goals,
             self._as_string_list(facts.get("goals")),
         )
-        has_complete_memory = all(
-            [
-                facts.get("display_name"),
-                facts.get("level") or profile_row["level"],
-                goals,
-                facts.get("weak_topics"),
-                facts.get("preferred_difficulty")
-                or profile_row["preferred_difficulty"],
-                facts.get("preferred_num_questions")
-                or profile_row["preferred_num_questions"],
-            ]
-        )
-
         connection.execute(
             """
             UPDATE user_profiles
@@ -1332,10 +1920,6 @@ class SQLiteLearningRepository:
                 goals_json = ?,
                 preferred_difficulty = COALESCE(?, preferred_difficulty),
                 preferred_num_questions = COALESCE(?, preferred_num_questions),
-                onboarding_completed = CASE
-                    WHEN ? THEN 1
-                    ELSE onboarding_completed
-                END,
                 updated_at = CURRENT_TIMESTAMP
             WHERE user_id = ?
             """,
@@ -1344,7 +1928,6 @@ class SQLiteLearningRepository:
                 json.dumps(goals, ensure_ascii=False),
                 facts.get("preferred_difficulty"),
                 facts.get("preferred_num_questions"),
-                int(has_complete_memory),
                 user_id,
             ),
         )
@@ -1570,6 +2153,24 @@ class SQLiteLearningRepository:
             ]
         )
 
+    def _has_preference_scope(self, normalized: str) -> bool:
+        return any(
+            marker in normalized
+            for marker in [
+                "tu gio",
+                "tu bay gio",
+                "lan sau",
+                "moi lan",
+                "mac dinh",
+                "uu tien",
+                "toi muon",
+                "minh muon",
+                "i want",
+                "prefer",
+                "preference",
+            ]
+        )
+
     def _normalize_for_matching(self, value: str) -> str:
         normalized = value.replace("\u0111", "d").replace("\u0110", "D")
         normalized = unicodedata.normalize("NFD", normalized)
@@ -1646,6 +2247,24 @@ class SQLiteLearningRepository:
                 table_name="session_exercises",
                 column_name="client_exercise_id",
                 column_definition="TEXT",
+            )
+            self._ensure_column(
+                connection,
+                table_name="generation_runs",
+                column_name="activity_id",
+                column_definition="INTEGER",
+            )
+            self._ensure_column(
+                connection,
+                table_name="practice_sessions",
+                column_name="activity_id",
+                column_definition="INTEGER",
+            )
+            self._ensure_column(
+                connection,
+                table_name="chat_sessions",
+                column_name="active_activity_id",
+                column_definition="INTEGER",
             )
             self._ensure_column(
                 connection,
@@ -1739,6 +2358,174 @@ class SQLiteLearningRepository:
         ).fetchone()
         return int(row["id"])
 
+    def _get_activity_row_by_code(
+        self,
+        connection: sqlite3.Connection,
+        user_id: int,
+        activity_code: str,
+    ) -> sqlite3.Row | None:
+        return connection.execute(
+            """
+            SELECT
+                la.*,
+                u.user_code,
+                la.conversation_id AS conversation_db_id,
+                cs.session_code AS conversation_code,
+                gr.generation_run_id AS public_generation_run_id,
+                ps.session_code AS practice_session_code
+            FROM learning_activities la
+            JOIN users u ON u.id = la.user_id
+            JOIN chat_sessions cs ON cs.id = la.conversation_id
+            LEFT JOIN generation_runs gr ON gr.id = la.generation_run_id
+            LEFT JOIN practice_sessions ps ON ps.id = la.practice_session_id
+            WHERE la.user_id = ? AND la.activity_code = ?
+            """,
+            (user_id, activity_code),
+        ).fetchone()
+
+    def _get_activity_row_by_db_id(
+        self,
+        connection: sqlite3.Connection,
+        user_id: int,
+        activity_id: int,
+    ) -> sqlite3.Row | None:
+        return connection.execute(
+            """
+            SELECT
+                la.*,
+                u.user_code,
+                la.conversation_id AS conversation_db_id,
+                cs.session_code AS conversation_code,
+                gr.generation_run_id AS public_generation_run_id,
+                ps.session_code AS practice_session_code
+            FROM learning_activities la
+            JOIN users u ON u.id = la.user_id
+            JOIN chat_sessions cs ON cs.id = la.conversation_id
+            LEFT JOIN generation_runs gr ON gr.id = la.generation_run_id
+            LEFT JOIN practice_sessions ps ON ps.id = la.practice_session_id
+            WHERE la.user_id = ? AND la.id = ?
+            """,
+            (user_id, activity_id),
+        ).fetchone()
+
+    def _activity_from_row(self, row: sqlite3.Row | None) -> LearningActivity:
+        if row is None:
+            raise LookupError("Learning activity not found.")
+        return LearningActivity(
+            activity_id=row["activity_code"],
+            conversation_id=row["conversation_code"],
+            learner_id=row["user_code"],
+            type=self._activity_type_from_value(row["activity_type"]),
+            status=self._status_from_value(row["status"]),
+            target_skills=[
+                str(item)
+                for item in self._json_value(row["target_skills_json"], [])
+                if str(item).strip()
+            ],
+            difficulty=row["difficulty"],
+            created_at=row["created_at"],
+            started_at=row["started_at"],
+            submitted_at=row["submitted_at"],
+            completed_at=row["completed_at"],
+            updated_at=row["updated_at"],
+            generation_run_id=row["public_generation_run_id"],
+            session_code=row["practice_session_code"],
+            metadata=self._json_object(row["metadata_json"]),
+        )
+
+    def _sync_active_activity(
+        self,
+        connection: sqlite3.Connection,
+        conversation_id: int,
+        activity_id: int,
+        status: LearningActivityStatus,
+    ) -> None:
+        if self._is_terminal_activity_status(status):
+            connection.execute(
+                """
+                UPDATE chat_sessions
+                SET active_activity_id = NULL, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND active_activity_id = ?
+                """,
+                (conversation_id, activity_id),
+            )
+            return
+        connection.execute(
+            """
+            UPDATE chat_sessions
+            SET active_activity_id = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (activity_id, conversation_id),
+        )
+
+    def _record_activity_event(
+        self,
+        connection: sqlite3.Connection,
+        activity_id: int,
+        event_type: str,
+        status: LearningActivityStatus,
+        metadata: dict[str, object] | None = None,
+    ) -> None:
+        connection.execute(
+            """
+            INSERT INTO learning_activity_events (
+                activity_id,
+                event_type,
+                status,
+                metadata_json
+            )
+            VALUES (?, ?, ?, ?)
+            """,
+            (
+                activity_id,
+                event_type,
+                status.value,
+                json.dumps(metadata or {}, ensure_ascii=False),
+            ),
+        )
+
+    def _activity_type_value(self, activity_type: LearningActivityType | str) -> str:
+        if isinstance(activity_type, LearningActivityType):
+            return activity_type.value
+        return str(activity_type)
+
+    def _activity_status_value(self, status: LearningActivityStatus | str) -> str:
+        if isinstance(status, LearningActivityStatus):
+            return status.value
+        return str(status)
+
+    def _activity_type_from_value(self, value: object) -> LearningActivityType:
+        try:
+            return LearningActivityType(str(value))
+        except ValueError:
+            return LearningActivityType.PRACTICE
+
+    def _status_from_value(self, value: object) -> LearningActivityStatus:
+        try:
+            return LearningActivityStatus(str(value))
+        except ValueError:
+            return LearningActivityStatus.CREATED
+
+    def _is_terminal_activity_status(self, status: LearningActivityStatus) -> bool:
+        return status in {
+            LearningActivityStatus.COMPLETED,
+            LearningActivityStatus.FAILED,
+            LearningActivityStatus.CANCELLED,
+        }
+
+    def _json_value(self, raw_value: str | None, default: object) -> object:
+        if not raw_value:
+            return default
+        try:
+            return json.loads(raw_value)
+        except json.JSONDecodeError:
+            return default
+
+    def _json_object(self, raw_value: str | None) -> dict[str, object]:
+        value = self._json_value(raw_value, {})
+        return value if isinstance(value, dict) else {}
+
     def _get_latest_generation_run(
         self,
         connection: sqlite3.Connection,
@@ -1747,7 +2534,7 @@ class SQLiteLearningRepository:
     ) -> sqlite3.Row | None:
         return connection.execute(
             """
-            SELECT id, topic_id, difficulty
+            SELECT id, topic_id, difficulty, activity_id
             FROM generation_runs
             WHERE user_id = ? AND topic_id = ?
             ORDER BY id DESC
@@ -1764,7 +2551,7 @@ class SQLiteLearningRepository:
     ) -> sqlite3.Row | None:
         return connection.execute(
             """
-            SELECT id, topic_id, difficulty
+            SELECT id, topic_id, difficulty, activity_id
             FROM generation_runs
             WHERE user_id = ? AND generation_run_id = ?
             """,

@@ -27,6 +27,20 @@ class LangChainModelFactory:
 
         return RunnableLambda(self._fallback_json_response)
 
+    def build_tutor_response_runnable(self) -> Runnable[Any, Any] | None:
+        if not self.config.tutor_response_llm_enabled:
+            return None
+
+        backend = self._resolve_backend()
+        if backend == "ollama":
+            return self._build_ollama_chat_runnable()
+        if backend == "openai":
+            return ChatOpenAI(
+                model=self.config.openai_model,
+                temperature=self.config.openai_temperature,
+            )
+        return None
+
     def get_backend_name(self) -> str:
         backend = self._resolve_backend()
         if backend == "ollama":
@@ -34,6 +48,16 @@ class LangChainModelFactory:
         if backend == "openai":
             return f"langchain-openai:{self.config.openai_model}"
         return "langchain-fallback:runnable-lambda"
+
+    def get_tutor_response_backend_name(self) -> str:
+        if not self.config.tutor_response_llm_enabled:
+            return "disabled"
+        backend = self._resolve_backend()
+        if backend == "ollama":
+            return f"langchain-ollama:{self.config.ollama_model}"
+        if backend == "openai":
+            return f"langchain-openai:{self.config.openai_model}"
+        return "disabled"
 
     def _resolve_backend(self) -> str:
         requested = self.config.llm_backend.strip().lower()
@@ -63,6 +87,21 @@ class LangChainModelFactory:
             base_url=self.config.ollama_base_url,
             temperature=self.config.ollama_temperature,
             format="json",
+        )
+
+    def _build_ollama_chat_runnable(self) -> Runnable[Any, Any]:
+        try:
+            from langchain_ollama import ChatOllama
+        except ImportError as exc:
+            raise RuntimeError(
+                "LLM_BACKEND=ollama requires the `langchain-ollama` package. "
+                "Install dependencies with `pip install -r requirements.txt`."
+            ) from exc
+
+        return ChatOllama(
+            model=self.config.ollama_model,
+            base_url=self.config.ollama_base_url,
+            temperature=self.config.ollama_temperature,
         )
 
     def _fallback_json_response(self, prompt_value: Any) -> str:

@@ -70,6 +70,22 @@ class AppConfig:
         "PRACTICE_INTENT_LLM_TIMEOUT_SECONDS",
         5.0,
     )
+    conversation_router_llm_enabled: bool = _bool_env(
+        "CONVERSATION_ROUTER_LLM_ENABLED",
+        False,
+    )
+    conversation_router_llm_timeout_seconds: float = _float_env(
+        "CONVERSATION_ROUTER_LLM_TIMEOUT_SECONDS",
+        4.0,
+    )
+    tutor_response_llm_enabled: bool = _bool_env(
+        "TUTOR_RESPONSE_LLM_ENABLED",
+        True,
+    )
+    tutor_response_llm_timeout_seconds: float = _float_env(
+        "TUTOR_RESPONSE_LLM_TIMEOUT_SECONDS",
+        6.0,
+    )
     vector_store_backend: str = os.getenv("VECTOR_STORE_BACKEND", "inmemory")
     retrieval_mode: str = os.getenv("RETRIEVAL_MODE", "hybrid")
     reranker_enabled: bool = _bool_env("RERANKER_ENABLED", True)

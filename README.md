@@ -15,6 +15,8 @@ direction is to make the AI core more explicit and measurable:
 - Skill taxonomy and prerequisite graph for English grammar/vocabulary.
 - Bayesian Knowledge Tracing (BKT) for user skill mastery.
 - Structured answer-level error diagnosis for mastery and review feedback.
+- LLM-backed tutor responses for open conversation/explanations with offline
+  context-aware fallbacks.
 - Topic, subtopic, error-pattern, and skill-level personalization dashboard.
 - Offline AI evaluation scripts for retrieval, generation, diagnosis, and
   recommendation checks.
@@ -28,15 +30,20 @@ direction is to make the AI core more explicit and measurable:
 
 ```text
 Next.js UI
-  -> FastAPI
-  -> LearningAgent
-     -> intent parser
+  -> FastAPI Conversation API
+  -> Conversation Orchestrator
+     -> intent router
+     -> learning activities with stable activity_id
+     -> profile/progress/explain/review/tutor response services
+     -> recommendation accept flow
+  -> LearningAgent for practice activities
+     -> structured request or legacy parser
      -> personalization planner
      -> retrieval service
      -> exercise generator
      -> validator
      -> scorer / error diagnosis / review
-     -> mastery update / recommendation
+     -> mastery update / structured recommendation
   -> SQLite or PostgreSQL persistence
   -> Chroma, in-memory, or pgvector retrieval
 ```
@@ -44,12 +51,15 @@ Next.js UI
 Key backend modules:
 
 - `app/agent/`: bounded learning agent and LangGraph-compatible workflow graph.
+- `app/activities/`: learning activity lifecycle for practice generation and submit.
 - `app/auth/`: signed demo-token auth and user ownership checks.
+- `app/conversation/`: conversation API orchestration, intent routing, and turn state.
 - `app/learner/`: skill graph, BKT, review scheduling.
 - `app/diagnosis/`: structured error classification and mastery impact.
 - `app/personalization/`: practice plan selection from learner state.
 - `app/recommendation/`: next-practice ranking from mastery and answer signals.
 - `app/retrieval/`: dense/sparse/hybrid retrieval, embeddings, and reranking.
+- `app/tutor/`: LLM-backed explain/general tutor responses with bounded fallbacks.
 - `app/persistence/`: SQLite and PostgreSQL repositories.
 - `app/observability/`: metrics registry and optional OpenTelemetry setup.
 - `evals/`: offline datasets and evaluation report targets.
@@ -80,6 +90,9 @@ docker compose up --build
 Docker Compose starts PostgreSQL with pgvector, Ollama, the FastAPI backend, and
 the Next.js frontend. SQLite/Chroma remain the default app backends unless you
 set the backend environment variables below.
+Inside Docker, the backend calls Ollama at `http://ollama:11434`. The compose
+file exposes container Ollama on host port `11435` for debugging so it does not
+get confused with a separate host Ollama running on `11434`.
 
 ## P2 Runtime Options
 
@@ -104,6 +117,20 @@ Token auth:
 AUTH_MODE=demo_token
 AUTH_TOKEN_SECRET=replace-this-secret
 ```
+
+Tutor response generation:
+
+```bash
+LLM_BACKEND=ollama
+DOCKER_OLLAMA_BASE_URL=http://ollama:11434
+TUTOR_RESPONSE_LLM_ENABLED=true
+TUTOR_RESPONSE_LLM_TIMEOUT_SECONDS=6
+```
+
+The conversation router remains rule-first for predictable activity routing.
+When `LLM_BACKEND=openai` or `LLM_BACKEND=ollama` is configured, general chat and
+explanation responses can use the tutor LLM. Without a chat model, the backend
+uses context-aware fallback replies instead of a single canned response.
 
 Get a local demo token:
 

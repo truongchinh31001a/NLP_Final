@@ -102,6 +102,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
 CREATE TABLE IF NOT EXISTS generation_runs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     generation_run_id TEXT NOT NULL UNIQUE,
+    activity_id INTEGER,
     user_id INTEGER NOT NULL,
     topic_id INTEGER NOT NULL,
     exercise_type TEXT NOT NULL,
@@ -114,6 +115,7 @@ CREATE TABLE IF NOT EXISTS generation_runs (
     generator_backend TEXT,
     model_name TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (activity_id) REFERENCES learning_activities(id),
     FOREIGN KEY (user_id) REFERENCES users(id),
     FOREIGN KEY (topic_id) REFERENCES topics(id)
 );
@@ -121,6 +123,7 @@ CREATE TABLE IF NOT EXISTS generation_runs (
 CREATE TABLE IF NOT EXISTS practice_sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_code TEXT NOT NULL UNIQUE,
+    activity_id INTEGER,
     user_id INTEGER NOT NULL,
     topic_id INTEGER NOT NULL,
     generation_run_id INTEGER,
@@ -131,6 +134,7 @@ CREATE TABLE IF NOT EXISTS practice_sessions (
     recommendation_text TEXT,
     started_at TEXT,
     ended_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (activity_id) REFERENCES learning_activities(id),
     FOREIGN KEY (user_id) REFERENCES users(id),
     FOREIGN KEY (topic_id) REFERENCES topics(id),
     FOREIGN KEY (generation_run_id) REFERENCES generation_runs(id)
@@ -310,6 +314,7 @@ CREATE TABLE IF NOT EXISTS chat_sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_code TEXT NOT NULL UNIQUE,
     user_id INTEGER NOT NULL,
+    active_activity_id INTEGER,
     title TEXT,
     status TEXT NOT NULL DEFAULT 'active',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -319,6 +324,45 @@ CREATE TABLE IF NOT EXISTS chat_sessions (
 
 CREATE INDEX IF NOT EXISTS idx_chat_sessions_user_updated
 ON chat_sessions (user_id, updated_at);
+
+CREATE TABLE IF NOT EXISTS learning_activities (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    activity_code TEXT NOT NULL UNIQUE,
+    conversation_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    activity_type TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'CREATED',
+    target_skills_json TEXT NOT NULL DEFAULT '[]',
+    difficulty TEXT,
+    generation_run_id INTEGER,
+    practice_session_id INTEGER,
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    started_at TEXT,
+    submitted_at TEXT,
+    completed_at TEXT,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (conversation_id) REFERENCES chat_sessions(id),
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (generation_run_id) REFERENCES generation_runs(id),
+    FOREIGN KEY (practice_session_id) REFERENCES practice_sessions(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_learning_activities_user_conversation_updated
+ON learning_activities (user_id, conversation_id, updated_at);
+
+CREATE TABLE IF NOT EXISTS learning_activity_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    activity_id INTEGER NOT NULL,
+    event_type TEXT NOT NULL,
+    status TEXT NOT NULL,
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (activity_id) REFERENCES learning_activities(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_learning_activity_events_activity_created
+ON learning_activity_events (activity_id, created_at);
 
 CREATE TABLE IF NOT EXISTS chat_messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

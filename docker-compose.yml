@@ -19,14 +19,28 @@ services:
   ollama:
     image: ollama/ollama:latest
     container_name: english-exercise-ollama
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
     volumes:
       - ollama_data:/root/.ollama
+    ports:
+      - "${DOCKER_OLLAMA_HOST_PORT:-11435}:11434"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "ollama", "list"]
       interval: 10s
       timeout: 5s
       retries: 12
+
+  ollama-models:
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    command: ["pull", "${OLLAMA_MODEL:-llama3.1:8b}"]
+    restart: "no"
 
   backend:
     build:
@@ -37,7 +51,9 @@ services:
       postgres:
         condition: service_healthy
       ollama:
-        condition: service_started
+        condition: service_healthy
+      ollama-models:
+        condition: service_completed_successfully
     environment:
       CORS_ORIGINS: http://localhost:3000
       LEARNING_REPOSITORY_BACKEND: ${LEARNING_REPOSITORY_BACKEND:-sqlite}
@@ -58,6 +74,10 @@ services:
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b}
       OLLAMA_BASE_URL: ${DOCKER_OLLAMA_BASE_URL:-http://ollama:11434}
+      CONVERSATION_ROUTER_LLM_ENABLED: ${CONVERSATION_ROUTER_LLM_ENABLED:-false}
+      CONVERSATION_ROUTER_LLM_TIMEOUT_SECONDS: ${CONVERSATION_ROUTER_LLM_TIMEOUT_SECONDS:-4}
+      TUTOR_RESPONSE_LLM_ENABLED: ${TUTOR_RESPONSE_LLM_ENABLED:-true}
+      TUTOR_RESPONSE_LLM_TIMEOUT_SECONDS: ${TUTOR_RESPONSE_LLM_TIMEOUT_SECONDS:-30}
       GENERATION_LLM_TIMEOUT_SECONDS: ${GENERATION_LLM_TIMEOUT_SECONDS:-20}
       REVIEW_LLM_TIMEOUT_SECONDS: ${REVIEW_LLM_TIMEOUT_SECONDS:-8}
       ONBOARDING_LLM_TIMEOUT_SECONDS: ${ONBOARDING_LLM_TIMEOUT_SECONDS:-35}
@@ -74,6 +94,17 @@ services:
       - ./data:/workspace/data
     ports:
       - "8000:8000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5).read()",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
 
   frontend:
     build:
@@ -84,7 +115,8 @@ services:
         NEXT_PUBLIC_AUTH_TOKEN: ${NEXT_PUBLIC_AUTH_TOKEN:-}
     container_name: english-exercise-frontend
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
       - "3000:3000"
 

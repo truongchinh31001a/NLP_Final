@@ -20,6 +20,7 @@ from app.schemas import (
     ExerciseItem,
     GeneratedExerciseSet,
     KnowledgeChunk,
+    LearningActivityStatus,
     PracticePlan,
     PracticeRequest,
     SessionResult,
@@ -73,22 +74,24 @@ class LearningAgent:
         user_id: str,
         raw_text: str,
         request_overrides: PracticeRequest | None = None,
+        activity_id: str | None = None,
+        skip_request_parser: bool = False,
     ) -> GeneratedExerciseSet:
         trace: list[AgentStep] = []
 
-        request = self._run_tool(
-            trace,
-            "parse_learning_request",
-            lambda: self.parser.parse(user_id=user_id, raw_text=raw_text),
-            "Parsed the learner request into structured practice fields.",
-        )
-        if request_overrides is not None:
+        if skip_request_parser and request_overrides is not None:
+            request = PracticeRequest(
+                user_id=user_id,
+                raw_text=raw_text,
+                processing_text=request_overrides.processing_text or raw_text,
+                detected_language=request_overrides.detected_language or "en",
+            )
             request = self._merge_request_overrides(request, request_overrides)
             trace.append(
                 AgentStep(
-                    tool="apply_interpreted_practice_intent",
+                    tool="use_structured_practice_request",
                     status="ok",
-                    detail="Applied structured intent fields from the practice interpreter.",
+                    detail="Used structured recommendation fields without parsing learner text.",
                     metadata={
                         "topic": request.topic,
                         "difficulty": request.difficulty,
@@ -99,6 +102,30 @@ class LearningAgent:
                     },
                 )
             )
+        else:
+            request = self._run_tool(
+                trace,
+                "parse_learning_request",
+                lambda: self.parser.parse(user_id=user_id, raw_text=raw_text),
+                "Parsed the learner request into structured practice fields.",
+            )
+            if request_overrides is not None:
+                request = self._merge_request_overrides(request, request_overrides)
+                trace.append(
+                    AgentStep(
+                        tool="apply_interpreted_practice_intent",
+                        status="ok",
+                        detail="Applied structured intent fields from the practice interpreter.",
+                        metadata={
+                            "topic": request.topic,
+                            "difficulty": request.difficulty,
+                            "exercise_type": request.exercise_type,
+                            "num_questions": request.num_questions,
+                            "target_subtopic": request.target_subtopic,
+                            "content_theme": request.content_theme,
+                        },
+                    )
+                )
         trace.append(
             AgentStep(
                 tool="normalize_user_language",
@@ -203,6 +230,7 @@ class LearningAgent:
             plan=plan,
             retrieved_chunks=chunks,
             exercises=exercises,
+            activity_id=activity_id,
             agent_trace=[self._step_to_dict(step) for step in trace],
         )
 
@@ -227,6 +255,7 @@ class LearningAgent:
                     "difficulty": plan.difficulty,
                     "num_questions": len(exercises),
                     "generation_run_id": generation_run_id,
+                    "activity_id": activity_id,
                 },
             )
         )
@@ -253,6 +282,18 @@ class LearningAgent:
         )
         if generated is None:
             raise LookupError(f"Generation run not found: {generation_run_id}")
+        if generated.activity_id:
+            self._run_tool(
+                trace,
+                "mark_activity_submitted",
+                lambda: self.repository.update_learning_activity_status(
+                    user_id,
+                    generated.activity_id or "",
+                    status=LearningActivityStatus.SUBMITTED,
+                ),
+                "Marked the learning activity as submitted before grading.",
+                {"activity_id": generated.activity_id},
+            )
 
         answer_lookup = {
             answer.exercise_id: answer.selected_answer for answer in answers
@@ -277,6 +318,7 @@ class LearningAgent:
             correct_count=correct_count,
             total_questions=total_questions,
             weak_topics_detected=[topic] if score < 0.8 else [],
+            activity_id=generated.activity_id,
             generation_run_id=generation_run_id,
             answer_diagnoses=answer_diagnoses,
         )
@@ -313,6 +355,18 @@ class LearningAgent:
             "Persisted the updated learner profile.",
             {"user_id": user_id},
         )
+        if generated.activity_id:
+            self._run_tool(
+                trace,
+                "mark_activity_graded",
+                lambda: self.repository.update_learning_activity_status(
+                    user_id,
+                    generated.activity_id or "",
+                    status=LearningActivityStatus.GRADED,
+                ),
+                "Marked the learning activity as graded before final persistence.",
+                {"activity_id": generated.activity_id},
+            )
         session_code = self._run_tool(
             trace,
             "save_session_result",
@@ -321,6 +375,7 @@ class LearningAgent:
                 generation_run_id=generation_run_id,
                 selected_answers=answer_lookup,
                 answer_diagnoses=answer_diagnoses,
+                activity_id=generated.activity_id,
             ),
             "Persisted the practice session result.",
             {"user_id": user_id, "topic": topic, "generation_run_id": generation_run_id},

@@ -65,6 +65,56 @@ class OnboardingInterpreter:
     def __init__(self, config: AppConfig) -> None:
         self.config = config
 
+    def extract_progressive_profile_facts(self, message: str) -> dict[str, Any]:
+        """Extract conservative profile facts from an ordinary chat turn."""
+
+        normalized = self._normalize_text(message)
+        facts: dict[str, Any] = {}
+
+        if self._has_display_name_signal(normalized):
+            display_name = self._parse_display_name(message)
+            if display_name:
+                facts["display_name"] = display_name
+
+        if (
+            self._has_level_signal(normalized)
+            and not self._is_unclear_or_survey_request(normalized)
+        ):
+            facts["level"] = self._parse_level(normalized)
+
+        if self._has_goal_signal(normalized):
+            goals = self._parse_goals(normalized, message)
+            if goals:
+                facts["goals"] = goals
+
+        topics = (
+            self._parse_topics(normalized, message)
+            if self._has_topic_signal(normalized)
+            else []
+        )
+        if topics:
+            facts["recent_topics"] = topics
+            facts["last_topic_requested"] = topics[0]
+            if self._has_weakness_marker(normalized):
+                facts["weak_topics"] = topics
+
+        content_themes = self._extract_content_themes(normalized)
+        if content_themes:
+            facts["content_themes"] = content_themes
+            facts["preferred_content_theme"] = content_themes[0]
+
+        if self._has_difficulty_signal(normalized) and self._has_preference_scope(
+            normalized,
+        ):
+            facts["preferred_difficulty"] = self._parse_difficulty(normalized)
+
+        if self._has_question_count_signal(normalized) and self._has_preference_scope(
+            normalized,
+        ):
+            facts["preferred_num_questions"] = self._parse_question_count(message)
+
+        return facts
+
     def interpret(
         self,
         *,
@@ -723,6 +773,60 @@ class OnboardingInterpreter:
                 "nang cao",
             ],
         )
+
+    def _has_preference_scope(self, normalized: str) -> bool:
+        return self._has_any(
+            normalized,
+            [
+                "tu gio",
+                "tu bay gio",
+                "lan sau",
+                "moi lan",
+                "mac dinh",
+                "uu tien",
+                "toi muon",
+                "minh muon",
+                "i want",
+                "prefer",
+                "preference",
+            ],
+        )
+
+    def _has_question_count_signal(self, normalized: str) -> bool:
+        return bool(re.search(r"\b\d{1,2}\b", normalized))
+
+    def _has_weakness_marker(self, normalized: str) -> bool:
+        return self._has_any(
+            normalized,
+            [
+                "hay sai",
+                "thuong sai",
+                "yeu",
+                "kem",
+                "kho",
+                "loi",
+                "quen",
+                "weak",
+                "mistake",
+                "struggle",
+                "bad at",
+            ],
+        )
+
+    def _extract_content_themes(self, normalized: str) -> list[str]:
+        themes: list[str] = []
+        if self._has_any(
+            normalized,
+            [
+                "anime",
+                "manga",
+                "otaku",
+                "anime character",
+                "nhan vat anime",
+            ],
+        ):
+            themes.append("anime")
+        return themes
 
     def _has_tense_signal(self, normalized: str) -> bool:
         return normalized == "thi" or self._has_any(

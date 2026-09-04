@@ -1,5 +1,36 @@
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any
+
+
+class ConversationIntent(str, Enum):
+    PRACTICE = "PRACTICE"
+    EXPLAIN = "EXPLAIN"
+    REVIEW = "REVIEW"
+    PROGRESS = "PROGRESS"
+    PROFILE_UPDATE = "PROFILE_UPDATE"
+    GENERAL = "GENERAL"
+
+
+class LearningActivityType(str, Enum):
+    PRACTICE = "PRACTICE"
+    REVIEW = "REVIEW"
+    CALIBRATION = "CALIBRATION"
+    QUIZ = "QUIZ"
+    READING = "READING"
+    CONVERSATION_EXERCISE = "CONVERSATION_EXERCISE"
+
+
+class LearningActivityStatus(str, Enum):
+    CREATED = "CREATED"
+    GENERATING = "GENERATING"
+    READY = "READY"
+    IN_PROGRESS = "IN_PROGRESS"
+    SUBMITTED = "SUBMITTED"
+    GRADED = "GRADED"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
 
 
 @dataclass(slots=True)
@@ -48,6 +79,46 @@ class LearnerProfile:
     skill_mastery: dict[str, float] = field(default_factory=dict)
     skill_confidence: dict[str, float] = field(default_factory=dict)
     skill_attempts: dict[str, int] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class PendingClarification:
+    pending_intent: ConversationIntent
+    missing_fields: list[str] = field(default_factory=list)
+    collected_slots: dict[str, Any] = field(default_factory=dict)
+    question: str = ""
+
+
+@dataclass(slots=True)
+class LearningActivity:
+    activity_id: str
+    conversation_id: str
+    learner_id: str
+    type: LearningActivityType
+    status: LearningActivityStatus = LearningActivityStatus.CREATED
+    target_skills: list[str] = field(default_factory=list)
+    difficulty: str | None = None
+    created_at: str | None = None
+    started_at: str | None = None
+    submitted_at: str | None = None
+    completed_at: str | None = None
+    updated_at: str | None = None
+    generation_run_id: str | None = None
+    session_code: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class ConversationTurnContext:
+    conversation_id: str
+    learner_id: str
+    profile: LearnerProfile
+    recent_messages: list[dict[str, Any]] = field(default_factory=list)
+    memory_summary: str = ""
+    active_intent: ConversationIntent | None = None
+    pending_clarification: PendingClarification | None = None
+    active_activity: LearningActivity | None = None
+    recent_context: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -108,6 +179,7 @@ class GeneratedExerciseSet:
     plan: PracticePlan
     retrieved_chunks: list[KnowledgeChunk]
     exercises: list[ExerciseItem]
+    activity_id: str | None = None
     generation_run_id: str = ""
     prompt_snapshot: str = ""
     agent_trace: list[dict[str, Any]] = field(default_factory=list)
@@ -147,6 +219,22 @@ class PracticeReview:
 
 
 @dataclass(slots=True)
+class ActivityRecommendation:
+    recommendation_id: str
+    user_id: str
+    topic: str
+    difficulty: str
+    exercise_type: str
+    num_questions: int
+    reason: str
+    skill: str | None = None
+    subtopic: str | None = None
+    source_activity_id: str | None = None
+    conversation_id: str | None = None
+    prompt: str = ""
+
+
+@dataclass(slots=True)
 class SessionResult:
     user_id: str
     topic: str
@@ -155,6 +243,7 @@ class SessionResult:
     total_questions: int
     weak_topics_detected: list[str] = field(default_factory=list)
     recommendation: str = ""
+    activity_id: str | None = None
     generation_run_id: str = ""
     session_code: str = ""
     answer_diagnoses: list[AnswerDiagnosis] = field(default_factory=list)

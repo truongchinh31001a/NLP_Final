@@ -478,6 +478,46 @@ h2 {
   line-height: 1.62;
 }
 
+.message-activity {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(15, 118, 110, 0.24);
+  border-radius: 8px;
+  background: rgba(15, 118, 110, 0.08);
+}
+
+.message-activity div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.message-activity span {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.message-activity strong {
+  color: var(--ink);
+  font-size: 0.92rem;
+}
+
+.message-activity p,
+.message-activity small {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
 .message--typing {
   min-width: 112px;
 }
@@ -934,6 +974,11 @@ h2 {
 
 .coach-review-prompt:hover {
   background: rgba(36, 84, 166, 0.12);
+}
+
+.coach-review-prompt:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
 }
 
 .review-card p {

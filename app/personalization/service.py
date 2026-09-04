@@ -1,6 +1,18 @@
+from typing import Any
+
 from app.config import AppConfig
+from app.conversation.schemas import ConversationRoute
 from app.learner.skill_graph import DEFAULT_SKILL_GRAPH, SkillGraph
-from app.schemas import LearnerProfile, PracticePlan, PracticeRequest, SessionResult
+from app.onboarding.service import OnboardingInterpreter
+from app.persistence.repository import LearningRepository
+from app.schemas import (
+    ConversationTurnContext,
+    LearnerProfile,
+    PracticePlan,
+    PracticeRequest,
+    SessionResult,
+)
+from app.tutor.service import TutorCapabilityResult
 
 
 class PersonalizationService:
@@ -304,3 +316,266 @@ class PersonalizationService:
         if "vocabulary" in topic:
             return "vocabulary"
         return "grammar"
+
+
+class ProgressiveProfileService:
+    """Extracts learner facts from normal chat without gating the conversation."""
+
+    def __init__(
+        self,
+        repository: LearningRepository,
+        onboarding: OnboardingInterpreter,
+    ) -> None:
+        self.repository = repository
+        self.onboarding = onboarding
+
+    def enrich(
+        self,
+        *,
+        user_id: str,
+        message: str,
+        conversation_id: str,
+    ) -> dict[str, Any]:
+        extracted_facts = self.onboarding.extract_progressive_profile_facts(message)
+        extracted_facts["last_user_request"] = message[:500]
+        if not extracted_facts:
+            return {}
+
+        self.repository.merge_chat_memory_facts(
+            user_id,
+            extracted_facts,
+            session_id=conversation_id,
+        )
+        return extracted_facts
+
+
+class ProgressService:
+    """Conversation capability for reading learner progress and weak areas."""
+
+    def __init__(self, repository: LearningRepository) -> None:
+        self.repository = repository
+
+    def summarize(
+        self,
+        *,
+        user_id: str,
+        route: ConversationRoute,
+        context: ConversationTurnContext,
+    ) -> TutorCapabilityResult:
+        snapshot = self.repository.get_personalization_snapshot(user_id)
+        metric = str(route.slots.get("metric") or "weak_areas")
+        if metric == "lowest_skill":
+            reply, metadata = self._lowest_skill_reply(snapshot)
+        else:
+            reply, metadata = self._weak_areas_reply(snapshot)
+        return TutorCapabilityResult(
+            assistant_reply=reply,
+            ui_action="progress.open",
+            metadata={
+                "metric": metric,
+                "conversation_id": context.conversation_id,
+                **metadata,
+            },
+        )
+
+    def _lowest_skill_reply(
+        self,
+        snapshot: dict,
+    ) -> tuple[str, dict]:
+        skills = snapshot.get("skill_mastery")
+        if isinstance(skills, list) and skills:
+            skill_items = [item for item in skills if isinstance(item, dict)]
+            if not skill_items:
+                return self._no_skill_data_reply()
+            weakest = max(
+                skill_items,
+                key=lambda item: float(item.get("weakness_score") or 0.0),
+            )
+            label = str(weakest.get("label") or weakest.get("code") or "ky nang nay")
+            mastery = float(weakest.get("mastery_probability") or 0.0)
+            reply = (
+                f"Ky nang thap nhat hien tai la {label} "
+                f"(mastery khoang {mastery:.0%}). Nen luyen lai nhom nay truoc."
+            )
+            return reply, {"lowest_skill": weakest}
+
+        return self._no_skill_data_reply()
+
+    def _no_skill_data_reply(self) -> tuple[str, dict]:
+        return (
+            "Minh chua co du lieu mastery theo skill. Hay lam mot bai practice "
+            "de minh bat dau do diem manh/yeu cho ban.",
+            {"lowest_skill": None},
+        )
+
+    def _weak_areas_reply(
+        self,
+        snapshot: dict,
+    ) -> tuple[str, dict]:
+        candidates = []
+        for key in ("subtopic_stats", "error_stats", "topic_stats"):
+            values = snapshot.get(key)
+            if isinstance(values, list):
+                candidates.extend(
+                    item
+                    for item in values
+                    if isinstance(item, dict)
+                    and float(item.get("weakness_score") or 0.0) > 0
+                )
+
+        candidates.sort(
+            key=lambda item: float(item.get("weakness_score") or 0.0),
+            reverse=True,
+        )
+        if not candidates:
+            return (
+                "Minh chua thay diem yeu ro rang. Lam them mot bai ngan se giup "
+                "minh cap nhat tien do chinh xac hon.",
+                {"weak_areas": []},
+            )
+
+        top = candidates[:3]
+        labels = ", ".join(
+            str(item.get("label") or item.get("code") or "unknown")
+            for item in top
+        )
+        reply = (
+            f"Hien tai ban nen uu tien: {labels}. "
+            "Minh co the tao bai tiep theo bam vao nhom nay."
+        )
+        return reply, {"weak_areas": top}
+
+
+class ProfileUpdateService:
+    """Applies preference/profile updates extracted from conversation turns."""
+
+    def __init__(
+        self,
+        config: AppConfig,
+        repository: LearningRepository,
+    ) -> None:
+        self.config = config
+        self.repository = repository
+
+    def apply(
+        self,
+        *,
+        user_id: str,
+        route: ConversationRoute,
+        message: str,
+    ) -> TutorCapabilityResult:
+        profile = self.repository.get_profile(user_id)
+        changes: list[str] = []
+
+        preferred_num_questions = route.slots.get("preferred_num_questions")
+        if isinstance(preferred_num_questions, int):
+            profile.preferred_num_questions = preferred_num_questions
+            changes.append(f"{preferred_num_questions} cau moi bai")
+
+        preferred_difficulty = route.slots.get("preferred_difficulty")
+        if isinstance(preferred_difficulty, str):
+            profile.preferred_difficulty = preferred_difficulty
+            changes.append(f"do kho {preferred_difficulty}")
+        elif route.slots.get("difficulty_delta") in {"harder", "easier"}:
+            profile.preferred_difficulty = self._shift_difficulty(
+                profile,
+                str(route.slots["difficulty_delta"]),
+            )
+            changes.append(f"do kho {profile.preferred_difficulty}")
+
+        for goal in self._extract_goals(route, message):
+            if goal not in profile.goals:
+                profile.goals.append(goal)
+                changes.append(f"muc tieu {goal}")
+
+        for topic in self._extract_weak_topics(route, message):
+            profile.topic_accuracy.setdefault(topic, 0.25)
+            profile.weak_topics[topic] = max(profile.weak_topics.get(topic, 0.0), 0.75)
+            changes.append(f"diem yeu {topic.replace('_', ' ')}")
+
+        if changes:
+            self.repository.save_profile(profile)
+
+        change_text = ", ".join(changes) if changes else "thong tin uu tien moi"
+        return TutorCapabilityResult(
+            assistant_reply=f"Minh da cap nhat ho so hoc: {change_text}.",
+            ui_action="profile.update",
+            metadata={
+                "changes": changes,
+                "preferred_difficulty": profile.preferred_difficulty,
+                "preferred_num_questions": profile.preferred_num_questions,
+                "goals": list(profile.goals),
+                "weak_topics": dict(profile.weak_topics),
+            },
+        )
+
+    def _extract_goals(
+        self,
+        route: ConversationRoute,
+        message: str,
+    ) -> list[str]:
+        raw_goals = route.slots.get("goals")
+        goals: list[str] = []
+        if isinstance(raw_goals, list):
+            goals.extend(str(item).strip() for item in raw_goals if str(item).strip())
+
+        normalized = message.lower()
+        keyword_goals = {
+            "ielts": "ielts",
+            "toeic": "toeic",
+            "giao tiep": "communication",
+            "communication": "communication",
+            "speaking": "speaking",
+            "writing": "writing",
+            "du lich": "travel",
+            "travel": "travel",
+        }
+        for marker, goal in keyword_goals.items():
+            if marker in normalized and goal not in goals:
+                goals.append(goal)
+        return goals
+
+    def _extract_weak_topics(
+        self,
+        route: ConversationRoute,
+        message: str,
+    ) -> list[str]:
+        raw_topics = route.slots.get("weak_topics")
+        topics: list[str] = []
+        if isinstance(raw_topics, list):
+            topics.extend(self._normalize_topic(item) for item in raw_topics)
+
+        normalized = message.lower()
+        topic_markers = {
+            "passive": "passive_voice",
+            "bi dong": "passive_voice",
+            "relative": "relative_clause",
+            "quan he": "relative_clause",
+            "conditional": "conditional_sentence",
+            "dieu kien": "conditional_sentence",
+            "reported": "reported_speech",
+            "gian tiep": "reported_speech",
+            "preposition": "prepositions",
+            "gioi tu": "prepositions",
+            "vocabulary": "vocabulary",
+            "tu vung": "vocabulary",
+            "tense": "tenses",
+            "thi": "tenses",
+        }
+        weakness_markers = ("yeu", "sai", "kem", "kho", "weak", "bad at")
+        if any(marker in normalized for marker in weakness_markers):
+            for marker, topic in topic_markers.items():
+                if marker in normalized and topic not in topics:
+                    topics.append(topic)
+        return [topic for topic in topics if topic]
+
+    def _normalize_topic(self, value: object) -> str:
+        return str(value).strip().lower().replace(" ", "_").replace("-", "_")
+
+    def _shift_difficulty(self, profile: LearnerProfile, direction: str) -> str:
+        levels = ["easy", "medium", "hard"]
+        current = profile.preferred_difficulty or self.config.default_difficulty
+        index = levels.index(current) if current in levels else 0
+        if direction == "harder":
+            return levels[min(index + 1, len(levels) - 1)]
+        return levels[max(index - 1, 0)]

@@ -20,24 +20,24 @@ import {
 } from "@ant-design/icons";
 
 import {
-  createChatSession,
-  generatePractice,
-  getChatResume,
-  getChatSession,
+  acceptRecommendation,
+  createConversation,
+  getConversation,
   getPersonalizationSnapshot,
   interpretOnboardingAnswer,
-  interpretPracticeRequest,
-  listChatSessions,
-  saveChatMessage,
-  scorePractice,
-  type PracticeIntentFields,
+  listConversations,
+  sendConversationMessage,
+  submitActivity,
   updateUserProfile,
 } from "@/lib/api";
 import type {
   ChatMemoryResume,
   ChatSessionSummary,
+  ConversationTurn,
   DashboardSnapshot,
   ExercisePreview,
+  LearningActivityPreview,
+  NextActivitySuggestion,
   PersonalizationSnapshot,
   PracticePlanPreview,
   ScoreResult,
@@ -48,6 +48,20 @@ type ChatWorkbenchProps = {
 };
 
 type Screen = "chat" | "generating" | "practice" | "result";
+type ConversationPhase = "idle" | "loading" | "sending" | "error";
+type ActivityPhase = "idle" | "ready" | "submitting" | "completed" | "error";
+
+type ConversationState = {
+  activeConversationId: string | null;
+  phase: ConversationPhase;
+};
+
+type ActivityState = {
+  activeActivityId: string | null;
+  generationRunId: string | null;
+  phase: ActivityPhase;
+  nextActivitySuggestion: NextActivitySuggestion | null;
+};
 
 type OnboardingValues = {
   displayName: string;
@@ -64,6 +78,8 @@ type ChatMessage = {
   id: string;
   role: "bot" | "user";
   content: string;
+  activity?: LearningActivityPreview | null;
+  uiAction?: string | null;
   createdAt?: string | null;
 };
 
@@ -92,14 +108,6 @@ type OnboardingInterpretationResult = {
   assistantReply: string;
   nextQuestion?: string | null;
   nextStepKey?: OnboardingStepKey | null;
-  source: string;
-};
-
-type PracticeInterpretationResult = {
-  request: PracticeIntentFields;
-  assistantReply: string;
-  needsClarification: boolean;
-  clarificationQuestion?: string | null;
   source: string;
 };
 
@@ -245,7 +253,16 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
   const [scoreResult, setScoreResult] = useState<ScoreResult | null>(null);
   const [status, setStatus] = useState("Sẵn sàng tạo bài luyện tập.");
   const [isScoring, setIsScoring] = useState(false);
-  const [generationRunId, setGenerationRunId] = useState<string | null>(null);
+  const [conversationState, setConversationState] = useState<ConversationState>({
+    activeConversationId: null,
+    phase: "idle",
+  });
+  const [activityState, setActivityState] = useState<ActivityState>({
+    activeActivityId: null,
+    generationRunId: null,
+    nextActivitySuggestion: null,
+    phase: "idle",
+  });
   const [learnerDisplayName, setLearnerDisplayName] = useState(
     snapshot.profile.name,
   );
@@ -263,7 +280,10 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
     () => preview.filter((exercise) => answers[exercise.id]).length,
     [answers, preview],
   );
-  const canSubmit = preview.length > 0 && answeredCount === preview.length;
+  const canSubmit =
+    Boolean(activityState.activeActivityId) &&
+    preview.length > 0 &&
+    answeredCount === preview.length;
   const showOnboardingShortcuts = true;
   const isComposerLocked = isOnboardingSaving || isCoachThinking;
 
@@ -295,11 +315,20 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
 
     async function loadProfileAndChat() {
       try {
-        const [personalization, chatResume, backendSessions] = await Promise.all([
+        setConversationState((current) => ({
+          ...current,
+          phase: "loading",
+        }));
+        const [personalization, backendSessions] = await Promise.all([
           getPersonalizationSnapshot(USER_ID),
-          getChatResume(USER_ID),
-          listChatSessions(USER_ID).catch(() => []),
+          listConversations(USER_ID).catch(() => []),
         ]);
+        const preferredConversationId = backendSessions[0]?.sessionId;
+        const chatResume = preferredConversationId
+          ? await getConversation(USER_ID, preferredConversationId).catch(() =>
+              createConversation(USER_ID),
+            )
+          : await createConversation(USER_ID);
         if (!isMounted) {
           return;
         }
@@ -311,6 +340,11 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
         setLearnerDisplayName(displayName);
         setLearnerLevel(personalization.level);
         chatSessionIdRef.current = chatResume.sessionId;
+        setConversationState({
+          activeConversationId: chatResume.sessionId,
+          phase: "idle",
+        });
+        setActivityState(activityStateFromActivity(chatResume.activeActivity));
         const history = mapPersistedChatMessages(chatResume);
         const storedSessions = loadStoredChatSessions();
         setChatSessions(
@@ -320,7 +354,7 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
         );
         const resumedLocalSessionId = chatResume.sessionId;
 
-        if (!personalization.onboardingCompleted) {
+        if (shouldRunGuidedOnboarding(personalization)) {
           const rememberedAnswers = buildOnboardingAnswersFromMemory(
             personalization,
             chatResume,
@@ -379,7 +413,12 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
         if (!isMounted) {
           return;
         }
-        setIsGuidedOnboarding(true);
+        setConversationState({
+          activeConversationId: null,
+          phase: "error",
+        });
+        setActivityState(emptyActivityState());
+        setIsGuidedOnboarding(false);
         setOnboardingStepIndex(0);
         setOnboardingAnswers({});
         setPrompt("");
@@ -489,11 +528,18 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
 
     activeLocalSessionIdRef.current = session.id;
     chatSessionIdRef.current = session.backendSessionId ?? null;
+    setConversationState({
+      activeConversationId: session.backendSessionId ?? null,
+      phase: session.backendSessionId ? "idle" : "error",
+    });
+    setActivityState(emptyActivityState());
     chatMessagesRef.current = session.messages;
     setActiveLocalSessionId(session.id);
     setChatMessages(session.messages);
     setPrompt("");
     setSubmittedPrompt(null);
+    setAnswers({});
+    setScoreResult(null);
     setIsCoachThinking(false);
     setIsGuidedOnboarding(false);
     setScreen("chat");
@@ -503,8 +549,13 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
     }
 
     try {
-      const chatResume = await getChatSession(USER_ID, session.backendSessionId);
+      const chatResume = await getConversation(USER_ID, session.backendSessionId);
       chatSessionIdRef.current = chatResume.sessionId;
+      setConversationState({
+        activeConversationId: chatResume.sessionId,
+        phase: "idle",
+      });
+      setActivityState(activityStateFromActivity(chatResume.activeActivity));
       activateChatSession(mapPersistedChatMessages(chatResume), {
         backendSessionId: chatResume.sessionId,
         localSessionId: session.id,
@@ -517,7 +568,7 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
   async function handleStartNewChatSession() {
     let backendSessionId: string | null = null;
     try {
-      const chatResume = await createChatSession(USER_ID);
+      const chatResume = await createConversation(USER_ID);
       backendSessionId = chatResume.sessionId;
     } catch {
       backendSessionId = null;
@@ -529,8 +580,15 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
     );
 
     chatSessionIdRef.current = backendSessionId;
+    setConversationState({
+      activeConversationId: backendSessionId,
+      phase: backendSessionId ? "idle" : "error",
+    });
+    setActivityState(emptyActivityState());
     setPrompt("");
     setSubmittedPrompt(null);
+    setAnswers({});
+    setScoreResult(null);
     setIsCoachThinking(false);
     setIsGuidedOnboarding(false);
     setOnboardingStepIndex(0);
@@ -542,77 +600,28 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
     });
   }
 
-  function startGuidedOnboarding(
-    intro?: string,
-    initialAnswers: Partial<OnboardingValues> = {},
-    initialStepIndex = 0,
-    shouldPersist = true,
-  ) {
-    setIsGuidedOnboarding(true);
-    setOnboardingStepIndex(initialStepIndex);
-    setOnboardingAnswers(initialAnswers);
-    setPrompt("");
-    setSubmittedPrompt(null);
-    const opening = buildConversationalOnboardingOpening(
-      initialStepIndex,
-      false,
-    );
-    const botMessages = [
-      intro ? `${intro} ${opening}` : opening,
-    ];
-    activateChatSession(botMessages.map((content) => makeMessage("bot", content)), {
-      backendSessionId: chatSessionIdRef.current,
-      localSessionId: createLocalChatSessionId(),
-    });
-    if (shouldPersist) {
-      botMessages.forEach((content) => {
-        void persistChatMessage(
-          "bot",
-          content,
-          {
-            phase: "onboarding",
-            source: "guided_restart",
-          },
-          false,
-        );
-      });
-    }
-  }
-
   function appendChatMessage(
     role: ChatMessage["role"],
     content: string,
     metadata: Record<string, unknown> = {},
     updateMemory = role === "user",
   ) {
-    const nextMessage = makeMessage(role, content);
+    const nextMessage = makeMessage(role, content, {
+      activity: isLearningActivityPreview(metadata.activity)
+        ? metadata.activity
+        : null,
+      uiAction:
+        typeof metadata.uiAction === "string"
+          ? metadata.uiAction
+          : typeof metadata.ui_action === "string"
+            ? metadata.ui_action
+            : null,
+    });
     const nextMessages = [...chatMessagesRef.current, nextMessage];
     chatMessagesRef.current = nextMessages;
     setChatMessages(nextMessages);
     syncActiveChatSession(nextMessages);
-    void persistChatMessage(role, content, metadata, updateMemory);
-  }
-
-  async function persistChatMessage(
-    role: ChatMessage["role"],
-    content: string,
-    metadata: Record<string, unknown> = {},
-    updateMemory = role === "user",
-  ) {
-    try {
-      const saved = await saveChatMessage({
-        userId: USER_ID,
-        sessionId: chatSessionIdRef.current,
-        role: role === "bot" ? "assistant" : "user",
-        content,
-        metadata,
-        updateMemory,
-      });
-      chatSessionIdRef.current = saved.sessionId;
-      attachBackendSessionIdToActiveSession(saved.sessionId);
-    } catch {
-      // Chat memory is helpful, but the practice flow should still work offline.
-    }
+    void updateMemory;
   }
 
   async function handleGuidedOnboardingAnswer(message: string) {
@@ -707,17 +716,7 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
         false,
       );
       await wait(320);
-      await handleGenerate(
-        buildInitialPracticePrompt(values),
-        {
-          persistUserMessage: false,
-          skipPracticeInterpretation: true,
-          requestMetadata: {
-            phase: "practice_request",
-            source: "auto_after_onboarding",
-          },
-        },
-      );
+      await handleConversationMessage(buildInitialPracticePrompt(values));
     } catch {
       appendChatMessage(
         "bot",
@@ -746,188 +745,306 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
       return;
     }
 
-    await handleGenerate(message);
+    await handleConversationMessage(message);
   };
 
-  const handleGenerate = async (
-    message: string,
-    options: {
-      persistUserMessage?: boolean;
-      skipPracticeInterpretation?: boolean;
-      requestMetadata?: Record<string, unknown>;
-    } = {},
-  ) => {
-    if (options.persistUserMessage ?? true) {
-      appendChatMessage("user", message, {
-        phase: "practice_request",
-        ...options.requestMetadata,
-      });
+  const ensureActiveConversation = async () => {
+    if (chatSessionIdRef.current) {
+      return chatSessionIdRef.current;
     }
 
+    const chatResume = await createConversation(USER_ID);
+    chatSessionIdRef.current = chatResume.sessionId;
+    setConversationState({
+      activeConversationId: chatResume.sessionId,
+      phase: "idle",
+    });
+    attachBackendSessionIdToActiveSession(chatResume.sessionId);
+    syncActiveChatSession(chatMessagesRef.current, {
+      backendSessionId: chatResume.sessionId,
+      localSessionId: activeLocalSessionIdRef.current ?? chatResume.sessionId,
+    });
+    return chatResume.sessionId;
+  };
+
+  const handleConversationMessage = async (message: string) => {
     setSubmittedPrompt(message);
     setPrompt("");
     setIsCoachThinking(true);
+    setConversationState((current) => ({
+      activeConversationId: current.activeConversationId ?? chatSessionIdRef.current,
+      phase: "sending",
+    }));
 
-    let interpretedIntent: PracticeIntentFields | undefined;
-    if (!options.skipPracticeInterpretation) {
-      const interpretation = await interpretPracticeRequestWithFallback(message);
-      if (interpretation.needsClarification) {
-        appendChatMessage(
-          "bot",
-          interpretation.clarificationQuestion ||
-            defaultPracticeClarificationQuestion(),
-          {
-            phase: "practice_clarification",
-            interpreter: interpretation.source,
-          },
-          false,
-        );
-        setSubmittedPrompt(null);
-        setScreen("chat");
+    try {
+      const conversationId = await ensureActiveConversation();
+      const turn = await sendConversationMessage({
+        userId: USER_ID,
+        conversationId,
+        message,
+        metadata: {
+          phase: "conversation_turn",
+          source: "chat_workbench",
+        },
+      });
+
+      chatSessionIdRef.current = turn.conversationId;
+      setConversationState({
+        activeConversationId: turn.conversationId,
+        phase: "idle",
+      });
+      attachBackendSessionIdToActiveSession(turn.conversationId);
+      appendConversationTurn(turn);
+
+      if (turn.activity?.exercises.length && turn.activity.plan) {
         setIsCoachThinking(false);
+        setScreen("generating");
+        setStatus("Mình đã nhận activity từ backend, đang mở bài luyện...");
+        await wait(260);
+        applyPracticeActivity(turn.activity, message);
+        setScreen("practice");
         return;
       }
-      interpretedIntent = interpretation.request;
+
+      if (turn.uiAction === "profile.update") {
+        await refreshPersonalizationSummary();
+      }
+      if (turn.pendingClarification) {
+        setSubmittedPrompt(null);
+      }
+      setScreen("chat");
+    } catch {
+      setConversationState((current) => ({
+        activeConversationId: current.activeConversationId ?? chatSessionIdRef.current,
+        phase: "error",
+      }));
+      appendChatMessage(
+        "user",
+        message,
+        { phase: "conversation_failed", uiAction: "conversation.local_user" },
+        false,
+      );
+      appendChatMessage(
+        "bot",
+        "Mình chưa gửi được tin nhắn tới backend. Bạn kiểm tra server rồi gửi lại nhé.",
+        { phase: "conversation_failed", uiAction: "conversation.error" },
+        false,
+      );
+      setSubmittedPrompt(null);
+      setScreen("chat");
+    } finally {
+      setIsCoachThinking(false);
+    }
+  };
+
+  const appendConversationTurn = (turn: ConversationTurn) => {
+    const userMessage = mapPersistedChatMessage(turn.message);
+    const persistedAssistantMessage = turn.assistantMessage
+      ? mapPersistedChatMessage(turn.assistantMessage)
+      : null;
+    const assistantMessage = persistedAssistantMessage
+      ? {
+          ...persistedAssistantMessage,
+          activity: persistedAssistantMessage?.activity ?? turn.activity ?? null,
+          uiAction: persistedAssistantMessage?.uiAction ?? turn.uiAction,
+        }
+      : makeMessage("bot", turn.assistantReply, {
+          activity: turn.activity ?? null,
+          uiAction: turn.uiAction,
+        });
+    const nextMessages = [
+      ...chatMessagesRef.current,
+      userMessage,
+      assistantMessage,
+    ];
+    activateChatSession(nextMessages, {
+      backendSessionId: turn.conversationId,
+      localSessionId: activeLocalSessionIdRef.current ?? turn.conversationId,
+    });
+  };
+
+  const applyPracticeActivity = (
+    activity: LearningActivityPreview,
+    sourcePrompt: string | null,
+  ) => {
+    if (!activity.plan || activity.exercises.length === 0) {
+      return false;
     }
 
-    await wait(260);
+    startTransition(() => {
+      setPreview(activity.exercises);
+      setPlan(activity.plan as PracticePlanPreview);
+    });
+    setAnswers({});
+    setScoreResult(activity.result ?? null);
+    setSubmittedPrompt(sourcePrompt);
+    setActivityState(activityStateFromActivity(activity));
+    setStatus(
+      `Đã sẵn sàng. ${activity.recommendation ?? ""}`.trim(),
+    );
+    return true;
+  };
 
-    setIsCoachThinking(false);
+  const refreshPersonalizationSummary = async () => {
+    try {
+      const personalization = await getPersonalizationSnapshot(USER_ID);
+      setLearnerDisplayName(
+        normalizeDisplayNameForUi(personalization.displayName, USER_ID),
+      );
+      setLearnerLevel(personalization.level);
+    } catch {
+      // Profile refresh is nice-to-have; the saved conversation turn already succeeded.
+    }
+  };
+
+  const handleCreateSuggestedPractice = async (
+    suggestion: NextActivitySuggestion,
+  ) => {
+    const previousScoreResult = scoreResult;
     setScreen("generating");
     setScoreResult(null);
     setAnswers({});
-    setGenerationRunId(null);
-    setStatus("Mình đang ghép bài theo đúng yêu cầu của bạn...");
+    setIsCoachThinking(true);
+    setActivityState(emptyActivityState());
+    setStatus("Mình đang tạo bài luyện tiếp theo gợi ý vừa chấm...");
 
     try {
-      const response = await generatePractice({
+      if (!suggestion.recommendationId) {
+        throw new Error("Recommendation id is required.");
+      }
+      const conversationId = await ensureActiveConversation();
+      const response = await acceptRecommendation({
         userId: USER_ID,
-        message,
-        intent: interpretedIntent,
+        recommendationId: suggestion.recommendationId,
+        conversationId,
       });
+      const activity = response.activity;
+      const message =
+        response.recommendation.prompt ||
+        suggestion.prompt ||
+        suggestion.reason ||
+        `Luyện tiếp về ${formatTopic(suggestion.topic)}.`;
 
-      startTransition(() => {
-        setPreview(response.exercises);
-        setPlan(response.plan);
-      });
-      setGenerationRunId(response.generationRunId);
-      setStatus(
-        `Đã sẵn sàng. ${
-          response.recommendation ?? ""
-        }`.trim(),
-      );
+      applyPracticeActivity(activity, message);
       appendChatMessage(
         "bot",
-        `Mình đã chuẩn bị ${response.exercises.length} câu về ${formatTopic(response.plan.topic)}${formatContentThemeSuffix(response.plan.contentTheme)}, mức ${formatDifficulty(response.plan.difficulty)}. Bạn làm thong thả, nộp xong mình sẽ chỉ ra phần nên luyện tiếp.`,
+        `Mình đã tạo bài luyện tiếp theo về ${formatTopic(activity.plan?.topic ?? suggestion.topic)} với ${activity.exercises.length} câu.`,
         {
           phase: "practice_generated",
-          generationRunId: response.generationRunId,
-          topic: response.plan.topic,
+          uiAction: response.uiAction,
+          activity,
+          activityId: activity.activityId,
+          generationRunId: activity.generationRunId,
         },
         false,
       );
+      setScreen("practice");
     } catch {
-      const generated = buildPreviewFromPrompt(message);
-      startTransition(() => {
-        setPreview(generated.exercises);
-        setPlan(generated.plan);
-      });
-      setGenerationRunId(null);
-      setStatus("Backend chưa sẵn sàng, mình dùng bộ câu dự phòng trước.");
+      setActivityState((current) => ({
+        ...current,
+        phase: "error",
+      }));
+      setStatus("Chưa tạo được bài luyện tiếp theo từ gợi ý. Bạn thử lại sau nhé.");
       appendChatMessage(
         "bot",
-        "Backend đang chưa phản hồi ổn, nên mình dùng bộ câu dự phòng để bạn vẫn luyện được ngay. Khi backend chạy lại, bài sẽ được cá nhân hóa sâu hơn.",
-        { phase: "practice_generated", fallback: true },
+        "Mình chưa tạo được bài luyện tiếp theo từ gợi ý này. Backend cần trả activity_id để mình mở bài mới.",
+        { phase: "practice_generated", uiAction: "practice.error" },
         false,
       );
+      setScoreResult(previousScoreResult);
+      setScreen(previousScoreResult ? "result" : "chat");
     } finally {
       setIsCoachThinking(false);
-      window.setTimeout(() => setScreen("practice"), 650);
     }
   };
 
   const handleScorePractice = async () => {
+    const activeActivityId = activityState.activeActivityId;
+    if (!activeActivityId) {
+      setStatus("Bài này chưa có activity_id hợp lệ, nên mình chưa thể nộp lên backend.");
+      return;
+    }
+
     setIsScoring(true);
-    setStatus("Mình đang chấm và nhìn xem bạn hay vướng chỗ nào...");
+    setActivityState((current) => ({
+      ...current,
+      phase: "submitting",
+    }));
+    setStatus("Mình đang chấm và cập nhật mastery từ backend...");
 
     try {
-      if (!generationRunId) {
-        throw new Error("Missing persisted generation run.");
-      }
-
-      const response = await scorePractice({
+      const response = await submitActivity({
         userId: USER_ID,
-        generationRunId,
+        activityId: activeActivityId,
         answers: preview.map((exercise) => ({
           exerciseId: exercise.id,
           selectedAnswer: answers[exercise.id],
         })),
       });
+      const nextActivitySuggestion = response.nextActivitySuggestion ?? null;
+      const result = {
+        ...response.result,
+        nextActivitySuggestion,
+      };
 
-      setScoreResult(response);
+      startTransition(() => {
+        if (response.exercises.length) {
+          setPreview(response.exercises);
+        }
+      });
+      setScoreResult(result);
+      setActivityState({
+        activeActivityId: response.activity.activityId,
+        generationRunId:
+          response.activity.generationRunId ?? response.result.generationRunId ?? null,
+        nextActivitySuggestion,
+        phase: "completed",
+      });
       setStatus("Chấm xong rồi. Mình đã cập nhật gợi ý luyện tiếp.");
       appendChatMessage(
         "bot",
         buildResultCoachMessage({
-          correctCount: response.correctCount,
+          correctCount: response.result.correctCount,
           recommendation:
-            response.practiceReview?.summary ?? response.recommendation,
-          score: response.score,
-          totalQuestions: response.totalQuestions,
+            response.result.practiceReview?.summary ?? response.result.recommendation,
+          score: response.result.score,
+          totalQuestions: response.result.totalQuestions,
         }),
         {
           phase: "practice_result",
-          generationRunId,
-          sessionCode: response.sessionCode,
-          topic: response.topic,
-          score: response.score,
+          uiAction: response.uiAction,
+          activity: response.activity,
+          activityId: response.activity.activityId,
+          generationRunId: response.result.generationRunId,
+          sessionCode: response.result.sessionCode,
+          topic: response.result.topic,
+          score: response.result.score,
         },
         false,
       );
+      await refreshPersonalizationSummary();
+      setScreen("result");
     } catch {
-      const correctCount = preview.filter(
-        (exercise) => answers[exercise.id] === exercise.correctAnswer,
-      ).length;
-      const score = correctCount / Math.max(preview.length, 1);
-      setScoreResult({
-        topic: plan.topic,
-        score,
-        correctCount,
-        totalQuestions: preview.length,
-        weakTopicsDetected: score < 0.8 ? [plan.topic] : [],
-        recommendation:
-          score < 0.8
-            ? "Nên luyện lại chủ đề này với độ khó thấp hơn một mức."
-            : "Có thể tăng độ khó hoặc chuyển sang biến thể gần với chủ đề này.",
-      });
-      setStatus("Chấm xong bằng bộ dự phòng.");
+      setActivityState((current) => ({
+        ...current,
+        phase: "error",
+      }));
+      setStatus("Chưa nộp được bài lên backend. Mình giữ bài ở đây để bạn thử nộp lại.");
       appendChatMessage(
         "bot",
-        buildResultCoachMessage({
-          correctCount,
-          recommendation:
-            score < 0.8
-              ? "Mình nghĩ nên luyện lại chủ đề này với mức dễ hơn một chút."
-              : "Bạn có thể tăng độ khó hoặc chuyển sang một biến thể gần với chủ đề này.",
-          score,
-          totalQuestions: preview.length,
-        }),
-        {
-          phase: "practice_result",
-          fallback: true,
-          topic: plan.topic,
-          score,
-        },
+        "Mình chưa chấm được bài này vì backend chưa nhận submit. Không có chấm điểm fallback ở frontend nữa để tránh lệch mastery.",
+        { phase: "practice_result", uiAction: "practice.submit_failed" },
         false,
       );
+      setScreen("practice");
     } finally {
       setIsScoring(false);
-      setScreen("result");
     }
   };
-
   const currentQuickReplies =
     onboardingSteps[onboardingStepIndex]?.quickReplies ?? [];
+  const nextActivitySuggestion =
+    scoreResult?.nextActivitySuggestion ?? activityState.nextActivitySuggestion;
 
   return (
     <main className="flow-shell">
@@ -942,11 +1059,16 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
           <button
             className="learner-pill__button"
             type="button"
-            onClick={() =>
-              startGuidedOnboarding(
-                "Mình sẽ cập nhật hồ sơ theo kiểu trò chuyện nhẹ thôi. Bạn cứ kể tự nhiên, mình sẽ tự rút ra điều cần thiết để tạo bài phù hợp hơn.",
-              )
-            }
+            onClick={() => {
+              setScreen("chat");
+              setIsGuidedOnboarding(false);
+              appendChatMessage(
+                "bot",
+                "Bạn cứ nói tự nhiên điều muốn đổi, ví dụ level, mục tiêu, phần hay sai, độ khó hoặc số câu mỗi lần. Mình sẽ lưu qua cuộc trò chuyện này.",
+                { phase: "profile_update_prompt", uiAction: "profile.update" },
+                false,
+              );
+            }}
           >
             <EditOutlined />
             <span>Cập nhật hồ sơ</span>
@@ -987,7 +1109,15 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
                 </div>
               </div>
               <span className="chat-session-pill">
-                {chatMessages.length > 1 ? "Đã nối lại hội thoại" : "Phiên mới"}
+                {conversationState.phase === "loading"
+                  ? "Đang nối backend"
+                  : conversationState.phase === "sending"
+                    ? "Đang gửi"
+                    : conversationState.phase === "error"
+                      ? "Offline"
+                      : chatMessages.length > 1
+                        ? "Đã nối lại hội thoại"
+                        : "Phiên mới"}
               </span>
             </div>
 
@@ -1212,21 +1342,39 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
                   title="Bước tiếp theo"
                 />
               </div>
-              {scoreResult.practiceReview.nextPracticePrompt ? (
+              {nextActivitySuggestion ? (
                 <button
                   className="coach-review-prompt"
                   type="button"
                   onClick={() => {
-                    setPrompt(scoreResult.practiceReview?.nextPracticePrompt ?? "");
-                    setScreen("chat");
-                    setScoreResult(null);
-                    setSubmittedPrompt(null);
+                    void handleCreateSuggestedPractice(nextActivitySuggestion);
                   }}
+                  disabled={isCoachThinking}
                 >
                   Dùng gợi ý luyện tiếp:{" "}
-                  {scoreResult.practiceReview.nextPracticePrompt}
+                  {nextActivitySuggestion.reason ??
+                    nextActivitySuggestion.prompt ??
+                    formatTopic(nextActivitySuggestion.topic)}
                 </button>
               ) : null}
+            </section>
+          ) : null}
+
+          {!scoreResult.practiceReview && nextActivitySuggestion ? (
+            <section className="coach-review-card">
+              <button
+                className="coach-review-prompt"
+                type="button"
+                onClick={() => {
+                  void handleCreateSuggestedPractice(nextActivitySuggestion);
+                }}
+                disabled={isCoachThinking}
+              >
+                Dùng gợi ý luyện tiếp:{" "}
+                {nextActivitySuggestion.reason ??
+                  nextActivitySuggestion.prompt ??
+                  formatTopic(nextActivitySuggestion.topic)}
+              </button>
             </section>
           ) : null}
 
@@ -1371,8 +1519,42 @@ function ChatMessageBubble({ message }: { message: ChatMessage }) {
         <div className="message-content">
           {renderMessageContent(message.content)}
         </div>
+        {message.activity?.exercises.length ? (
+          <PracticeActivityMiniCard activity={message.activity} />
+        ) : null}
       </div>
     </article>
+  );
+}
+
+function PracticeActivityMiniCard({
+  activity,
+}: {
+  activity: LearningActivityPreview;
+}) {
+  const topic = activity.plan?.topic ?? activity.request?.topic ?? "practice";
+  const difficulty = activity.plan?.difficulty ?? activity.difficulty ?? "";
+  const exerciseCount = activity.exercises.length;
+
+  return (
+    <div className="message-activity">
+      <div>
+        <span>{activity.status}</span>
+        <strong>{formatTopic(String(topic))}</strong>
+      </div>
+      {activity.result ? (
+        <p>
+          Điểm {Math.round(activity.result.score * 100)}% -{" "}
+          {activity.result.correctCount}/{activity.result.totalQuestions} câu đúng
+        </p>
+      ) : (
+        <p>
+          {exerciseCount} câu
+          {difficulty ? ` - mức ${formatDifficulty(String(difficulty))}` : ""}
+        </p>
+      )}
+      <small>Activity: {activity.activityId}</small>
+    </div>
   );
 }
 
@@ -1759,11 +1941,20 @@ function wait(milliseconds: number) {
   });
 }
 
-function makeMessage(role: ChatMessage["role"], content: string): ChatMessage {
+function makeMessage(
+  role: ChatMessage["role"],
+  content: string,
+  options: {
+    activity?: LearningActivityPreview | null;
+    uiAction?: string | null;
+  } = {},
+): ChatMessage {
   return {
     id: `${role}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     role,
     content,
+    activity: options.activity ?? null,
+    uiAction: options.uiAction ?? null,
     createdAt: new Date().toISOString(),
   };
 }
@@ -1812,12 +2003,60 @@ function buildResultCoachMessage({
 }
 
 function mapPersistedChatMessages(resume: ChatMemoryResume): ChatMessage[] {
-  return resume.messages.map((message) => ({
+  return resume.messages.map(mapPersistedChatMessage);
+}
+
+function mapPersistedChatMessage(
+  message: ChatMemoryResume["messages"][number],
+): ChatMessage {
+  return {
     id: message.messageId,
     role: message.role === "assistant" ? "bot" : "user",
     content: normalizePersistedChatContent(message.content),
+    activity: message.activity ?? null,
+    uiAction: message.uiAction ?? null,
     createdAt: message.createdAt,
-  }));
+  };
+}
+
+function shouldRunGuidedOnboarding(
+  _personalization: PersonalizationSnapshot,
+) {
+  return false;
+}
+
+function emptyActivityState(): ActivityState {
+  return {
+    activeActivityId: null,
+    generationRunId: null,
+    nextActivitySuggestion: null,
+    phase: "idle",
+  };
+}
+
+function activityStateFromActivity(
+  activity?: LearningActivityPreview | null,
+): ActivityState {
+  if (!activity) {
+    return emptyActivityState();
+  }
+  return {
+    activeActivityId: activity.activityId,
+    generationRunId: activity.generationRunId ?? null,
+    nextActivitySuggestion: activity.nextActivitySuggestion ?? null,
+    phase: activity.result ? "completed" : "ready",
+  };
+}
+
+function isLearningActivityPreview(
+  value: unknown,
+): value is LearningActivityPreview {
+  return (
+    isRecord(value) &&
+    typeof value.activityId === "string" &&
+    typeof value.conversationId === "string" &&
+    Array.isArray(value.exercises)
+  );
 }
 
 function normalizePersistedChatContent(content: string) {
@@ -1921,196 +2160,6 @@ function getStringListFact(facts: Record<string, unknown>, key: string) {
   return value
     .map((item) => String(item).trim())
     .filter(Boolean);
-}
-
-async function interpretPracticeRequestWithFallback(
-  message: string,
-): Promise<PracticeInterpretationResult> {
-  try {
-    const response = await interpretPracticeRequest({
-      userId: USER_ID,
-      message,
-    });
-    return {
-      request: response.request,
-      assistantReply: response.assistantReply,
-      needsClarification: response.needsClarification,
-      clarificationQuestion: response.clarificationQuestion,
-      source: response.source || "backend",
-    };
-  } catch {
-    return buildPracticeIntentFallback(message);
-  }
-}
-
-function buildPracticeIntentFallback(message: string): PracticeInterpretationResult {
-  const normalized = normalizeText(message);
-  const request: PracticeIntentFields = {};
-  const topic = inferPracticeTopic(normalized);
-  const targetSubtopic = inferPracticeSubtopic(normalized);
-  const numQuestions = extractPracticeQuestionCount(normalized);
-  const contentTheme = inferPracticeContentTheme(normalized);
-
-  if (topic) {
-    request.topic = topic;
-    request.exerciseType = topic.includes("vocabulary")
-      ? "vocabulary_mcq"
-      : "grammar_mcq";
-  }
-  if (targetSubtopic) {
-    request.targetSubtopic = targetSubtopic;
-    request.topic = request.topic || "tenses";
-    request.exerciseType = request.exerciseType || "grammar_mcq";
-  }
-  if (hasDifficultySignal(normalized)) {
-    request.difficulty = parseDifficulty(message);
-  }
-  if (numQuestions) {
-    request.numQuestions = numQuestions;
-  }
-  if (contentTheme) {
-    request.contentTheme = contentTheme;
-  }
-
-  const hasFocus = Boolean(request.topic || request.targetSubtopic);
-  const isContinueRequest = hasAnySignal(normalized, [
-    "tiep tuc",
-    "luyen tiep",
-    "continue",
-  ]);
-  const shouldClarify = !hasFocus && !isContinueRequest;
-
-  return {
-    request,
-    assistantReply: shouldClarify
-      ? defaultPracticeClarificationQuestion()
-      : "Mình sẽ dựa vào hồ sơ học của bạn để chọn bài phù hợp.",
-    needsClarification: shouldClarify,
-    clarificationQuestion: shouldClarify
-      ? defaultPracticeClarificationQuestion()
-      : null,
-    source: "frontend-rule-fallback",
-  };
-}
-
-function inferPracticeTopic(normalized: string) {
-  if (hasAnySignal(normalized, ["travel", "du lich", "san bay", "khach san"])) {
-    return "travel_vocabulary";
-  }
-  if (hasAnySignal(normalized, ["tu vung", "vocabulary", "vocab"])) {
-    return "vocabulary";
-  }
-  if (hasAnySignal(normalized, ["passive", "bi dong"])) {
-    return "passive_voice";
-  }
-  if (hasAnySignal(normalized, ["relative", "quan he"])) {
-    return "relative_clause";
-  }
-  if (hasAnySignal(normalized, ["conditional", "dieu kien"])) {
-    return "conditional_sentence";
-  }
-  if (hasAnySignal(normalized, ["reported", "gian tiep", "tuong thuat"])) {
-    return "reported_speech";
-  }
-  if (hasAnySignal(normalized, ["preposition", "gioi tu"])) {
-    return "prepositions";
-  }
-  if (
-    hasAnySignal(normalized, [
-      "grammar",
-      "ngu phap",
-      "tense",
-      "thi",
-      "qua khu",
-      "hom qua",
-      "yesterday",
-      "last week",
-      "tuan truoc",
-      "last month",
-      "thang truoc",
-      "hien tai",
-      "tuong lai",
-    ])
-  ) {
-    return "tenses";
-  }
-  return undefined;
-}
-
-function inferPracticeContentTheme(normalized: string) {
-  if (
-    hasAnySignal(normalized, [
-      "anime",
-      "manga",
-      "otaku",
-      "anime character",
-      "nhan vat anime",
-      "chu de anime",
-    ])
-  ) {
-    return "anime";
-  }
-  return undefined;
-}
-
-function inferPracticeSubtopic(normalized: string) {
-  if (
-    hasAnySignal(normalized, [
-      "modal passive",
-      "passive modal",
-      "passive voice modal",
-      "khuyet thieu bi dong",
-      "dong tu khuyet thieu bi dong",
-    ])
-  ) {
-    return "modal_passive";
-  }
-  if (hasAnySignal(normalized, ["past perfect"])) {
-    return "past_perfect_sequence";
-  }
-  if (hasAnySignal(normalized, ["past continuous"])) {
-    return "past_continuous_interrupted_action";
-  }
-  if (
-    hasAnySignal(normalized, [
-      "past tense",
-      "past simple",
-      "qua khu",
-      "hom qua",
-      "yesterday",
-      "last week",
-      "tuan truoc",
-      "last month",
-      "thang truoc",
-    ])
-  ) {
-    return "past_simple_finished_time";
-  }
-  if (hasAnySignal(normalized, ["present perfect"])) {
-    return "present_perfect_experience";
-  }
-  if (hasAnySignal(normalized, ["present continuous"])) {
-    return "present_continuous_now";
-  }
-  if (hasAnySignal(normalized, ["present simple", "thi hien tai"])) {
-    return "present_simple_habits";
-  }
-  if (hasAnySignal(normalized, ["future tense", "thi tuong lai", "tuong lai"])) {
-    return "future_will_prediction";
-  }
-  return undefined;
-}
-
-function extractPracticeQuestionCount(normalized: string) {
-  const match = normalized.match(/\b\d{1,2}\b/);
-  if (!match) {
-    return undefined;
-  }
-  return Math.max(1, Math.min(Number(match[0]), 20));
-}
-
-function defaultPracticeClarificationQuestion() {
-  return "Mình chưa rõ bạn muốn luyện phần nào. Bạn nói rõ hơn một chút nhé: ngữ pháp, từ vựng, thì quá khứ, bị động hay giới từ?";
 }
 
 async function interpretOnboardingAnswerWithFallback(
@@ -2831,439 +2880,3 @@ function formatContentThemeSuffix(contentTheme?: string | null) {
   };
   return labels[contentTheme] ?? ` theo chủ đề ${contentTheme}`;
 }
-
-function buildPreviewFromPrompt(prompt: string): {
-  exercises: ExercisePreview[];
-  plan: PracticePlanPreview;
-} {
-  const normalized = normalizeText(prompt);
-  const contentTheme = inferPracticeContentTheme(normalized);
-  const topic = normalized.includes("passive") || normalized.includes("bi dong")
-    ? "passive_voice"
-    : normalized.includes("travel") || normalized.includes("du lich")
-      ? "travel_vocabulary"
-      : normalized.includes("vocabulary") || normalized.includes("tu vung")
-        ? "vocabulary"
-      : normalized.includes("preposition") || normalized.includes("gioi tu")
-        ? "prepositions"
-        : normalized.includes("relative") || normalized.includes("quan he")
-          ? "relative_clause"
-          : normalized.includes("conditional") || normalized.includes("dieu kien")
-            ? "conditional_sentence"
-            : "tenses";
-  const difficulty = normalized.includes("hard")
-    ? "hard"
-    : normalized.includes("easy") ||
-        normalized.includes("co ban") ||
-        normalized.includes("de")
-      ? "easy"
-      : "medium";
-  const numQuestions = parseFallbackQuestionCount(normalized);
-  const exerciseType = topic.includes("vocabulary")
-    ? "vocabulary_mcq"
-    : "grammar_mcq";
-  const exercises = Array.from({ length: numQuestions }, (_, index) =>
-    buildFallbackExercise({
-      difficulty,
-      exerciseType,
-      index: index + 1,
-      topic,
-      contentTheme,
-    }),
-  );
-
-  return {
-    plan: {
-      topic,
-      difficulty,
-      exerciseType,
-      numQuestions,
-      focusReason: "Fallback plan from frontend.",
-      contentTheme,
-    },
-    exercises,
-  };
-}
-
-function parseFallbackQuestionCount(normalizedPrompt: string) {
-  const match = normalizedPrompt.match(
-    /\b(\d{1,2})\s*(?:cau|questions?|bai|exercises?)?\b/,
-  );
-  if (!match) {
-    return 5;
-  }
-  return Math.max(1, Math.min(Number(match[1]), 20));
-}
-
-function buildFallbackExercise({
-  difficulty,
-  exerciseType,
-  index,
-  topic,
-  contentTheme,
-}: {
-  difficulty: string;
-  exerciseType: string;
-  index: number;
-  topic: string;
-  contentTheme?: string;
-}): ExercisePreview {
-  const isVocabulary = exerciseType === "vocabulary_mcq";
-  const templates = isVocabulary
-    ? fallbackVocabularyTemplates
-    : contentTheme === "anime"
-      ? fallbackAnimeGrammarTemplates
-      : fallbackGrammarTemplates;
-  const template = templates[(index - 1) % templates.length];
-  return {
-    id: `fallback-${index}`,
-    type: exerciseType,
-    topic,
-    difficulty,
-    skill: isVocabulary ? "vocabulary" : "grammar",
-    subtopic: template.subtopic,
-    errorTag: template.errorTag,
-    question: template.question,
-    options: template.options.map((option) => ({
-      ...option,
-      isCorrect: option.label === template.correctAnswer,
-    })),
-    correctAnswer: template.correctAnswer,
-    explanation: template.explanation,
-    sourceChunkIds: [],
-  };
-}
-
-const fallbackGrammarTemplates = [
-  {
-    question: "Choose the correct sentence.",
-    options: [
-      { label: "A", text: "She goes to school every day." },
-      { label: "B", text: "She go to school every day." },
-      { label: "C", text: "She going to school every day." },
-      { label: "D", text: "She gone to school every day." },
-    ],
-    correctAnswer: "A",
-    explanation: "With the subject `she`, present simple uses `goes`.",
-    subtopic: "present_simple",
-    errorTag: "subject_verb_agreement",
-  },
-  {
-    question: "Complete the sentence: I ___ coffee in the morning.",
-    options: [
-      { label: "A", text: "drink" },
-      { label: "B", text: "drinks" },
-      { label: "C", text: "drinking" },
-      { label: "D", text: "drank" },
-    ],
-    correctAnswer: "A",
-    explanation: "With `I`, present simple uses the base verb `drink`.",
-    subtopic: "present_simple",
-    errorTag: "verb_form",
-  },
-  {
-    question: "Choose the correct question.",
-    options: [
-      { label: "A", text: "Do you like English?" },
-      { label: "B", text: "Does you like English?" },
-      { label: "C", text: "Are you like English?" },
-      { label: "D", text: "You like English?" },
-    ],
-    correctAnswer: "A",
-    explanation: "Use `Do + subject + base verb` for present simple questions.",
-    subtopic: "present_simple_questions",
-    errorTag: "auxiliary_do",
-  },
-  {
-    question: "Complete the sentence: They ___ at home yesterday.",
-    options: [
-      { label: "A", text: "were" },
-      { label: "B", text: "was" },
-      { label: "C", text: "are" },
-      { label: "D", text: "is" },
-    ],
-    correctAnswer: "A",
-    explanation: "`They` takes `were` in the past simple of `be`.",
-    subtopic: "past_simple",
-    errorTag: "be_verb_past",
-  },
-  {
-    question: "Choose the correct article: I saw ___ apple on the table.",
-    options: [
-      { label: "A", text: "an" },
-      { label: "B", text: "a" },
-      { label: "C", text: "the a" },
-      { label: "D", text: "no article" },
-    ],
-    correctAnswer: "A",
-    explanation: "Use `an` before a vowel sound, as in `apple`.",
-    subtopic: "articles",
-    errorTag: "article_choice",
-  },
-  {
-    question: "Complete the sentence: My book is ___ the bag.",
-    options: [
-      { label: "A", text: "in" },
-      { label: "B", text: "on" },
-      { label: "C", text: "at" },
-      { label: "D", text: "to" },
-    ],
-    correctAnswer: "A",
-    explanation: "`In` means inside something, so `in the bag` is correct.",
-    subtopic: "prepositions",
-    errorTag: "preposition_place",
-  },
-  {
-    question: "Choose the correct form: This test is ___ than the last one.",
-    options: [
-      { label: "A", text: "easier" },
-      { label: "B", text: "easy" },
-      { label: "C", text: "easiest" },
-      { label: "D", text: "more easy" },
-    ],
-    correctAnswer: "A",
-    explanation: "Use the comparative form `easier` with `than`.",
-    subtopic: "comparatives",
-    errorTag: "comparative_form",
-  },
-  {
-    question: "Complete the sentence: He can ___ very fast.",
-    options: [
-      { label: "A", text: "run" },
-      { label: "B", text: "runs" },
-      { label: "C", text: "running" },
-      { label: "D", text: "ran" },
-    ],
-    correctAnswer: "A",
-    explanation: "After modal verbs like `can`, use the base verb.",
-    subtopic: "modals",
-    errorTag: "modal_base_verb",
-  },
-  {
-    question: "Choose the correct sentence.",
-    options: [
-      { label: "A", text: "There are two chairs in the room." },
-      { label: "B", text: "There is two chairs in the room." },
-      { label: "C", text: "There be two chairs in the room." },
-      { label: "D", text: "There am two chairs in the room." },
-    ],
-    correctAnswer: "A",
-    explanation: "Use `there are` with plural nouns like `two chairs`.",
-    subtopic: "there_is_are",
-    errorTag: "plural_agreement",
-  },
-  {
-    question: "Complete the sentence: We ___ TV now.",
-    options: [
-      { label: "A", text: "are watching" },
-      { label: "B", text: "watch" },
-      { label: "C", text: "watches" },
-      { label: "D", text: "watched" },
-    ],
-    correctAnswer: "A",
-    explanation: "`Now` often signals present continuous: `are watching`.",
-    subtopic: "present_continuous",
-    errorTag: "continuous_form",
-  },
-];
-
-const fallbackAnimeGrammarTemplates = [
-  {
-    question: "Complete the sentence: The next episode should ___ by new fans first.",
-    options: [
-      { label: "A", text: "be watched" },
-      { label: "B", text: "watch" },
-      { label: "C", text: "watched" },
-      { label: "D", text: "be watch" },
-    ],
-    correctAnswer: "A",
-    explanation: "Modal passive uses modal + be + past participle: should be watched.",
-    subtopic: "modal_passive",
-    errorTag: "missing_be",
-  },
-  {
-    question: "Choose the correct passive sentence.",
-    options: [
-      { label: "A", text: "The opening song was performed by a new band." },
-      { label: "B", text: "The opening song performed by a new band." },
-      { label: "C", text: "The opening song was perform by a new band." },
-      { label: "D", text: "The opening song is performing by a new band." },
-    ],
-    correctAnswer: "A",
-    explanation: "Past passive uses was/were + past participle.",
-    subtopic: "past_simple_passive",
-    errorTag: "wrong_verb_form",
-  },
-  {
-    question: "Complete the sentence: Spoilers must ___ before the review is posted.",
-    options: [
-      { label: "A", text: "be hidden" },
-      { label: "B", text: "hide" },
-      { label: "C", text: "hidden" },
-      { label: "D", text: "be hide" },
-    ],
-    correctAnswer: "A",
-    explanation: "`Must be hidden` is modal passive: must + be + past participle.",
-    subtopic: "modal_passive",
-    errorTag: "missing_be",
-  },
-  {
-    question: "Choose the correct sentence.",
-    options: [
-      { label: "A", text: "The manga chapter has been translated into English." },
-      { label: "B", text: "The manga chapter has translated into English." },
-      { label: "C", text: "The manga chapter is translated yesterday." },
-      { label: "D", text: "The manga chapter have been translate into English." },
-    ],
-    correctAnswer: "A",
-    explanation: "Present perfect passive uses has/have been + past participle.",
-    subtopic: "present_perfect_passive",
-    errorTag: "missing_been",
-  },
-  {
-    question: "Complete the sentence: The character design can ___ after feedback.",
-    options: [
-      { label: "A", text: "be improved" },
-      { label: "B", text: "improved" },
-      { label: "C", text: "be improve" },
-      { label: "D", text: "improving" },
-    ],
-    correctAnswer: "A",
-    explanation: "`Can be improved` follows modal + be + past participle.",
-    subtopic: "modal_passive",
-    errorTag: "wrong_verb_form",
-  },
-];
-
-const fallbackVocabularyTemplates = [
-  {
-    question: "Choose the word that means `a person who travels by plane, bus, or train`.",
-    options: [
-      { label: "A", text: "passenger" },
-      { label: "B", text: "platform" },
-      { label: "C", text: "receipt" },
-      { label: "D", text: "luggage" },
-    ],
-    correctAnswer: "A",
-    explanation: "`Passenger` means a person who travels in a vehicle.",
-    subtopic: "basic_vocabulary",
-    errorTag: "vocabulary_meaning_confusion",
-  },
-  {
-    question: "Choose the best meaning of `luggage`.",
-    options: [
-      { label: "A", text: "bags and suitcases" },
-      { label: "B", text: "a travel ticket" },
-      { label: "C", text: "a hotel room" },
-      { label: "D", text: "a bus stop" },
-    ],
-    correctAnswer: "A",
-    explanation: "`Luggage` means bags and suitcases used when travelling.",
-    subtopic: "basic_vocabulary",
-    errorTag: "vocabulary_meaning_confusion",
-  },
-  {
-    question: "Complete the sentence: I need to ___ a room for two nights.",
-    options: [
-      { label: "A", text: "book" },
-      { label: "B", text: "borrow" },
-      { label: "C", text: "break" },
-      { label: "D", text: "build" },
-    ],
-    correctAnswer: "A",
-    explanation: "`Book a room` means reserve a room.",
-    subtopic: "travel_vocabulary",
-    errorTag: "vocabulary_context_error",
-  },
-  {
-    question: "Which word means `the place where you get on a train`?",
-    options: [
-      { label: "A", text: "platform" },
-      { label: "B", text: "passport" },
-      { label: "C", text: "pillow" },
-      { label: "D", text: "payment" },
-    ],
-    correctAnswer: "A",
-    explanation: "A train `platform` is the area where passengers get on or off.",
-    subtopic: "travel_vocabulary",
-    errorTag: "vocabulary_meaning_confusion",
-  },
-  {
-    question: "Choose the opposite of `expensive`.",
-    options: [
-      { label: "A", text: "cheap" },
-      { label: "B", text: "crowded" },
-      { label: "C", text: "delayed" },
-      { label: "D", text: "available" },
-    ],
-    correctAnswer: "A",
-    explanation: "`Cheap` means not expensive.",
-    subtopic: "adjectives",
-    errorTag: "antonym_confusion",
-  },
-  {
-    question: "Complete the sentence: The flight was ___, so we waited two hours.",
-    options: [
-      { label: "A", text: "delayed" },
-      { label: "B", text: "direct" },
-      { label: "C", text: "empty" },
-      { label: "D", text: "local" },
-    ],
-    correctAnswer: "A",
-    explanation: "`Delayed` means later than planned.",
-    subtopic: "travel_vocabulary",
-    errorTag: "vocabulary_context_error",
-  },
-  {
-    question: "Choose the best word: Please keep your ___ with you at the airport.",
-    options: [
-      { label: "A", text: "passport" },
-      { label: "B", text: "blanket" },
-      { label: "C", text: "menu" },
-      { label: "D", text: "receipt" },
-    ],
-    correctAnswer: "A",
-    explanation: "A `passport` is an official travel document.",
-    subtopic: "travel_vocabulary",
-    errorTag: "vocabulary_context_error",
-  },
-  {
-    question: "Which word means `free to use or buy now`?",
-    options: [
-      { label: "A", text: "available" },
-      { label: "B", text: "ancient" },
-      { label: "C", text: "asleep" },
-      { label: "D", text: "angry" },
-    ],
-    correctAnswer: "A",
-    explanation: "`Available` means ready or free to be used.",
-    subtopic: "adjectives",
-    errorTag: "vocabulary_meaning_confusion",
-  },
-  {
-    question: "Choose the best meaning of `receipt`.",
-    options: [
-      { label: "A", text: "a paper or message that shows you paid" },
-      { label: "B", text: "a place to sleep" },
-      { label: "C", text: "a type of ticket gate" },
-      { label: "D", text: "a heavy suitcase" },
-    ],
-    correctAnswer: "A",
-    explanation: "A `receipt` shows that payment was made.",
-    subtopic: "daily_vocabulary",
-    errorTag: "vocabulary_meaning_confusion",
-  },
-  {
-    question: "Complete the sentence: Could you ___ this word in Vietnamese?",
-    options: [
-      { label: "A", text: "translate" },
-      { label: "B", text: "travel" },
-      { label: "C", text: "train" },
-      { label: "D", text: "try" },
-    ],
-    correctAnswer: "A",
-    explanation: "`Translate` means change words from one language to another.",
-    subtopic: "learning_vocabulary",
-    errorTag: "vocabulary_context_error",
-  },
-];

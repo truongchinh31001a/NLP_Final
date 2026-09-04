@@ -2,8 +2,15 @@ import type {
   ChatMemoryResume,
   ChatSessionSummary,
   ChromaDebugSnapshot,
+  ConversationRoute,
+  ConversationTurn,
   ExercisePreview,
+  LearningActivityPreview,
+  NextActivitySuggestion,
+  PendingClarification,
   PersonalizationSnapshot,
+  PracticePlanPreview,
+  ScoreResult,
 } from "@/lib/types";
 
 const API_BASE_URL =
@@ -22,6 +29,7 @@ function authHeaders(extra: Record<string, string> = {}): Record<string, string>
 export type GeneratePracticeRequest = {
   userId: string;
   message: string;
+  conversationId?: string | null;
   intent?: PracticeIntentFields;
 };
 
@@ -35,7 +43,9 @@ export type PracticeIntentFields = {
 };
 
 export type GeneratePracticeResponse = {
+  activity_id?: string | null;
   generation_run_id: string;
+  request?: Record<string, unknown>;
   plan: {
     topic: string;
     difficulty: string;
@@ -89,6 +99,7 @@ export type ScorePracticeResponse = {
   total_questions: number;
   weak_topics_detected: string[];
   recommendation: string;
+  activity_id?: string | null;
   generation_run_id: string;
   session_code: string;
   answer_diagnoses?: Array<{
@@ -114,6 +125,21 @@ export type ScorePracticeResponse = {
     next_practice_prompt: string;
     raw_response?: string;
   } | null;
+};
+
+export type NextActivitySuggestionResponse = {
+  recommendation_id?: string | null;
+  user_id?: string | null;
+  source_activity_id?: string | null;
+  conversation_id?: string | null;
+  skill?: string | null;
+  topic?: string | null;
+  subtopic?: string | null;
+  difficulty?: string | null;
+  exercise_type?: string | null;
+  num_questions?: number | null;
+  reason?: string | null;
+  prompt?: string | null;
 };
 
 export type PersonalizationSnapshotResponse = {
@@ -255,12 +281,8 @@ export type ChatMemoryResumeResponse = {
   memory_summary: string;
   extracted_facts: Record<string, unknown>;
   suggested_next_question: string;
-  messages: Array<{
-    message_id: string;
-    role: "user" | "assistant";
-    content: string;
-    created_at?: string | null;
-  }>;
+  messages: ChatMessageResponse[];
+  active_activity?: LearningActivityResponse | null;
 };
 
 export type ChatSessionSummaryResponse = {
@@ -274,6 +296,139 @@ export type ChatSessionSummaryResponse = {
 
 export type ChatSessionListResponse = {
   sessions: ChatSessionSummaryResponse[];
+};
+
+export type ConversationSummaryResponse = {
+  conversation_id: string;
+  title: string;
+  preview: string;
+  message_count: number;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type ConversationListResponse = {
+  conversations: ConversationSummaryResponse[];
+};
+
+export type ConversationDetailResponse = {
+  conversation_id: string;
+  has_history: boolean;
+  memory_summary: string;
+  extracted_facts: Record<string, unknown>;
+  suggested_next_question: string;
+  messages: ChatMessageResponse[];
+  active_activity?: LearningActivityResponse | null;
+};
+
+export type ChatMessageResponse = {
+  message_id: string;
+  role: "user" | "assistant";
+  content: string;
+  metadata?: Record<string, unknown>;
+  created_at?: string | null;
+};
+
+export type PendingClarificationResponse = {
+  pending_intent: string;
+  missing_fields: string[];
+  collected_slots: Record<string, unknown>;
+  question: string;
+};
+
+export type ConversationRouteResponse = {
+  intent: string;
+  confidence: number;
+  source: string;
+  reason: string;
+  slots: Record<string, unknown>;
+  needs_clarification: boolean;
+  clarification_question?: string | null;
+};
+
+export type LearningActivityResponse = {
+  activity_id: string;
+  conversation_id: string;
+  learner_id: string;
+  type: string;
+  status: string;
+  target_skills?: string[];
+  difficulty?: string | null;
+  created_at?: string | null;
+  started_at?: string | null;
+  submitted_at?: string | null;
+  completed_at?: string | null;
+  updated_at?: string | null;
+  generation_run_id?: string | null;
+  session_code?: string | null;
+  metadata?: Record<string, unknown>;
+  request?: Record<string, unknown> | null;
+  plan?: GeneratePracticeResponse["plan"] | null;
+  exercises?: GeneratePracticeResponse["exercises"];
+  result?: ScorePracticeResponse | null;
+  recommendation?: string;
+  next_activity_suggestion?: NextActivitySuggestionResponse | null;
+};
+
+export type ConversationMessageTurnResponse = {
+  conversation_id: string;
+  message: ChatMessageResponse;
+  intent: string;
+  assistant_reply: string;
+  pending_clarification?: PendingClarificationResponse | null;
+  activity?: LearningActivityResponse | null;
+  ui_action: string;
+  assistant_message?: ChatMessageResponse | null;
+  route?: ConversationRouteResponse | null;
+};
+
+export type SubmitActivityRequest = {
+  userId: string;
+  activityId: string;
+  answers: Array<{
+    exerciseId: string;
+    selectedAnswer: string;
+  }>;
+};
+
+export type ActivitySubmitResponse = {
+  activity: LearningActivityResponse;
+  result: ScorePracticeResponse;
+  exercises: GeneratePracticeResponse["exercises"];
+  answers: Array<{
+    exercise_id: string;
+    selected_answer: string;
+  }>;
+  next_activity_suggestion?: NextActivitySuggestionResponse | null;
+  ui_action: string;
+};
+
+export type ActivitySubmitResult = {
+  activity: LearningActivityPreview;
+  result: ScoreResult;
+  exercises: ExercisePreview[];
+  answers: Array<{
+    exerciseId: string;
+    selectedAnswer: string;
+  }>;
+  nextActivitySuggestion?: NextActivitySuggestion | null;
+  uiAction: string;
+};
+
+export type RecommendationListResponse = {
+  recommendations: NextActivitySuggestionResponse[];
+};
+
+export type RecommendationAcceptResponse = {
+  recommendation: NextActivitySuggestionResponse;
+  activity: LearningActivityResponse;
+  ui_action: string;
+};
+
+export type RecommendationAcceptResult = {
+  recommendation: NextActivitySuggestion;
+  activity: LearningActivityPreview;
+  uiAction: string;
 };
 
 export type SaveChatMessageRequest = {
@@ -326,21 +481,15 @@ export type ChromaDebugResponse = {
   error?: string | null;
 };
 
+// Legacy compatibility client. The main UI uses conversation/activity endpoints.
 export async function generatePractice(
   payload: GeneratePracticeRequest,
 ): Promise<{
   exercises: ExercisePreview[];
-  plan: {
-    topic: string;
-    difficulty: string;
-    exerciseType: string;
-    numQuestions: number;
-    focusReason: string;
-    contentTheme?: string | null;
-    targetSkillId?: string | null;
-  };
+  plan: PracticePlanPreview;
   recommendation?: string;
   generatorBackend?: string;
+  activityId?: string | null;
   generationRunId: string;
 }> {
   const response = await fetch(`${API_BASE_URL}/api/practice/generate`, {
@@ -349,6 +498,7 @@ export async function generatePractice(
     body: JSON.stringify({
       user_id: payload.userId,
       message: payload.message,
+      conversation_id: payload.conversationId,
       topic: payload.intent?.topic,
       difficulty: payload.intent?.difficulty,
       exercise_type: payload.intent?.exerciseType,
@@ -365,73 +515,19 @@ export async function generatePractice(
   const data = (await response.json()) as GeneratePracticeResponse;
 
   return {
-    plan: {
-      topic: data.plan.topic,
-      difficulty: data.plan.difficulty,
-      exerciseType: data.plan.exercise_type,
-      numQuestions: data.plan.num_questions,
-      focusReason: data.plan.focus_reason,
-      contentTheme: data.plan.content_theme,
-      targetSkillId: data.plan.target_skill_id,
-    },
-    exercises: data.exercises.map((exercise) => ({
-      id: exercise.exercise_id,
-      type: exercise.exercise_type,
-      topic: exercise.topic,
-      difficulty: exercise.difficulty,
-      skill: exercise.skill,
-      subtopic: exercise.subtopic,
-      errorTag: exercise.error_tag,
-      question: exercise.question_text,
-      options: exercise.options.map((option) => ({
-        label: option.label,
-        text: option.text,
-        isCorrect: option.is_correct,
-      })),
-      correctAnswer: exercise.correct_answer,
-      explanation: exercise.explanation,
-      sourceChunkIds: exercise.source_chunk_ids,
-    })),
+    plan: mapPracticePlan(data.plan),
+    exercises: data.exercises.map(mapExercisePreview),
     recommendation: data.recommendation,
     generatorBackend: data.generator_backend,
+    activityId: data.activity_id,
     generationRunId: data.generation_run_id,
   };
 }
 
+// Legacy compatibility client. The main UI submits practice by activity id.
 export async function scorePractice(
   payload: ScorePracticeRequest,
-): Promise<{
-  topic: string;
-  score: number;
-  correctCount: number;
-  totalQuestions: number;
-  weakTopicsDetected: string[];
-  recommendation: string;
-  generationRunId: string;
-  sessionCode: string;
-  practiceReview?: {
-    reviewCode: string;
-    evaluator: string;
-    summary: string;
-    strengths: string[];
-    weaknesses: string[];
-    nextSteps: string[];
-    nextPracticePrompt: string;
-  } | null;
-  answerDiagnoses?: Array<{
-    exerciseId: string;
-    isCorrect: boolean;
-    errorType: string;
-    skillId: string;
-    topic: string;
-    subtopic?: string | null;
-    subtype?: string | null;
-    severity: number;
-    masteryImpact: number;
-    explanation: string;
-    evidence: Record<string, unknown>;
-  }>;
-}> {
+): Promise<ScoreResult> {
   const response = await fetch(`${API_BASE_URL}/api/practice/score`, {
     method: "POST",
     headers: authHeaders({ "Content-Type": "application/json" }),
@@ -450,40 +546,208 @@ export async function scorePractice(
   }
 
   const data = (await response.json()) as ScorePracticeResponse;
+  return mapScoreResult(data);
+}
+
+export async function createConversation(
+  userId: string,
+): Promise<ChatMemoryResume> {
+  const response = await fetch(`${API_BASE_URL}/api/conversations`, {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({
+      user_id: userId,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to create conversation.");
+  }
+
+  const data = (await response.json()) as ConversationDetailResponse;
+  return mapConversationDetail(data);
+}
+
+export async function listConversations(
+  userId: string,
+): Promise<ChatSessionSummary[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/conversations?user_id=${encodeURIComponent(userId)}`,
+    {
+      headers: authHeaders(),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to load conversations.");
+  }
+
+  const data = (await response.json()) as ConversationListResponse;
+  return data.conversations.map(mapConversationSummary);
+}
+
+export async function getConversation(
+  userId: string,
+  conversationId: string,
+): Promise<ChatMemoryResume> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/conversations/${encodeURIComponent(
+      conversationId,
+    )}?user_id=${encodeURIComponent(userId)}`,
+    {
+      headers: authHeaders(),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to load conversation.");
+  }
+
+  const data = (await response.json()) as ConversationDetailResponse;
+  return mapConversationDetail(data);
+}
+
+export async function sendConversationMessage(payload: {
+  userId: string;
+  conversationId: string;
+  message: string;
+  metadata?: Record<string, unknown>;
+}): Promise<ConversationTurn> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/conversations/${encodeURIComponent(
+      payload.conversationId,
+    )}/messages`,
+    {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({
+        user_id: payload.userId,
+        message: payload.message,
+        metadata: payload.metadata ?? {},
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to send conversation message.");
+  }
+
+  const data = (await response.json()) as ConversationMessageTurnResponse;
+  return mapConversationTurn(data);
+}
+
+export async function submitActivity(
+  payload: SubmitActivityRequest,
+): Promise<ActivitySubmitResult> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/activities/${encodeURIComponent(
+      payload.activityId,
+    )}/submit`,
+    {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({
+        user_id: payload.userId,
+        answers: payload.answers.map((answer) => ({
+          exercise_id: answer.exerciseId,
+          selected_answer: answer.selectedAnswer,
+        })),
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to submit activity.");
+  }
+
+  const data = (await response.json()) as ActivitySubmitResponse;
+  const nextActivitySuggestion = mapNextActivitySuggestion(
+    data.next_activity_suggestion ?? data.activity.next_activity_suggestion,
+  );
+  const result = mapScoreResult(data.result, nextActivitySuggestion);
+  const activity = mapLearningActivity({
+    ...data.activity,
+    exercises: data.exercises.length ? data.exercises : data.activity.exercises,
+    result: data.result,
+    next_activity_suggestion: data.next_activity_suggestion,
+  });
+
+  if (!activity) {
+    throw new Error("Backend returned an invalid activity.");
+  }
 
   return {
-    topic: data.topic,
-    score: data.score,
-    correctCount: data.correct_count,
-    totalQuestions: data.total_questions,
-    weakTopicsDetected: data.weak_topics_detected,
-    recommendation: data.recommendation,
-    generationRunId: data.generation_run_id,
-    sessionCode: data.session_code,
-    answerDiagnoses: (data.answer_diagnoses ?? []).map((diagnosis) => ({
-      exerciseId: diagnosis.exercise_id,
-      isCorrect: diagnosis.is_correct,
-      errorType: diagnosis.error_type,
-      skillId: diagnosis.skill_id,
-      topic: diagnosis.topic,
-      subtopic: diagnosis.subtopic,
-      subtype: diagnosis.subtype,
-      severity: diagnosis.severity,
-      masteryImpact: diagnosis.mastery_impact,
-      explanation: diagnosis.explanation,
-      evidence: diagnosis.evidence,
+    activity,
+    result,
+    exercises: data.exercises.map(mapExercisePreview),
+    answers: data.answers.map((answer) => ({
+      exerciseId: answer.exercise_id,
+      selectedAnswer: answer.selected_answer,
     })),
-    practiceReview: data.practice_review
-      ? {
-          reviewCode: data.practice_review.review_code,
-          evaluator: data.practice_review.evaluator,
-          summary: data.practice_review.summary,
-          strengths: data.practice_review.strengths,
-          weaknesses: data.practice_review.weaknesses,
-          nextSteps: data.practice_review.next_steps,
-          nextPracticePrompt: data.practice_review.next_practice_prompt,
-        }
-      : null,
+    nextActivitySuggestion,
+    uiAction: data.ui_action,
+  };
+}
+
+export async function listRecommendations(
+  userId: string,
+  limit = 5,
+): Promise<NextActivitySuggestion[]> {
+  const params = new URLSearchParams({
+    user_id: userId,
+    limit: String(limit),
+  });
+  const response = await fetch(`${API_BASE_URL}/api/recommendations?${params}`, {
+    headers: authHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to load recommendations.");
+  }
+
+  const data = (await response.json()) as RecommendationListResponse;
+  return data.recommendations
+    .map(mapNextActivitySuggestion)
+    .filter(
+      (recommendation): recommendation is NextActivitySuggestion =>
+        recommendation !== null,
+    );
+}
+
+export async function acceptRecommendation(payload: {
+  userId: string;
+  recommendationId: string;
+  conversationId?: string | null;
+}): Promise<RecommendationAcceptResult> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/recommendations/${encodeURIComponent(
+      payload.recommendationId,
+    )}/accept`,
+    {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({
+        user_id: payload.userId,
+        conversation_id: payload.conversationId,
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to accept recommendation.");
+  }
+
+  const data = (await response.json()) as RecommendationAcceptResponse;
+  const recommendation = mapNextActivitySuggestion(data.recommendation);
+  const activity = mapLearningActivity(data.activity);
+  if (!recommendation || !activity) {
+    throw new Error("Backend returned an invalid recommendation activity.");
+  }
+
+  return {
+    recommendation,
+    activity,
+    uiAction: data.ui_action,
   };
 }
 
@@ -822,12 +1086,20 @@ function mapChatResume(data: ChatMemoryResumeResponse): ChatMemoryResume {
     memorySummary: data.memory_summary,
     extractedFacts: data.extracted_facts,
     suggestedNextQuestion: data.suggested_next_question,
-    messages: data.messages.map((message) => ({
-      messageId: message.message_id,
-      role: message.role,
-      content: message.content,
-      createdAt: message.created_at,
-    })),
+    messages: data.messages.map(mapChatMessage),
+    activeActivity: mapLearningActivity(data.active_activity),
+  };
+}
+
+function mapConversationDetail(data: ConversationDetailResponse): ChatMemoryResume {
+  return {
+    sessionId: data.conversation_id,
+    hasHistory: data.has_history,
+    memorySummary: data.memory_summary,
+    extractedFacts: data.extracted_facts,
+    suggestedNextQuestion: data.suggested_next_question,
+    messages: data.messages.map(mapChatMessage),
+    activeActivity: mapLearningActivity(data.active_activity),
   };
 }
 
@@ -842,4 +1114,263 @@ function mapChatSessionSummary(
     createdAt: data.created_at,
     updatedAt: data.updated_at,
   };
+}
+
+function mapConversationSummary(
+  data: ConversationSummaryResponse,
+): ChatSessionSummary {
+  return {
+    sessionId: data.conversation_id,
+    title: data.title,
+    preview: data.preview,
+    messageCount: data.message_count,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+  };
+}
+
+function mapConversationTurn(data: ConversationMessageTurnResponse): ConversationTurn {
+  return {
+    conversationId: data.conversation_id,
+    message: mapChatMessage(data.message),
+    intent: data.intent,
+    assistantReply: data.assistant_reply,
+    pendingClarification: mapPendingClarification(data.pending_clarification),
+    activity: mapLearningActivity(data.activity),
+    uiAction: data.ui_action,
+    assistantMessage: data.assistant_message
+      ? mapChatMessage(data.assistant_message)
+      : null,
+    route: mapConversationRoute(data.route),
+  };
+}
+
+function mapChatMessage(data: ChatMessageResponse) {
+  const metadata = isRecord(data.metadata) ? data.metadata : {};
+  const activity = mapLearningActivity(metadata.activity);
+  const uiAction =
+    typeof metadata.ui_action === "string" ? metadata.ui_action : null;
+
+  return {
+    messageId: data.message_id,
+    role: data.role,
+    content: data.content,
+    metadata,
+    activity,
+    uiAction,
+    createdAt: data.created_at,
+  };
+}
+
+function mapPendingClarification(
+  data?: PendingClarificationResponse | null,
+): PendingClarification | null {
+  if (!data) {
+    return null;
+  }
+  return {
+    pendingIntent: data.pending_intent,
+    missingFields: data.missing_fields,
+    collectedSlots: data.collected_slots,
+    question: data.question,
+  };
+}
+
+function mapConversationRoute(
+  data?: ConversationRouteResponse | null,
+): ConversationRoute | null {
+  if (!data) {
+    return null;
+  }
+  return {
+    intent: data.intent,
+    confidence: data.confidence,
+    source: data.source,
+    reason: data.reason,
+    slots: data.slots,
+    needsClarification: data.needs_clarification,
+    clarificationQuestion: data.clarification_question,
+  };
+}
+
+function mapLearningActivity(
+  rawActivity?: unknown,
+): LearningActivityPreview | null {
+  if (!isRecord(rawActivity)) {
+    return null;
+  }
+  const activityId = getString(rawActivity.activity_id);
+  const conversationId = getString(rawActivity.conversation_id);
+  const learnerId = getString(rawActivity.learner_id);
+  const type = getString(rawActivity.type);
+  const status = getString(rawActivity.status);
+  if (!activityId || !conversationId || !learnerId || !type || !status) {
+    return null;
+  }
+
+  const rawPlan = isRecord(rawActivity.plan) ? rawActivity.plan : null;
+  const rawExercises = Array.isArray(rawActivity.exercises)
+    ? rawActivity.exercises
+    : [];
+  const nextActivitySuggestion = mapNextActivitySuggestion(
+    rawActivity.next_activity_suggestion,
+  );
+  const rawResult = isRecord(rawActivity.result)
+    ? (rawActivity.result as ScorePracticeResponse)
+    : null;
+
+  return {
+    activityId,
+    conversationId,
+    learnerId,
+    type,
+    status,
+    targetSkills: Array.isArray(rawActivity.target_skills)
+      ? rawActivity.target_skills.map(String).filter(Boolean)
+      : [],
+    difficulty: getString(rawActivity.difficulty),
+    createdAt: getString(rawActivity.created_at),
+    startedAt: getString(rawActivity.started_at),
+    submittedAt: getString(rawActivity.submitted_at),
+    completedAt: getString(rawActivity.completed_at),
+    updatedAt: getString(rawActivity.updated_at),
+    generationRunId: getString(rawActivity.generation_run_id),
+    sessionCode: getString(rawActivity.session_code),
+    metadata: isRecord(rawActivity.metadata) ? rawActivity.metadata : {},
+    request: isRecord(rawActivity.request) ? rawActivity.request : null,
+    plan: rawPlan ? mapPracticePlan(rawPlan) : null,
+    exercises: rawExercises
+      .filter(isRecord)
+      .map((exercise) => mapExercisePreview(exercise)),
+    result: rawResult ? mapScoreResult(rawResult, nextActivitySuggestion) : null,
+    recommendation: getString(rawActivity.recommendation) ?? "",
+    nextActivitySuggestion,
+  };
+}
+
+function mapPracticePlan(rawPlan: Record<string, unknown>): PracticePlanPreview {
+  return {
+    topic: getString(rawPlan.topic) ?? "grammar",
+    difficulty: getString(rawPlan.difficulty) ?? "medium",
+    exerciseType: getString(rawPlan.exercise_type) ?? "grammar_mcq",
+    numQuestions: getNumber(rawPlan.num_questions) ?? 5,
+    focusReason: getString(rawPlan.focus_reason) ?? "",
+    contentTheme: getString(rawPlan.content_theme),
+    targetSkillId: getString(rawPlan.target_skill_id),
+  };
+}
+
+function mapExercisePreview(rawExercise: Record<string, unknown>): ExercisePreview {
+  const rawOptions = Array.isArray(rawExercise.options)
+    ? rawExercise.options
+    : [];
+  const sourceChunkIds = Array.isArray(rawExercise.source_chunk_ids)
+    ? rawExercise.source_chunk_ids.map(String).filter(Boolean)
+    : [];
+
+  return {
+    id: getString(rawExercise.exercise_id) ?? "",
+    type: getString(rawExercise.exercise_type) ?? "grammar_mcq",
+    topic: getString(rawExercise.topic) ?? "grammar",
+    difficulty: getString(rawExercise.difficulty) ?? "medium",
+    skill: getString(rawExercise.skill) ?? undefined,
+    subtopic: getString(rawExercise.subtopic),
+    errorTag: getString(rawExercise.error_tag),
+    question: getString(rawExercise.question_text) ?? "",
+    options: rawOptions.filter(isRecord).map((option) => ({
+      label: getString(option.label) ?? "",
+      text: getString(option.text) ?? "",
+      isCorrect: Boolean(option.is_correct),
+    })),
+    correctAnswer: getString(rawExercise.correct_answer) ?? "",
+    explanation: getString(rawExercise.explanation) ?? "",
+    sourceChunkIds,
+  };
+}
+
+function mapScoreResult(
+  data: ScorePracticeResponse,
+  nextActivitySuggestion?: NextActivitySuggestion | null,
+): ScoreResult {
+  return {
+    topic: data.topic,
+    score: data.score,
+    correctCount: data.correct_count,
+    totalQuestions: data.total_questions,
+    weakTopicsDetected: data.weak_topics_detected,
+    recommendation: data.recommendation,
+    activityId: data.activity_id,
+    generationRunId: data.generation_run_id,
+    sessionCode: data.session_code,
+    answerDiagnoses: (data.answer_diagnoses ?? []).map((diagnosis) => ({
+      exerciseId: diagnosis.exercise_id,
+      isCorrect: diagnosis.is_correct,
+      errorType: diagnosis.error_type,
+      skillId: diagnosis.skill_id,
+      topic: diagnosis.topic,
+      subtopic: diagnosis.subtopic,
+      subtype: diagnosis.subtype,
+      severity: diagnosis.severity,
+      masteryImpact: diagnosis.mastery_impact,
+      explanation: diagnosis.explanation,
+      evidence: diagnosis.evidence,
+    })),
+    practiceReview: data.practice_review
+      ? {
+          reviewCode: data.practice_review.review_code,
+          evaluator: data.practice_review.evaluator,
+          summary: data.practice_review.summary,
+          strengths: data.practice_review.strengths,
+          weaknesses: data.practice_review.weaknesses,
+          nextSteps: data.practice_review.next_steps,
+          nextPracticePrompt: data.practice_review.next_practice_prompt,
+        }
+      : null,
+    nextActivitySuggestion,
+  };
+}
+
+function mapNextActivitySuggestion(
+  rawSuggestion?: unknown,
+): NextActivitySuggestion | null {
+  if (!isRecord(rawSuggestion)) {
+    return null;
+  }
+  const topic = getString(rawSuggestion.topic);
+  if (!topic) {
+    return null;
+  }
+  return {
+    recommendationId: getString(rawSuggestion.recommendation_id) ?? undefined,
+    userId: getString(rawSuggestion.user_id) ?? undefined,
+    sourceActivityId: getString(rawSuggestion.source_activity_id),
+    conversationId: getString(rawSuggestion.conversation_id),
+    skill: getString(rawSuggestion.skill),
+    topic,
+    subtopic: getString(rawSuggestion.subtopic),
+    difficulty: getString(rawSuggestion.difficulty),
+    exerciseType: getString(rawSuggestion.exercise_type),
+    numQuestions: getNumber(rawSuggestion.num_questions),
+    reason: getString(rawSuggestion.reason) ?? undefined,
+    prompt: getString(rawSuggestion.prompt) ?? undefined,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function getString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
+function getNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
 }

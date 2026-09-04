@@ -9,6 +9,8 @@ from app.schemas import (
     AnswerDiagnosis,
     GeneratedExerciseSet,
     LearnerProfile,
+    LearningActivity,
+    LearningActivityStatus,
     PracticeReview,
     SessionResult,
 )
@@ -19,6 +21,48 @@ class LearningRepository(Protocol):
         ...
 
     def save_profile(self, profile: LearnerProfile) -> None:
+        ...
+
+    def create_learning_activity(self, activity: LearningActivity) -> LearningActivity:
+        ...
+
+    def get_learning_activity(
+        self,
+        user_id: str,
+        activity_id: str,
+    ) -> LearningActivity | None:
+        ...
+
+    def update_learning_activity_status(
+        self,
+        user_id: str,
+        activity_id: str,
+        status: LearningActivityStatus,
+    ) -> LearningActivity:
+        ...
+
+    def attach_generated_exercise_set_to_activity(
+        self,
+        user_id: str,
+        activity_id: str,
+        generation_run_id: str,
+    ) -> LearningActivity:
+        ...
+
+    def attach_session_result_to_activity(
+        self,
+        user_id: str,
+        activity_id: str,
+        session_code: str,
+    ) -> LearningActivity:
+        ...
+
+    def get_latest_learning_activity(
+        self,
+        user_id: str,
+        conversation_id: str,
+        statuses: list[LearningActivityStatus] | None = None,
+    ) -> LearningActivity | None:
         ...
 
     def get_generated_exercise_set(
@@ -34,7 +78,15 @@ class LearningRepository(Protocol):
         generation_run_id: str | None = None,
         selected_answers: dict[str, str] | None = None,
         answer_diagnoses: list[AnswerDiagnosis] | None = None,
+        activity_id: str | None = None,
     ) -> str:
+        ...
+
+    def get_session_result(
+        self,
+        user_id: str,
+        session_code: str,
+    ) -> SessionResult | None:
         ...
 
     def save_generated_exercise_set(
@@ -72,6 +124,14 @@ class LearningRepository(Protocol):
     ) -> dict[str, Any]:
         ...
 
+    def merge_chat_memory_facts(
+        self,
+        user_id: str,
+        facts: dict[str, Any],
+        session_id: str | None = None,
+    ) -> dict[str, Any]:
+        ...
+
     def save_practice_review(
         self,
         user_id: str,
@@ -91,6 +151,9 @@ class InMemoryLearningRepository:
     chat_session_order: dict[str, int] = field(default_factory=dict)
     chat_messages: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
     chat_memory: dict[str, dict[str, Any]] = field(default_factory=dict)
+    learning_activities: dict[str, LearningActivity] = field(default_factory=dict)
+    activity_events: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    active_activity_by_chat_session: dict[str, str] = field(default_factory=dict)
     practice_reviews: dict[str, PracticeReview] = field(default_factory=dict)
     knowledge_tracer: BayesianKnowledgeTracer = field(
         default_factory=BayesianKnowledgeTracer
@@ -101,6 +164,126 @@ class InMemoryLearningRepository:
 
     def save_profile(self, profile: LearnerProfile) -> None:
         self.profiles[profile.user_id] = profile
+
+    def create_learning_activity(self, activity: LearningActivity) -> LearningActivity:
+        self._ensure_activity_conversation_owner(
+            activity.learner_id,
+            activity.conversation_id,
+        )
+        now = self._now()
+        if not activity.activity_id:
+            activity.activity_id = f"inmemory-activity-{uuid.uuid4().hex[:12]}"
+        activity.created_at = activity.created_at or now
+        activity.updated_at = now
+        self.learning_activities[activity.activity_id] = activity
+        self._sync_active_activity(activity)
+        self._record_activity_event(activity, "CREATED")
+        return activity
+
+    def get_learning_activity(
+        self,
+        user_id: str,
+        activity_id: str,
+    ) -> LearningActivity | None:
+        activity = self.learning_activities.get(activity_id)
+        if activity is None or activity.learner_id != user_id:
+            return None
+        return activity
+
+    def update_learning_activity_status(
+        self,
+        user_id: str,
+        activity_id: str,
+        status: LearningActivityStatus,
+    ) -> LearningActivity:
+        activity = self._require_learning_activity(user_id, activity_id)
+        now = self._now()
+        activity.status = status
+        activity.updated_at = now
+        if status == LearningActivityStatus.IN_PROGRESS and activity.started_at is None:
+            activity.started_at = now
+        if status == LearningActivityStatus.SUBMITTED and activity.submitted_at is None:
+            activity.submitted_at = now
+        if self._is_terminal_activity_status(status) and activity.completed_at is None:
+            activity.completed_at = now
+        self._sync_active_activity(activity)
+        self._record_activity_event(activity, "STATUS_CHANGED")
+        return activity
+
+    def attach_generated_exercise_set_to_activity(
+        self,
+        user_id: str,
+        activity_id: str,
+        generation_run_id: str,
+    ) -> LearningActivity:
+        activity = self._require_learning_activity(user_id, activity_id)
+        if generation_run_id not in self.generated_sets:
+            raise LookupError(f"Generation run not found: {generation_run_id}")
+        generated = self.generated_sets[generation_run_id]
+        if generated.request.user_id != user_id:
+            raise LookupError(f"Generation run not found: {generation_run_id}")
+        activity.generation_run_id = generation_run_id
+        activity.updated_at = self._now()
+        generated.activity_id = activity.activity_id
+        self._record_activity_event(
+            activity,
+            "GENERATED_SET_ATTACHED",
+            {"generation_run_id": generation_run_id},
+        )
+        return activity
+
+    def attach_session_result_to_activity(
+        self,
+        user_id: str,
+        activity_id: str,
+        session_code: str,
+    ) -> LearningActivity:
+        activity = self._require_learning_activity(user_id, activity_id)
+        session_result = next(
+            (
+                result
+                for result in self.session_results
+                if result.session_code == session_code and result.user_id == user_id
+            ),
+            None,
+        )
+        if session_result is None:
+            raise LookupError(f"Practice session not found: {session_code}")
+        now = self._now()
+        activity.session_code = session_code
+        activity.status = LearningActivityStatus.COMPLETED
+        activity.submitted_at = activity.submitted_at or now
+        activity.completed_at = activity.completed_at or now
+        activity.updated_at = now
+        session_result.activity_id = activity.activity_id
+        self._sync_active_activity(activity)
+        self._record_activity_event(
+            activity,
+            "SESSION_RESULT_ATTACHED",
+            {"session_code": session_code},
+        )
+        return activity
+
+    def get_latest_learning_activity(
+        self,
+        user_id: str,
+        conversation_id: str,
+        statuses: list[LearningActivityStatus] | None = None,
+    ) -> LearningActivity | None:
+        self._ensure_activity_conversation_owner(user_id, conversation_id)
+        status_values = {status.value for status in statuses or []}
+        activities = [
+            activity
+            for activity in self.learning_activities.values()
+            if activity.learner_id == user_id
+            and activity.conversation_id == conversation_id
+            and (not status_values or activity.status.value in status_values)
+        ]
+        activities.sort(
+            key=lambda activity: activity.updated_at or activity.created_at or "",
+            reverse=True,
+        )
+        return activities[0] if activities else None
 
     def get_generated_exercise_set(
         self,
@@ -118,8 +301,17 @@ class InMemoryLearningRepository:
         generation_run_id: str | None = None,
         selected_answers: dict[str, str] | None = None,
         answer_diagnoses: list[AnswerDiagnosis] | None = None,
+        activity_id: str | None = None,
     ) -> str:
         _ = answer_diagnoses
+        activity_id = (
+            activity_id
+            or result.activity_id
+            or self._activity_id_for_generation_run(generation_run_id)
+        )
+        if activity_id:
+            result.activity_id = activity_id
+        result.session_code = result.session_code or f"inmemory-session-{len(self.session_results) + 1}"
         self.session_results.append(result)
         if generation_run_id and selected_answers is not None:
             self._update_skill_mastery_from_answers(
@@ -127,7 +319,23 @@ class InMemoryLearningRepository:
                 generation_run_id,
                 selected_answers,
             )
-        return f"inmemory-session-{len(self.session_results)}"
+        if activity_id:
+            self.attach_session_result_to_activity(
+                result.user_id,
+                activity_id,
+                result.session_code,
+            )
+        return result.session_code
+
+    def get_session_result(
+        self,
+        user_id: str,
+        session_code: str,
+    ) -> SessionResult | None:
+        for result in self.session_results:
+            if result.user_id == user_id and result.session_code == session_code:
+                return result
+        return None
 
     def save_generated_exercise_set(
         self,
@@ -137,6 +345,12 @@ class InMemoryLearningRepository:
         generation_run_id = f"inmemory-{len(self.generated_sets) + 1}"
         generated.generation_run_id = generation_run_id
         self.generated_sets[generation_run_id] = generated
+        if generated.activity_id:
+            self.attach_generated_exercise_set_to_activity(
+                generated.request.user_id,
+                generated.activity_id,
+                generation_run_id,
+            )
         return generation_run_id
 
     def get_personalization_snapshot(self, user_id: str) -> dict[str, Any]:
@@ -310,6 +524,7 @@ class InMemoryLearningRepository:
             "message_id": f"inmemory-msg-{len(self.chat_messages.get(active_session_id, [])) + 1}",
             "role": normalized_role,
             "content": cleaned_content,
+            "metadata": metadata or {},
             "created_at": created_at,
         }
         self.chat_messages.setdefault(active_session_id, []).append(message)
@@ -336,6 +551,31 @@ class InMemoryLearningRepository:
             "suggested_next_question": self._suggest_next_question(facts),
         }
 
+    def merge_chat_memory_facts(
+        self,
+        user_id: str,
+        facts: dict[str, Any],
+        session_id: str | None = None,
+    ) -> dict[str, Any]:
+        cleaned_facts = {
+            key: value
+            for key, value in facts.items()
+            if value not in (None, "", [])
+        }
+        if not cleaned_facts:
+            return self.get_chat_resume(user_id, session_id=session_id)
+
+        if session_id is not None:
+            meta = self.chat_session_meta.get(session_id)
+            if meta is None or meta.get("user_id") != user_id:
+                raise LookupError("Chat session not found.")
+
+        current_facts = self.chat_memory.setdefault(user_id, {})
+        merged_facts = self._merge_chat_facts(current_facts, cleaned_facts)
+        self.chat_memory[user_id] = merged_facts
+        self._sync_profile_from_chat_facts(user_id, merged_facts)
+        return self.get_chat_resume(user_id, session_id=session_id)
+
     def save_practice_review(
         self,
         user_id: str,
@@ -344,6 +584,68 @@ class InMemoryLearningRepository:
     ) -> str:
         self.practice_reviews[session_code] = review
         return review.review_code
+
+    def _require_learning_activity(
+        self,
+        user_id: str,
+        activity_id: str,
+    ) -> LearningActivity:
+        activity = self.get_learning_activity(user_id, activity_id)
+        if activity is None:
+            raise LookupError(f"Learning activity not found: {activity_id}")
+        return activity
+
+    def _ensure_activity_conversation_owner(
+        self,
+        user_id: str,
+        conversation_id: str,
+    ) -> None:
+        meta = self.chat_session_meta.get(conversation_id)
+        if meta is None or meta.get("user_id") != user_id:
+            raise LookupError("Chat session not found.")
+
+    def _sync_active_activity(self, activity: LearningActivity) -> None:
+        if self._is_terminal_activity_status(activity.status):
+            if (
+                self.active_activity_by_chat_session.get(activity.conversation_id)
+                == activity.activity_id
+            ):
+                self.active_activity_by_chat_session.pop(activity.conversation_id, None)
+            return
+        self.active_activity_by_chat_session[activity.conversation_id] = (
+            activity.activity_id
+        )
+
+    def _record_activity_event(
+        self,
+        activity: LearningActivity,
+        event_type: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        self.activity_events.setdefault(activity.activity_id, []).append(
+            {
+                "event_type": event_type,
+                "status": activity.status.value,
+                "created_at": self._now(),
+                "metadata": metadata or {},
+            }
+        )
+
+    def _activity_id_for_generation_run(
+        self,
+        generation_run_id: str | None,
+    ) -> str | None:
+        if not generation_run_id:
+            return None
+        generated = self.generated_sets.get(generation_run_id)
+        return generated.activity_id if generated is not None else None
+
+    def _is_terminal_activity_status(self, status: LearningActivityStatus) -> bool:
+        return status in {
+            LearningActivityStatus.COMPLETED,
+            LearningActivityStatus.FAILED,
+            LearningActivityStatus.CANCELLED,
+        }
 
     def _get_or_create_chat_session(self, user_id: str) -> str:
         session_id = self.chat_session_ids.get(user_id)
@@ -418,6 +720,100 @@ class InMemoryLearningRepository:
         if any(keyword in normalized for keyword in ["anime", "manga", "otaku"]):
             return "anime"
         return None
+
+    def _merge_chat_facts(
+        self,
+        current_facts: dict[str, Any],
+        extracted_facts: dict[str, Any],
+    ) -> dict[str, Any]:
+        merged = dict(current_facts)
+        list_keys = {"content_themes", "goals", "weak_topics", "recent_topics"}
+        for key, value in extracted_facts.items():
+            if value in (None, "", []):
+                continue
+            if key in list_keys:
+                existing = merged.get(key, [])
+                existing_values = existing if isinstance(existing, list) else []
+                incoming_values = value if isinstance(value, list) else [value]
+                merged[key] = self._merge_unique_strings(
+                    existing_values,
+                    incoming_values,
+                )
+                continue
+            merged[key] = value
+        return merged
+
+    def _sync_profile_from_chat_facts(
+        self,
+        user_id: str,
+        facts: dict[str, Any],
+    ) -> None:
+        profile = self.get_profile(user_id)
+        changed = False
+
+        display_name = facts.get("display_name")
+        if isinstance(display_name, str) and display_name.strip():
+            profile.display_name = display_name.strip()
+            changed = True
+
+        level = facts.get("level")
+        if isinstance(level, str) and level in {"beginner", "intermediate", "advanced"}:
+            profile.level = level
+            changed = True
+
+        preferred_difficulty = facts.get("preferred_difficulty")
+        if isinstance(preferred_difficulty, str) and preferred_difficulty in {
+            "easy",
+            "medium",
+            "hard",
+        }:
+            profile.preferred_difficulty = preferred_difficulty
+            changed = True
+
+        preferred_num_questions = facts.get("preferred_num_questions")
+        if isinstance(preferred_num_questions, int):
+            profile.preferred_num_questions = preferred_num_questions
+            changed = True
+
+        goals = self._merge_unique_strings(
+            profile.goals,
+            self._as_string_list(facts.get("goals")),
+        )
+        if goals != profile.goals:
+            profile.goals = goals
+            changed = True
+
+        for topic in self._as_string_list(facts.get("weak_topics")):
+            profile.topic_accuracy.setdefault(topic, 0.25)
+            profile.weak_topics[topic] = max(profile.weak_topics.get(topic, 0.0), 0.75)
+            changed = True
+
+        if changed:
+            self.save_profile(profile)
+
+    def _merge_unique_strings(
+        self,
+        existing_values: list[Any],
+        incoming_values: list[Any],
+    ) -> list[str]:
+        merged: list[str] = []
+        seen: set[str] = set()
+        for value in [*existing_values, *incoming_values]:
+            normalized = str(value).strip()
+            if not normalized or normalized in seen:
+                continue
+            seen.add(normalized)
+            merged.append(normalized)
+        return merged
+
+    def _as_string_list(self, value: object) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, list):
+            return [str(item).strip() for item in value if str(item).strip()]
+        if isinstance(value, tuple):
+            return [str(item).strip() for item in value if str(item).strip()]
+        return [str(value).strip()] if str(value).strip() else []
 
     def _update_skill_mastery_from_answers(
         self,

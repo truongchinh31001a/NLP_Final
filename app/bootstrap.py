@@ -15,6 +15,7 @@ from app.recommendation.service import RecommendationService
 from app.retrieval.service import RetrievalService
 from app.retrieval.vector_store import LangChainVectorStore
 from app.review.service import PracticeReviewService
+from app.tutor.service import TutorResponseLLM
 
 
 def build_baseline_pipeline() -> PracticePipeline:
@@ -39,6 +40,11 @@ def build_baseline_pipeline() -> PracticePipeline:
     diagnosis = ErrorDiagnosisService()
     onboarding = OnboardingInterpreter(config)
     practice_intent = PracticeIntentInterpreter(config, parser)
+    tutor_response_llm = TutorResponseLLM(
+        config=config,
+        runnable=model_factory.build_tutor_response_runnable(),
+        backend_name=model_factory.get_tutor_response_backend_name(),
+    )
 
     return PracticePipeline(
         config=config,
@@ -53,6 +59,7 @@ def build_baseline_pipeline() -> PracticePipeline:
         diagnosis=diagnosis,
         onboarding=onboarding,
         practice_intent=practice_intent,
+        tutor_response_llm=tutor_response_llm,
     )
 
 

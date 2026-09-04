@@ -3,11 +3,16 @@ import urllib.error
 import urllib.request
 import uuid
 from collections import Counter
+from dataclasses import asdict
 from typing import Any
 
 from app.config import AppConfig
+from app.conversation.schemas import ConversationRoute
 from app.language.translation import BilingualTextNormalizer
+from app.persistence.repository import LearningRepository
 from app.schemas import AnswerDiagnosis, GeneratedExerciseSet, PracticeReview, SessionResult
+from app.schemas import ConversationTurnContext, LearningActivity, LearningActivityType
+from app.tutor.service import TutorCapabilityResult
 
 
 class PracticeReviewService:
@@ -288,3 +293,177 @@ class PracticeReviewService:
 
     def _label(self, value: str) -> str:
         return value.replace("_", " ").replace(":", " ").title()
+
+
+class ConversationReviewService:
+    """Review capability that answers questions about a prior activity."""
+
+    def __init__(self, repository: LearningRepository) -> None:
+        self.repository = repository
+        self.text_normalizer = BilingualTextNormalizer()
+
+    def review(
+        self,
+        *,
+        route: ConversationRoute,
+        context: ConversationTurnContext,
+    ) -> TutorCapabilityResult:
+        activity = self._resolve_activity(route, context)
+        if activity is None:
+            return TutorCapabilityResult(
+                assistant_reply=(
+                    "Minh can biet ban muon xem lai bai nao. "
+                    "Ban gui activity_id hoac noi ro cau so may nhe?"
+                ),
+                ui_action="clarification.ask",
+                metadata={"missing_fields": ["activity_id"]},
+            )
+
+        activity_payload = self._activity_payload(activity)
+        if activity.type != LearningActivityType.PRACTICE:
+            return TutorCapabilityResult(
+                assistant_reply="Activity nay khong phai bai practice de review.",
+                ui_action="review.open",
+                activity=activity_payload,
+                metadata={"activity_id": activity.activity_id},
+            )
+        if not activity.generation_run_id:
+            return TutorCapabilityResult(
+                assistant_reply=(
+                    "Minh da tim thay activity gan nhat, nhung activity nay "
+                    "chua co snapshot bai tap de giai thich chi tiet."
+                ),
+                ui_action="review.open",
+                activity=activity_payload,
+                metadata={"activity_id": activity.activity_id},
+            )
+
+        generated = self.repository.get_generated_exercise_set(
+            context.learner_id,
+            activity.generation_run_id,
+        )
+        if generated is None:
+            return TutorCapabilityResult(
+                assistant_reply="Minh khong tim thay bo cau hoi cua activity nay.",
+                ui_action="review.open",
+                activity=activity_payload,
+                metadata={"activity_id": activity.activity_id},
+            )
+
+        result = (
+            self.repository.get_session_result(context.learner_id, activity.session_code)
+            if activity.session_code
+            else None
+        )
+        if result is None:
+            return TutorCapabilityResult(
+                assistant_reply=(
+                    "Bai nay da duoc tao nhung chua co ket qua nop bai. "
+                    "Ban nop dap an truoc, roi minh se review tung cau."
+                ),
+                ui_action="review.open",
+                activity={
+                    **activity_payload,
+                    "exercises": [asdict(exercise) for exercise in generated.exercises],
+                },
+                metadata={"activity_id": activity.activity_id},
+            )
+
+        question_index = self._question_index(route, generated)
+        exercise = generated.exercises[question_index]
+        diagnosis = self._diagnosis_for(result, exercise.exercise_id)
+        selected_answer = (
+            str(diagnosis.evidence.get("selected_answer") or "")
+            if diagnosis is not None
+            else ""
+        )
+        answer_part = (
+            f"Ban chon {selected_answer}, dap an dung la {exercise.correct_answer}."
+            if selected_answer
+            else f"Dap an dung la {exercise.correct_answer}."
+        )
+
+        if diagnosis is not None and diagnosis.is_correct:
+            reply = (
+                f"Cau {question_index + 1} cua ban dung. {answer_part} "
+                f"Ly do: {exercise.explanation or diagnosis.explanation}"
+            )
+        elif diagnosis is not None:
+            reply = (
+                f"Cau {question_index + 1} sai vi {diagnosis.explanation} "
+                f"{answer_part} Goi y: xem lai {self._label(diagnosis.subtype or diagnosis.subtopic or diagnosis.topic)}."
+            )
+        else:
+            reply = (
+                f"Cau {question_index + 1}: {answer_part} "
+                f"Giai thich: {exercise.explanation}"
+            )
+
+        return TutorCapabilityResult(
+            assistant_reply=reply,
+            ui_action="review.open",
+            activity={
+                **activity_payload,
+                "request": asdict(generated.request),
+                "plan": asdict(generated.plan),
+                "exercises": [asdict(item) for item in generated.exercises],
+                "result": asdict(result),
+                "recommendation": result.recommendation,
+            },
+            metadata={
+                "activity_id": activity.activity_id,
+                "exercise_id": exercise.exercise_id,
+                "question_number": question_index + 1,
+                "is_correct": diagnosis.is_correct if diagnosis is not None else None,
+            },
+        )
+
+    def _resolve_activity(
+        self,
+        route: ConversationRoute,
+        context: ConversationTurnContext,
+    ) -> LearningActivity | None:
+        activity_id = route.slots.get("activity_id")
+        if activity_id:
+            activity = self.repository.get_learning_activity(
+                context.learner_id,
+                str(activity_id),
+            )
+            if activity is not None:
+                return activity
+        return context.active_activity
+
+    def _question_index(
+        self,
+        route: ConversationRoute,
+        generated: GeneratedExerciseSet,
+    ) -> int:
+        raw_question_number = route.slots.get("question_number")
+        if isinstance(raw_question_number, int):
+            return max(0, min(raw_question_number - 1, len(generated.exercises) - 1))
+        return max(0, len(generated.exercises) - 1)
+
+    def _diagnosis_for(
+        self,
+        result: SessionResult,
+        exercise_id: str,
+    ) -> AnswerDiagnosis | None:
+        for diagnosis in result.answer_diagnoses:
+            if diagnosis.exercise_id == exercise_id:
+                return diagnosis
+        return None
+
+    def _activity_payload(self, activity: LearningActivity) -> dict[str, Any]:
+        return self._json_safe(asdict(activity))
+
+    def _label(self, value: str) -> str:
+        return value.replace("_", " ").replace(":", " ").title()
+
+    def _json_safe(self, value: Any) -> Any:
+        if hasattr(value, "value"):
+            return value.value
+        if isinstance(value, dict):
+            return {str(key): self._json_safe(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [self._json_safe(item) for item in value]
+        return value

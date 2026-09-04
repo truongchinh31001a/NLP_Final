@@ -2,10 +2,13 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from app.schemas import ConversationIntent, LearningActivityStatus, LearningActivityType
+
 
 class GeneratePracticeRequestModel(BaseModel):
     user_id: str = Field(min_length=1)
     message: str = Field(min_length=1)
+    conversation_id: str | None = None
     topic: str | None = None
     difficulty: str | None = None
     exercise_type: str | None = None
@@ -36,6 +39,7 @@ class GeneratePracticeExerciseModel(BaseModel):
 
 
 class GeneratePracticeResponseModel(BaseModel):
+    activity_id: str | None = None
     generation_run_id: str
     request: dict
     plan: dict
@@ -64,6 +68,11 @@ class SubmittedAnswerModel(BaseModel):
 class ScorePracticeRequestModel(BaseModel):
     user_id: str = Field(min_length=1)
     generation_run_id: str = Field(min_length=1)
+    answers: list[SubmittedAnswerModel] = Field(min_length=1)
+
+
+class SubmitActivityRequestModel(BaseModel):
+    user_id: str = Field(min_length=1)
     answers: list[SubmittedAnswerModel] = Field(min_length=1)
 
 
@@ -99,6 +108,7 @@ class ScorePracticeResponseModel(BaseModel):
     total_questions: int
     weak_topics_detected: list[str]
     recommendation: str
+    activity_id: str | None = None
     generation_run_id: str
     session_code: str
     answer_diagnoses: list[AnswerDiagnosisResponseModel] = Field(default_factory=list)
@@ -164,11 +174,151 @@ class UserProfileResponseModel(BaseModel):
     skill_attempts: dict[str, int] = Field(default_factory=dict)
 
 
+class PendingClarificationResponseModel(BaseModel):
+    pending_intent: ConversationIntent
+    missing_fields: list[str] = Field(default_factory=list)
+    collected_slots: dict[str, Any] = Field(default_factory=dict)
+    question: str = ""
+
+
+class ActivityRecommendationResponseModel(BaseModel):
+    recommendation_id: str
+    user_id: str
+    topic: str
+    difficulty: str
+    exercise_type: str
+    num_questions: int
+    reason: str
+    skill: str | None = None
+    subtopic: str | None = None
+    source_activity_id: str | None = None
+    conversation_id: str | None = None
+    prompt: str = ""
+
+
+class LearningActivityResponseModel(BaseModel):
+    activity_id: str
+    conversation_id: str
+    learner_id: str
+    type: LearningActivityType
+    status: LearningActivityStatus = LearningActivityStatus.CREATED
+    target_skills: list[str] = Field(default_factory=list)
+    difficulty: str | None = None
+    created_at: str | None = None
+    started_at: str | None = None
+    submitted_at: str | None = None
+    completed_at: str | None = None
+    updated_at: str | None = None
+    generation_run_id: str | None = None
+    session_code: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    request: dict[str, Any] | None = None
+    plan: dict[str, Any] | None = None
+    exercises: list[GeneratePracticeExerciseModel] = Field(default_factory=list)
+    result: ScorePracticeResponseModel | None = None
+    recommendation: str = ""
+    next_activity_suggestion: ActivityRecommendationResponseModel | None = None
+
+
+class ActivitySubmitResponseModel(BaseModel):
+    activity: LearningActivityResponseModel
+    result: ScorePracticeResponseModel
+    exercises: list[GeneratePracticeExerciseModel] = Field(default_factory=list)
+    answers: list[SubmittedAnswerModel] = Field(default_factory=list)
+    next_activity_suggestion: ActivityRecommendationResponseModel | None = None
+    ui_action: str = "practice.result"
+
+
+class RecommendationListResponseModel(BaseModel):
+    recommendations: list[ActivityRecommendationResponseModel] = Field(
+        default_factory=list,
+    )
+
+
+class AcceptRecommendationRequestModel(BaseModel):
+    user_id: str = Field(min_length=1)
+    conversation_id: str | None = None
+
+
+class RecommendationAcceptResponseModel(BaseModel):
+    recommendation: ActivityRecommendationResponseModel
+    activity: LearningActivityResponseModel
+    ui_action: str = "practice.start"
+
+
+class ConversationTurnContextResponseModel(BaseModel):
+    conversation_id: str
+    learner_id: str
+    profile: UserProfileResponseModel | None = None
+    recent_messages: list[dict[str, Any]] = Field(default_factory=list)
+    memory_summary: str = ""
+    active_intent: ConversationIntent | None = None
+    pending_clarification: PendingClarificationResponseModel | None = None
+    active_activity: LearningActivityResponseModel | None = None
+    recent_context: dict[str, Any] = Field(default_factory=dict)
+
+
+class CreateConversationRequestModel(BaseModel):
+    user_id: str = Field(min_length=1)
+
+
+class SendConversationMessageRequestModel(BaseModel):
+    user_id: str = Field(min_length=1)
+    message: str = Field(min_length=1, max_length=4000)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
 class ChatMessageResponseModel(BaseModel):
     message_id: str
     role: Literal["user", "assistant"]
     content: str
+    metadata: dict[str, Any] = Field(default_factory=dict)
     created_at: str | None = None
+
+
+class ConversationSummaryResponseModel(BaseModel):
+    conversation_id: str
+    title: str
+    preview: str = ""
+    message_count: int = 0
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
+class ConversationListResponseModel(BaseModel):
+    conversations: list[ConversationSummaryResponseModel] = Field(default_factory=list)
+
+
+class ConversationDetailResponseModel(BaseModel):
+    conversation_id: str
+    has_history: bool
+    memory_summary: str = ""
+    extracted_facts: dict[str, Any] = Field(default_factory=dict)
+    suggested_next_question: str = ""
+    messages: list[ChatMessageResponseModel] = Field(default_factory=list)
+    active_activity: LearningActivityResponseModel | None = None
+
+
+class ConversationRouteResponseModel(BaseModel):
+    intent: ConversationIntent
+    confidence: float
+    source: str
+    reason: str
+    slots: dict[str, Any] = Field(default_factory=dict)
+    needs_clarification: bool = False
+    clarification_question: str | None = None
+
+
+class ConversationMessageTurnResponseModel(BaseModel):
+    conversation_id: str
+    message: ChatMessageResponseModel
+    intent: ConversationIntent
+    assistant_reply: str
+    pending_clarification: PendingClarificationResponseModel | None = None
+    activity: LearningActivityResponseModel | None = None
+    ui_action: str
+    assistant_message: ChatMessageResponseModel | None = None
+    route: ConversationRouteResponseModel | None = None
 
 
 class SaveChatMessageRequestModel(BaseModel):
@@ -301,6 +451,7 @@ class WorkflowGraphResponseModel(BaseModel):
     nodes: list[dict[str, Any]]
     generation_edges: list[dict[str, Any]]
     scoring_edges: list[dict[str, Any]]
+    recommendation_edges: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class ChromaDebugChunkModel(BaseModel):

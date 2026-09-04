@@ -56,6 +56,21 @@ export type PracticePlanPreview = {
   targetSkillId?: string | null;
 };
 
+export type NextActivitySuggestion = {
+  recommendationId?: string;
+  userId?: string;
+  sourceActivityId?: string | null;
+  conversationId?: string | null;
+  skill?: string | null;
+  topic: string;
+  subtopic?: string | null;
+  difficulty?: string | null;
+  exerciseType?: string | null;
+  numQuestions?: number | null;
+  reason?: string;
+  prompt?: string;
+};
+
 export type ScoreResult = {
   topic: string;
   score: number;
@@ -63,10 +78,12 @@ export type ScoreResult = {
   totalQuestions: number;
   weakTopicsDetected: string[];
   recommendation: string;
+  activityId?: string | null;
   generationRunId?: string;
   sessionCode?: string;
   answerDiagnoses?: AnswerDiagnosis[];
   practiceReview?: PracticeReview | null;
+  nextActivitySuggestion?: NextActivitySuggestion | null;
 };
 
 export type AnswerDiagnosis = {
@@ -93,10 +110,37 @@ export type PracticeReview = {
   nextPracticePrompt: string;
 };
 
+export type LearningActivityPreview = {
+  activityId: string;
+  conversationId: string;
+  learnerId: string;
+  type: string;
+  status: string;
+  targetSkills: string[];
+  difficulty?: string | null;
+  createdAt?: string | null;
+  startedAt?: string | null;
+  submittedAt?: string | null;
+  completedAt?: string | null;
+  updatedAt?: string | null;
+  generationRunId?: string | null;
+  sessionCode?: string | null;
+  metadata: Record<string, unknown>;
+  request?: Record<string, unknown> | null;
+  plan?: PracticePlanPreview | null;
+  exercises: ExercisePreview[];
+  result?: ScoreResult | null;
+  recommendation?: string;
+  nextActivitySuggestion?: NextActivitySuggestion | null;
+};
+
 export type PersistedChatMessage = {
   messageId: string;
   role: "user" | "assistant";
   content: string;
+  metadata?: Record<string, unknown>;
+  activity?: LearningActivityPreview | null;
+  uiAction?: string | null;
   createdAt?: string | null;
 };
 
@@ -107,6 +151,36 @@ export type ChatMemoryResume = {
   extractedFacts: Record<string, unknown>;
   suggestedNextQuestion: string;
   messages: PersistedChatMessage[];
+  activeActivity?: LearningActivityPreview | null;
+};
+
+export type PendingClarification = {
+  pendingIntent: string;
+  missingFields: string[];
+  collectedSlots: Record<string, unknown>;
+  question: string;
+};
+
+export type ConversationRoute = {
+  intent: string;
+  confidence: number;
+  source: string;
+  reason: string;
+  slots: Record<string, unknown>;
+  needsClarification: boolean;
+  clarificationQuestion?: string | null;
+};
+
+export type ConversationTurn = {
+  conversationId: string;
+  message: PersistedChatMessage;
+  intent: string;
+  assistantReply: string;
+  pendingClarification?: PendingClarification | null;
+  activity?: LearningActivityPreview | null;
+  uiAction: string;
+  assistantMessage?: PersistedChatMessage | null;
+  route?: ConversationRoute | null;
 };
 
 export type ChatSessionSummary = {
