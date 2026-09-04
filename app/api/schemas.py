@@ -172,7 +172,7 @@ class ChatMessageResponseModel(BaseModel):
 
 
 class SaveChatMessageRequestModel(BaseModel):
-    session_id: str | None = None
+    session_id: str | None = Field(default=None, max_length=160)
     role: Literal["user", "assistant"]
     content: str = Field(min_length=1, max_length=4000)
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -194,6 +194,19 @@ class SaveChatMessageResponseModel(BaseModel):
     memory_summary: str = ""
     extracted_facts: dict[str, Any] = Field(default_factory=dict)
     suggested_next_question: str
+
+
+class ChatSessionSummaryResponseModel(BaseModel):
+    session_id: str
+    title: str
+    preview: str = ""
+    message_count: int = 0
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
+class ChatSessionListResponseModel(BaseModel):
+    sessions: list[ChatSessionSummaryResponseModel] = Field(default_factory=list)
 
 
 class PersonalizationTopicStatModel(BaseModel):

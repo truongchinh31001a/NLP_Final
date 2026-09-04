@@ -1,4 +1,6 @@
+import uuid
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any, Protocol
 
 from app.learner.knowledge_tracing import BayesianKnowledgeTracer
@@ -45,7 +47,18 @@ class LearningRepository(Protocol):
     def get_personalization_snapshot(self, user_id: str) -> dict[str, Any]:
         ...
 
-    def get_chat_resume(self, user_id: str, limit: int = 24) -> dict[str, Any]:
+    def get_chat_resume(
+        self,
+        user_id: str,
+        limit: int = 24,
+        session_id: str | None = None,
+    ) -> dict[str, Any]:
+        ...
+
+    def list_chat_sessions(self, user_id: str, limit: int = 20) -> dict[str, Any]:
+        ...
+
+    def create_chat_session(self, user_id: str) -> dict[str, Any]:
         ...
 
     def save_chat_message(
@@ -74,6 +87,8 @@ class InMemoryLearningRepository:
     session_results: list[SessionResult] = field(default_factory=list)
     generated_sets: dict[str, GeneratedExerciseSet] = field(default_factory=dict)
     chat_session_ids: dict[str, str] = field(default_factory=dict)
+    chat_session_meta: dict[str, dict[str, Any]] = field(default_factory=dict)
+    chat_session_order: dict[str, int] = field(default_factory=dict)
     chat_messages: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
     chat_memory: dict[str, dict[str, Any]] = field(default_factory=dict)
     practice_reviews: dict[str, PracticeReview] = field(default_factory=dict)
@@ -204,20 +219,67 @@ class InMemoryLearningRepository:
             ],
         }
 
-    def get_chat_resume(self, user_id: str, limit: int = 24) -> dict[str, Any]:
-        session_id = self.chat_session_ids.setdefault(
-            user_id,
-            f"inmemory-chat-{user_id}",
-        )
-        messages = self.chat_messages.get(session_id, [])[-limit:]
+    def get_chat_resume(
+        self,
+        user_id: str,
+        limit: int = 24,
+        session_id: str | None = None,
+    ) -> dict[str, Any]:
+        if session_id:
+            meta = self.chat_session_meta.get(session_id)
+            if meta is None or meta.get("user_id") != user_id:
+                raise LookupError("Chat session not found.")
+            active_session_id = session_id
+        else:
+            active_session_id = self._get_or_create_chat_session(user_id)
+        messages = self.chat_messages.get(active_session_id, [])[-limit:]
         facts = self.chat_memory.get(user_id, {})
         return {
-            "session_id": session_id,
+            "session_id": active_session_id,
             "has_history": bool(messages or facts),
             "memory_summary": self._build_memory_summary(facts),
             "extracted_facts": facts,
             "suggested_next_question": self._suggest_next_question(facts),
             "messages": messages,
+        }
+
+    def list_chat_sessions(self, user_id: str, limit: int = 20) -> dict[str, Any]:
+        session_ids = [
+            session_id
+            for session_id, meta in self.chat_session_meta.items()
+            if meta.get("user_id") == user_id
+        ]
+        latest_session_id = self.chat_session_ids.get(user_id)
+        if latest_session_id:
+            self._ensure_chat_session_meta(user_id, latest_session_id)
+            if latest_session_id not in session_ids:
+                session_ids.append(latest_session_id)
+
+        sessions = [
+            self._chat_session_summary(session_id)
+            for session_id in session_ids
+        ]
+        sessions.sort(
+            key=lambda item: (
+                item["updated_at"] or "",
+                self.chat_session_order.get(str(item["session_id"]), 0),
+            ),
+            reverse=True,
+        )
+        return {"sessions": sessions[:limit]}
+
+    def create_chat_session(self, user_id: str) -> dict[str, Any]:
+        session_id = f"inmemory-chat-{uuid.uuid4().hex[:12]}"
+        self._ensure_chat_session_meta(user_id, session_id)
+        self.chat_session_ids[user_id] = session_id
+        facts = self.chat_memory.get(user_id, {})
+        return {
+            "session_id": session_id,
+            "has_history": bool(facts),
+            "memory_summary": self._build_memory_summary(facts),
+            "extracted_facts": facts,
+            "suggested_next_question": self._suggest_next_question(facts),
+            "messages": [],
         }
 
     def save_chat_message(
@@ -229,23 +291,37 @@ class InMemoryLearningRepository:
         metadata: dict[str, Any] | None = None,
         update_memory: bool = True,
     ) -> dict[str, Any]:
-        active_session_id = session_id or self.chat_session_ids.setdefault(
-            user_id,
-            f"inmemory-chat-{user_id}",
-        )
+        normalized_role = "assistant" if role == "bot" else role.strip().lower()
+        if normalized_role not in {"user", "assistant"}:
+            raise ValueError("Chat message role must be `user` or `assistant`.")
+
+        cleaned_content = content.strip()
+        if not cleaned_content:
+            raise ValueError("Chat message content cannot be empty.")
+
+        active_session_id = session_id or self._get_or_create_chat_session(user_id)
+        meta = self.chat_session_meta.get(active_session_id)
+        if meta is not None and meta.get("user_id") != user_id:
+            raise LookupError("Chat session not found.")
+        self._ensure_chat_session_meta(user_id, active_session_id)
         self.chat_session_ids[user_id] = active_session_id
+        created_at = self._now()
         message = {
             "message_id": f"inmemory-msg-{len(self.chat_messages.get(active_session_id, [])) + 1}",
-            "role": "assistant" if role == "bot" else role,
-            "content": content,
-            "created_at": None,
+            "role": normalized_role,
+            "content": cleaned_content,
+            "created_at": created_at,
         }
         self.chat_messages.setdefault(active_session_id, []).append(message)
+        session_meta = self.chat_session_meta[active_session_id]
+        if normalized_role == "user" and not session_meta.get("title"):
+            session_meta["title"] = self._make_chat_title(cleaned_content)
+        session_meta["updated_at"] = created_at
 
         facts = self.chat_memory.setdefault(user_id, {})
         if update_memory and message["role"] == "user":
-            facts["last_user_request"] = content
-            content_theme = self._extract_content_theme(content)
+            facts["last_user_request"] = cleaned_content
+            content_theme = self._extract_content_theme(cleaned_content)
             if content_theme:
                 facts["preferred_content_theme"] = content_theme
                 content_themes = facts.get("content_themes", [])
@@ -268,6 +344,64 @@ class InMemoryLearningRepository:
     ) -> str:
         self.practice_reviews[session_code] = review
         return review.review_code
+
+    def _get_or_create_chat_session(self, user_id: str) -> str:
+        session_id = self.chat_session_ids.get(user_id)
+        if session_id:
+            self._ensure_chat_session_meta(user_id, session_id)
+            return session_id
+        return str(self.create_chat_session(user_id)["session_id"])
+
+    def _ensure_chat_session_meta(self, user_id: str, session_id: str) -> None:
+        now = self._now()
+        self.chat_session_meta.setdefault(
+            session_id,
+            {
+                "user_id": user_id,
+                "title": "",
+                "created_at": now,
+                "updated_at": now,
+            },
+        )
+        self.chat_session_order.setdefault(session_id, len(self.chat_session_order) + 1)
+
+    def _chat_session_summary(self, session_id: str) -> dict[str, Any]:
+        meta = self.chat_session_meta[session_id]
+        messages = self.chat_messages.get(session_id, [])
+        last_message = next(
+            (message for message in reversed(messages) if message.get("content")),
+            None,
+        )
+        title = str(meta.get("title") or "")
+        if not title:
+            first_user_message = next(
+                (
+                    message
+                    for message in messages
+                    if message.get("role") == "user" and message.get("content")
+                ),
+                None,
+            )
+            title = self._make_chat_title(
+                str((first_user_message or last_message or {}).get("content") or "")
+            )
+        return {
+            "session_id": session_id,
+            "title": title or "Phien chat moi",
+            "preview": str((last_message or {}).get("content") or ""),
+            "message_count": len(messages),
+            "created_at": str(meta.get("created_at") or ""),
+            "updated_at": str(meta.get("updated_at") or ""),
+        }
+
+    def _make_chat_title(self, content: str) -> str:
+        normalized = " ".join(content.split())
+        if len(normalized) <= 64:
+            return normalized
+        return f"{normalized[:61]}..."
+
+    def _now(self) -> str:
+        return datetime.now(timezone.utc).isoformat()
 
     def _build_memory_summary(self, facts: dict[str, Any]) -> str:
         if not facts:

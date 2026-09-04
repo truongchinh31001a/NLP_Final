@@ -209,10 +209,25 @@ class PostgreSQLLearningRepository:
             ],
         }
 
-    def get_chat_resume(self, user_id: str, limit: int = 24) -> dict[str, Any]:
+    def get_chat_resume(
+        self,
+        user_id: str,
+        limit: int = 24,
+        session_id: str | None = None,
+    ) -> dict[str, Any]:
         with self._connect() as connection:
             self._ensure_user(connection, user_id)
-            session_id = self._get_or_create_chat_session(connection, user_id)
+            active_session_id = (
+                session_id
+                if session_id
+                else self._get_or_create_chat_session(connection, user_id)
+            )
+            if session_id and not self._chat_session_exists(
+                connection,
+                user_id,
+                session_id,
+            ):
+                raise LookupError("Chat session not found.")
             memory = self._get_chat_memory(connection, user_id)
             messages = connection.execute(
                 """
@@ -222,16 +237,63 @@ class PostgreSQLLearningRepository:
                 ORDER BY created_at DESC, id DESC
                 LIMIT %s
                 """,
-                (session_id, limit),
+                (active_session_id, limit),
             ).fetchall()
         ordered_messages = list(reversed(messages))
         return {
-            "session_id": session_id,
+            "session_id": active_session_id,
             "has_history": bool(ordered_messages or memory),
             "memory_summary": self._build_memory_summary(memory),
             "extracted_facts": memory,
             "suggested_next_question": self._suggest_next_question(memory),
             "messages": ordered_messages,
+        }
+
+    def list_chat_sessions(self, user_id: str, limit: int = 20) -> dict[str, Any]:
+        with self._connect() as connection:
+            self._ensure_user(connection, user_id)
+            rows = connection.execute(
+                """
+                SELECT
+                    s.session_id,
+                    s.title,
+                    s.created_at::text AS created_at,
+                    s.updated_at::text AS updated_at,
+                    COUNT(m.id)::int AS message_count,
+                    (
+                        SELECT lm.content
+                        FROM tutor_chat_messages lm
+                        WHERE lm.session_id = s.session_id
+                        ORDER BY lm.created_at DESC, lm.id DESC
+                        LIMIT 1
+                    ) AS preview
+                FROM tutor_chat_sessions s
+                LEFT JOIN tutor_chat_messages m ON m.session_id = s.session_id
+                WHERE s.user_code = %s
+                GROUP BY s.session_id, s.title, s.created_at, s.updated_at
+                ORDER BY s.updated_at DESC
+                LIMIT %s
+                """,
+                (user_id, limit),
+            ).fetchall()
+
+        return {
+            "sessions": [self._chat_session_summary_from_row(row) for row in rows],
+        }
+
+    def create_chat_session(self, user_id: str) -> dict[str, Any]:
+        with self._connect() as connection:
+            self._ensure_user(connection, user_id)
+            session_id = self._create_chat_session(connection, user_id)
+            memory = self._get_chat_memory(connection, user_id)
+
+        return {
+            "session_id": session_id,
+            "has_history": bool(memory),
+            "memory_summary": self._build_memory_summary(memory),
+            "extracted_facts": memory,
+            "suggested_next_question": self._suggest_next_question(memory),
+            "messages": [],
         }
 
     def save_chat_message(
@@ -243,15 +305,29 @@ class PostgreSQLLearningRepository:
         metadata: dict[str, Any] | None = None,
         update_memory: bool = True,
     ) -> dict[str, Any]:
-        normalized_role = "assistant" if role == "bot" else role
+        normalized_role = "assistant" if role == "bot" else role.strip().lower()
+        if normalized_role not in {"user", "assistant"}:
+            raise ValueError("Chat message role must be `user` or `assistant`.")
+
+        cleaned_content = content.strip()
+        if not cleaned_content:
+            raise ValueError("Chat message content cannot be empty.")
+
         message_id = f"pg-msg-{uuid.uuid4().hex[:12]}"
         with self._connect() as connection:
             self._ensure_user(connection, user_id)
-            active_session_id = session_id or self._get_or_create_chat_session(
+            active_session_id = (
+                session_id
+                if session_id
+                else self._get_or_create_chat_session(connection, user_id)
+            )
+            if session_id and not self._chat_session_exists(
                 connection,
                 user_id,
-            )
-            connection.execute(
+                session_id,
+            ):
+                raise LookupError("Chat session not found.")
+            message_row = connection.execute(
                 """
                 INSERT INTO tutor_chat_messages (
                     session_id,
@@ -262,25 +338,42 @@ class PostgreSQLLearningRepository:
                     metadata_json
                 )
                 VALUES (%s, %s, %s, %s, %s, %s)
+                RETURNING created_at::text AS created_at
                 """,
                 (
                     active_session_id,
                     user_id,
                     message_id,
                     normalized_role,
-                    content,
+                    cleaned_content,
                     Jsonb(metadata or {}),
+                ),
+            ).fetchone()
+            connection.execute(
+                """
+                UPDATE tutor_chat_sessions
+                SET
+                    title = COALESCE(title, %s),
+                    updated_at = now()
+                WHERE session_id = %s AND user_code = %s
+                """,
+                (
+                    self._make_chat_title(cleaned_content)
+                    if normalized_role == "user"
+                    else None,
+                    active_session_id,
+                    user_id,
                 ),
             )
             memory = self._get_chat_memory(connection, user_id)
             if update_memory and normalized_role == "user":
-                memory = self._updated_chat_memory(memory, content)
+                memory = self._updated_chat_memory(memory, cleaned_content)
                 self._save_chat_memory(connection, user_id, memory)
         message = {
             "message_id": message_id,
             "role": normalized_role,
-            "content": content,
-            "created_at": None,
+            "content": cleaned_content,
+            "created_at": message_row["created_at"] if message_row else None,
         }
         return {
             "session_id": active_session_id,
@@ -365,9 +458,16 @@ class PostgreSQLLearningRepository:
                     session_id TEXT PRIMARY KEY,
                     user_code TEXT NOT NULL REFERENCES tutor_users(user_code)
                         ON DELETE CASCADE,
+                    title TEXT,
                     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
                     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
                 )
+                """
+            )
+            connection.execute(
+                """
+                ALTER TABLE tutor_chat_sessions
+                ADD COLUMN IF NOT EXISTS title TEXT
                 """
             )
             connection.execute(
@@ -419,6 +519,12 @@ class PostgreSQLLearningRepository:
                 """
                 CREATE INDEX IF NOT EXISTS idx_tutor_sessions_user
                 ON tutor_practice_sessions(user_code)
+                """
+            )
+            connection.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_tutor_chat_sessions_user_updated
+                ON tutor_chat_sessions(user_code, updated_at)
                 """
             )
 
@@ -483,6 +589,29 @@ class PostgreSQLLearningRepository:
         if row is not None:
             return str(row["session_id"])
 
+        return self._create_chat_session(connection, user_id)
+
+    def _chat_session_exists(
+        self,
+        connection: Connection,
+        user_id: str,
+        session_id: str,
+    ) -> bool:
+        row = connection.execute(
+            """
+            SELECT 1
+            FROM tutor_chat_sessions
+            WHERE user_code = %s AND session_id = %s
+            """,
+            (user_id, session_id),
+        ).fetchone()
+        return row is not None
+
+    def _create_chat_session(
+        self,
+        connection: Connection,
+        user_id: str,
+    ) -> str:
         session_id = f"pg-chat-{uuid.uuid4().hex[:12]}"
         connection.execute(
             """
@@ -492,6 +621,23 @@ class PostgreSQLLearningRepository:
             (session_id, user_id),
         )
         return session_id
+
+    def _chat_session_summary_from_row(self, row: dict[str, Any]) -> dict[str, Any]:
+        title = str(row.get("title") or self._make_chat_title(row.get("preview") or ""))
+        return {
+            "session_id": row["session_id"],
+            "title": title or "Phien chat moi",
+            "preview": row.get("preview") or "",
+            "message_count": int(row.get("message_count") or 0),
+            "created_at": row.get("created_at"),
+            "updated_at": row.get("updated_at"),
+        }
+
+    def _make_chat_title(self, content: str) -> str:
+        normalized = " ".join(content.split())
+        if len(normalized) <= 64:
+            return normalized
+        return f"{normalized[:61]}..."
 
     def _get_chat_memory(
         self,

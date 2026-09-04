@@ -4,21 +4,30 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Steps } from "antd";
 import {
+  BarChartOutlined,
   CheckCircleOutlined,
   DatabaseOutlined,
+  EditOutlined,
   ExperimentOutlined,
+  HistoryOutlined,
   LoadingOutlined,
+  PlusOutlined,
   RobotOutlined,
   SearchOutlined,
+  SendOutlined,
   TranslationOutlined,
+  UserOutlined,
 } from "@ant-design/icons";
 
 import {
+  createChatSession,
   generatePractice,
   getChatResume,
+  getChatSession,
   getPersonalizationSnapshot,
   interpretOnboardingAnswer,
   interpretPracticeRequest,
+  listChatSessions,
   saveChatMessage,
   scorePractice,
   type PracticeIntentFields,
@@ -26,6 +35,7 @@ import {
 } from "@/lib/api";
 import type {
   ChatMemoryResume,
+  ChatSessionSummary,
   DashboardSnapshot,
   ExercisePreview,
   PersonalizationSnapshot,
@@ -54,6 +64,18 @@ type ChatMessage = {
   id: string;
   role: "bot" | "user";
   content: string;
+  createdAt?: string | null;
+};
+
+type ChatSessionHistoryItem = {
+  id: string;
+  backendSessionId?: string | null;
+  title: string;
+  preview: string;
+  messageCount: number;
+  createdAt: string;
+  updatedAt: string;
+  messages: ChatMessage[];
 };
 
 type OnboardingStep = {
@@ -82,6 +104,8 @@ type PracticeInterpretationResult = {
 };
 
 const USER_ID = "demo-user";
+const CHAT_SESSION_HISTORY_LIMIT = 12;
+const CHAT_SESSION_STORAGE_KEY = `english-tutor-chat-sessions:${USER_ID}`;
 
 const weakTopicOptions = [
   { label: "Passive voice", value: "passive_voice" },
@@ -203,8 +227,16 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
   const [prompt, setPrompt] = useState("");
   const [submittedPrompt, setSubmittedPrompt] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatSessions, setChatSessions] = useState<ChatSessionHistoryItem[]>(
+    [],
+  );
+  const [activeLocalSessionId, setActiveLocalSessionId] = useState<
+    string | null
+  >(null);
   const chatThreadRef = useRef<HTMLDivElement | null>(null);
+  const chatMessagesRef = useRef<ChatMessage[]>([]);
   const chatSessionIdRef = useRef<string | null>(null);
+  const activeLocalSessionIdRef = useRef<string | null>(null);
   const [preview, setPreview] = useState<ExercisePreview[]>(
     snapshot.exercisePreview,
   );
@@ -224,6 +256,7 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
     Partial<OnboardingValues>
   >({});
   const [isOnboardingSaving, setIsOnboardingSaving] = useState(false);
+  const [isCoachThinking, setIsCoachThinking] = useState(false);
   const [, startTransition] = useTransition();
 
   const answeredCount = useMemo(
@@ -231,7 +264,20 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
     [answers, preview],
   );
   const canSubmit = preview.length > 0 && answeredCount === preview.length;
-  const showOnboardingShortcuts = false;
+  const showOnboardingShortcuts = true;
+  const isComposerLocked = isOnboardingSaving || isCoachThinking;
+
+  useEffect(() => {
+    const storedSessions = loadStoredChatSessions();
+    setChatSessions(storedSessions);
+    const latestSession = storedSessions[0];
+    if (latestSession) {
+      activeLocalSessionIdRef.current = latestSession.id;
+      chatMessagesRef.current = latestSession.messages;
+      setActiveLocalSessionId(latestSession.id);
+      setChatMessages(latestSession.messages);
+    }
+  }, []);
 
   useEffect(() => {
     const thread = chatThreadRef.current;
@@ -249,9 +295,10 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
 
     async function loadProfileAndChat() {
       try {
-        const [personalization, chatResume] = await Promise.all([
+        const [personalization, chatResume, backendSessions] = await Promise.all([
           getPersonalizationSnapshot(USER_ID),
           getChatResume(USER_ID),
+          listChatSessions(USER_ID).catch(() => []),
         ]);
         if (!isMounted) {
           return;
@@ -265,6 +312,13 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
         setLearnerLevel(personalization.level);
         chatSessionIdRef.current = chatResume.sessionId;
         const history = mapPersistedChatMessages(chatResume);
+        const storedSessions = loadStoredChatSessions();
+        setChatSessions(
+          saveStoredChatSessions(
+            mergeBackendChatSessions(backendSessions, storedSessions),
+          ),
+        );
+        const resumedLocalSessionId = chatResume.sessionId;
 
         if (!personalization.onboardingCompleted) {
           const rememberedAnswers = buildOnboardingAnswersFromMemory(
@@ -282,7 +336,10 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
             setOnboardingAnswers({});
             setPrompt("");
             setSubmittedPrompt(null);
-            setChatMessages(appendDistinctBotMessages(history, [memoryIntro]));
+            activateChatSession(appendDistinctBotMessages(history, [memoryIntro]), {
+              backendSessionId: chatResume.sessionId,
+              localSessionId: resumedLocalSessionId,
+            });
             return;
           }
 
@@ -291,13 +348,17 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
           setOnboardingAnswers(rememberedAnswers);
           setPrompt("");
           setSubmittedPrompt(null);
-          setChatMessages(
+          activateChatSession(
             appendDistinctBotMessages(history, [
               buildConversationalOnboardingOpening(
                 nextStepIndex,
                 chatResume.hasHistory,
               ),
             ]),
+            {
+              backendSessionId: chatResume.sessionId,
+              localSessionId: resumedLocalSessionId,
+            },
           );
         } else {
           const memoryIntro = chatResume.hasHistory
@@ -309,7 +370,10 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
           setOnboardingAnswers({});
           setPrompt("");
           setSubmittedPrompt(null);
-          setChatMessages(appendDistinctBotMessages(history, [memoryIntro]));
+          activateChatSession(appendDistinctBotMessages(history, [memoryIntro]), {
+            backendSessionId: chatResume.sessionId,
+            localSessionId: resumedLocalSessionId,
+          });
         }
       } catch {
         if (!isMounted) {
@@ -320,10 +384,15 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
         setOnboardingAnswers({});
         setPrompt("");
         setSubmittedPrompt(null);
-        setChatMessages(
+        activateChatSession(
           [
             buildConversationalOnboardingOpening(0, false),
           ].map((content) => makeMessage("bot", content)),
+          {
+            backendSessionId: null,
+            localSessionId:
+              activeLocalSessionIdRef.current || createLocalChatSessionId(),
+          },
         );
       }
     }
@@ -333,7 +402,145 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
     return () => {
       isMounted = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  function activateChatSession(
+    messages: ChatMessage[],
+    options: {
+      backendSessionId?: string | null;
+      localSessionId?: string | null;
+    } = {},
+  ) {
+    const backendSessionId =
+      options.backendSessionId === undefined
+        ? chatSessionIdRef.current
+        : options.backendSessionId;
+    const nextLocalSessionId =
+      options.localSessionId ||
+      activeLocalSessionIdRef.current ||
+      backendSessionId ||
+      createLocalChatSessionId();
+
+    activeLocalSessionIdRef.current = nextLocalSessionId;
+    setActiveLocalSessionId(nextLocalSessionId);
+    chatMessagesRef.current = messages;
+    setChatMessages(messages);
+    syncActiveChatSession(messages, {
+      backendSessionId,
+      localSessionId: nextLocalSessionId,
+    });
+  }
+
+  function syncActiveChatSession(
+    messages: ChatMessage[],
+    options: {
+      backendSessionId?: string | null;
+      localSessionId?: string | null;
+    } = {},
+  ) {
+    const localSessionId =
+      options.localSessionId ||
+      activeLocalSessionIdRef.current ||
+      options.backendSessionId ||
+      createLocalChatSessionId();
+
+    if (!activeLocalSessionIdRef.current) {
+      activeLocalSessionIdRef.current = localSessionId;
+      setActiveLocalSessionId(localSessionId);
+    }
+
+    setChatSessions((currentSessions) =>
+      saveStoredChatSessions(
+        upsertChatSession(currentSessions, {
+          id: localSessionId,
+          backendSessionId:
+            options.backendSessionId === undefined
+              ? chatSessionIdRef.current
+              : options.backendSessionId,
+          messages,
+        }),
+      ),
+    );
+  }
+
+  function attachBackendSessionIdToActiveSession(backendSessionId: string) {
+    const localSessionId = activeLocalSessionIdRef.current;
+    if (!localSessionId) {
+      return;
+    }
+
+    setChatSessions((currentSessions) =>
+      saveStoredChatSessions(
+        currentSessions.map((session) =>
+          session.id === localSessionId
+            ? { ...session, backendSessionId }
+            : session,
+        ),
+      ),
+    );
+  }
+
+  async function handleSelectChatSession(sessionId: string) {
+    const session = chatSessions.find((item) => item.id === sessionId);
+    if (!session) {
+      return;
+    }
+
+    activeLocalSessionIdRef.current = session.id;
+    chatSessionIdRef.current = session.backendSessionId ?? null;
+    chatMessagesRef.current = session.messages;
+    setActiveLocalSessionId(session.id);
+    setChatMessages(session.messages);
+    setPrompt("");
+    setSubmittedPrompt(null);
+    setIsCoachThinking(false);
+    setIsGuidedOnboarding(false);
+    setScreen("chat");
+
+    if (!session.backendSessionId) {
+      return;
+    }
+
+    try {
+      const chatResume = await getChatSession(USER_ID, session.backendSessionId);
+      chatSessionIdRef.current = chatResume.sessionId;
+      activateChatSession(mapPersistedChatMessages(chatResume), {
+        backendSessionId: chatResume.sessionId,
+        localSessionId: session.id,
+      });
+    } catch {
+      // Cached chat history remains usable when the backend is unavailable.
+    }
+  }
+
+  async function handleStartNewChatSession() {
+    let backendSessionId: string | null = null;
+    try {
+      const chatResume = await createChatSession(USER_ID);
+      backendSessionId = chatResume.sessionId;
+    } catch {
+      backendSessionId = null;
+    }
+
+    const openingMessage = makeMessage(
+      "bot",
+      "Mình mở một phiên mới rồi. Bạn muốn luyện gì ở phiên này?",
+    );
+
+    chatSessionIdRef.current = backendSessionId;
+    setPrompt("");
+    setSubmittedPrompt(null);
+    setIsCoachThinking(false);
+    setIsGuidedOnboarding(false);
+    setOnboardingStepIndex(0);
+    setOnboardingAnswers({});
+    setScreen("chat");
+    activateChatSession([openingMessage], {
+      backendSessionId,
+      localSessionId: backendSessionId ?? createLocalChatSessionId(),
+    });
+  }
 
   function startGuidedOnboarding(
     intro?: string,
@@ -353,7 +560,10 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
     const botMessages = [
       intro ? `${intro} ${opening}` : opening,
     ];
-    setChatMessages(botMessages.map((content) => makeMessage("bot", content)));
+    activateChatSession(botMessages.map((content) => makeMessage("bot", content)), {
+      backendSessionId: chatSessionIdRef.current,
+      localSessionId: createLocalChatSessionId(),
+    });
     if (shouldPersist) {
       botMessages.forEach((content) => {
         void persistChatMessage(
@@ -375,7 +585,11 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
     metadata: Record<string, unknown> = {},
     updateMemory = role === "user",
   ) {
-    setChatMessages((current) => [...current, makeMessage(role, content)]);
+    const nextMessage = makeMessage(role, content);
+    const nextMessages = [...chatMessagesRef.current, nextMessage];
+    chatMessagesRef.current = nextMessages;
+    setChatMessages(nextMessages);
+    syncActiveChatSession(nextMessages);
     void persistChatMessage(role, content, metadata, updateMemory);
   }
 
@@ -395,6 +609,7 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
         updateMemory,
       });
       chatSessionIdRef.current = saved.sessionId;
+      attachBackendSessionIdToActiveSession(saved.sessionId);
     } catch {
       // Chat memory is helpful, but the practice flow should still work offline.
     }
@@ -404,6 +619,7 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
     const step = onboardingSteps[onboardingStepIndex];
     setPrompt("");
     setIsOnboardingSaving(true);
+    setIsCoachThinking(true);
     appendChatMessage("user", message, {
       phase: "onboarding",
       field: step.key,
@@ -441,6 +657,7 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
         false,
       );
       setIsOnboardingSaving(false);
+      setIsCoachThinking(false);
       return;
     }
 
@@ -480,7 +697,7 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
       setLearnerDisplayName(savedDisplayName);
       setLearnerLevel(savedProfile.level);
       setStatus(
-        "Da luu ho so ban dau. Bai tap tiep theo se duoc tinh chinh theo profile nay.",
+        "Đã lưu hồ sơ ban đầu. Bài tập tiếp theo sẽ được tinh chỉnh theo profile này.",
       );
       setIsGuidedOnboarding(false);
       appendChatMessage(
@@ -510,11 +727,12 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
       );
     } finally {
       setIsOnboardingSaving(false);
+      setIsCoachThinking(false);
     }
   }
 
   const handleSubmitMessage = async (overrideMessage?: string) => {
-    if (isOnboardingSaving) {
+    if (isComposerLocked) {
       return;
     }
 
@@ -548,6 +766,7 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
 
     setSubmittedPrompt(message);
     setPrompt("");
+    setIsCoachThinking(true);
 
     let interpretedIntent: PracticeIntentFields | undefined;
     if (!options.skipPracticeInterpretation) {
@@ -556,7 +775,7 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
         appendChatMessage(
           "bot",
           interpretation.clarificationQuestion ||
-            "Minh chua ro ban muon luyen phan nao. Ban noi ro hon mot chut nhe: ngu phap, tu vung, thi qua khu, bi dong hay gioi tu?",
+            defaultPracticeClarificationQuestion(),
           {
             phase: "practice_clarification",
             interpreter: interpretation.source,
@@ -565,6 +784,7 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
         );
         setSubmittedPrompt(null);
         setScreen("chat");
+        setIsCoachThinking(false);
         return;
       }
       interpretedIntent = interpretation.request;
@@ -572,6 +792,7 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
 
     await wait(260);
 
+    setIsCoachThinking(false);
     setScreen("generating");
     setScoreResult(null);
     setAnswers({});
@@ -620,6 +841,7 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
         false,
       );
     } finally {
+      setIsCoachThinking(false);
       window.setTimeout(() => setScreen("practice"), 650);
     }
   };
@@ -675,8 +897,8 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
         weakTopicsDetected: score < 0.8 ? [plan.topic] : [],
         recommendation:
           score < 0.8
-            ? "Nen luyen lai chu de nay voi do kho thap hon mot muc."
-            : "Co the tang do kho hoac chuyen sang bien the gan voi chu de nay.",
+            ? "Nên luyện lại chủ đề này với độ khó thấp hơn một mức."
+            : "Có thể tăng độ khó hoặc chuyển sang biến thể gần với chủ đề này.",
       });
       setStatus("Chấm xong bằng bộ dự phòng.");
       appendChatMessage(
@@ -704,11 +926,14 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
     }
   };
 
+  const currentQuickReplies =
+    onboardingSteps[onboardingStepIndex]?.quickReplies ?? [];
+
   return (
     <main className="flow-shell">
       <header className="flow-topbar">
-        <div>
-            <p className="eyebrow">Personalized English Practice</p>
+        <div className="flow-heading">
+          <p className="eyebrow">Adaptive English Tutor</p>
           <h1>Coach luyện tiếng Anh cá nhân</h1>
         </div>
         <div className="learner-pill">
@@ -723,35 +948,60 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
               )
             }
           >
-            Xóa Profile
+            <EditOutlined />
+            <span>Cập nhật hồ sơ</span>
           </button>
           <Link className="learner-pill__link" href="/personalization">
-            Xem cá nhân hóa
+            <BarChartOutlined />
+            <span>Cá nhân hóa</span>
           </Link>
           <Link className="learner-pill__link" href="/debug/chroma">
-            Xem Chroma
+            <DatabaseOutlined />
+            <span>RAG debug</span>
           </Link>
         </div>
       </header>
 
       {screen === "chat" ? (
-        <section className="chat-screen">
-          <div className="chat-thread" ref={chatThreadRef}>
-            {chatMessages.map((message) => (
-              <article
-                className={`message message--${message.role}`}
-                key={message.id}
-              >
-                <span>{message.role === "bot" ? "Coach" : "Bạn"}</span>
-                <p>{message.content}</p>
-              </article>
-            ))}
-            {showOnboardingShortcuts && isGuidedOnboarding ? (
-              <div className="quick-replies">
-                {onboardingSteps[onboardingStepIndex].quickReplies?.map(
-                  (reply) => (
+        <div className="chat-workspace">
+          <ChatSessionSidebar
+            activeSessionId={activeLocalSessionId}
+            sessions={chatSessions}
+            onNewSession={handleStartNewChatSession}
+            onSelectSession={handleSelectChatSession}
+          />
+
+          <section className="chat-screen">
+            <div className="chat-panel-top">
+              <div className="coach-presence">
+                <span className="coach-presence__avatar" aria-hidden="true">
+                  <RobotOutlined />
+                </span>
+                <div>
+                  <strong>AI Coach</strong>
+                  <span>
+                    {isGuidedOnboarding
+                      ? "Đang làm quen với bạn"
+                      : "Sẵn sàng tạo bài luyện"}
+                  </span>
+                </div>
+              </div>
+              <span className="chat-session-pill">
+                {chatMessages.length > 1 ? "Đã nối lại hội thoại" : "Phiên mới"}
+              </span>
+            </div>
+
+            <div className="chat-thread" ref={chatThreadRef}>
+              {chatMessages.map((message) => (
+                <ChatMessageBubble key={message.id} message={message} />
+              ))}
+              {showOnboardingShortcuts &&
+              isGuidedOnboarding &&
+              currentQuickReplies.length > 0 ? (
+                <div className="quick-replies" aria-label="Câu trả lời nhanh">
+                  {currentQuickReplies.map((reply) => (
                     <button
-                      disabled={isOnboardingSaving}
+                      disabled={isComposerLocked}
                       key={reply.label}
                       type="button"
                       onClick={() => {
@@ -760,22 +1010,18 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
                     >
                       {reply.label}
                     </button>
-                  ),
-                )}
-              </div>
-            ) : null}
-            {!submittedPrompt && !isGuidedOnboarding ? (
-              <section className="chat-intake-card">
-                <div>
-                  <span>Gợi ý nhanh</span>
-                  <p>
-                    Nếu chưa biết bắt đầu từ đâu, bạn chọn một gợi ý rồi sửa
-                    lại theo đúng nhu cầu của mình.
-                  </p>
+                  ))}
                 </div>
-                <div className="prompt-suggestions">
+              ) : null}
+              {isCoachThinking ? <CoachTypingMessage /> : null}
+            </div>
+
+            <div className="chat-composer">
+              {!submittedPrompt && !isGuidedOnboarding ? (
+                <div className="composer-suggestions" aria-label="Gợi ý nhanh">
                   {promptSuggestions.map((suggestion) => (
                     <button
+                      className="suggestion-chip"
                       key={suggestion.label}
                       type="button"
                       onClick={() => setPrompt(suggestion.value)}
@@ -784,53 +1030,41 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
                     </button>
                   ))}
                 </div>
-              </section>
-            ) : null}
-            {prompt.trim().length > 0 ? (
-              <article className="message message--user message--typing">
-                <span>Bạn đang nhập</span>
-                <div className="typing-dots" aria-label="Bạn đang nhập">
-                  <span />
-                  <span />
-                  <span />
-                </div>
-              </article>
-            ) : null}
-          </div>
+              ) : null}
 
-          <div className="chat-composer">
-            <div className="composer-input">
-              <textarea
-                value={prompt}
-                onChange={(event) => setPrompt(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey) {
-                    event.preventDefault();
-                    void handleSubmitMessage();
+              <div className="composer-input-row">
+                <textarea
+                  value={prompt}
+                  onChange={(event) => setPrompt(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      void handleSubmitMessage();
+                    }
+                  }}
+                  placeholder={
+                    isGuidedOnboarding
+                      ? "Trả lời tự nhiên thôi, không cần viết đúng format..."
+                      : "Ví dụ: Tạo 10 câu ngữ pháp cơ bản mức dễ, giải thích ngắn."
                   }
-                }}
-                placeholder={
-                  isGuidedOnboarding
-                    ? "Trả lời tự nhiên thôi, không cần viết đúng format..."
-                    : "Ví dụ: Tạo 10 câu ngữ pháp cơ bản mức dễ, giải thích ngắn."
-                }
-              />
-              <p className="composer-hint">
-                Enter để gửi, Shift + Enter để xuống dòng.
-              </p>
+                  rows={2}
+                  disabled={isComposerLocked}
+                />
+                <button
+                  className="button button--primary composer-send-button"
+                  type="button"
+                  onClick={() => {
+                    void handleSubmitMessage();
+                  }}
+                  disabled={prompt.trim().length === 0 || isComposerLocked}
+                >
+                  <SendOutlined />
+                  <span>{isGuidedOnboarding ? "Trả lời" : "Gửi"}</span>
+                </button>
+              </div>
             </div>
-            <button
-              className="button button--primary"
-              type="button"
-              onClick={() => {
-                void handleSubmitMessage();
-              }}
-              disabled={prompt.trim().length === 0 || isOnboardingSaving}
-            >
-              {isGuidedOnboarding ? "Trả lời" : "Gửi yêu cầu"}
-            </button>
-          </div>
-        </section>
+          </section>
+        </div>
       ) : null}
 
       {screen === "generating" ? (
@@ -1052,6 +1286,473 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
   );
 }
 
+function ChatSessionSidebar({
+  activeSessionId,
+  onNewSession,
+  onSelectSession,
+  sessions,
+}: {
+  activeSessionId: string | null;
+  onNewSession: () => void | Promise<void>;
+  onSelectSession: (sessionId: string) => void | Promise<void>;
+  sessions: ChatSessionHistoryItem[];
+}) {
+  return (
+    <aside className="chat-history-panel" aria-label="Lịch sử phiên chat">
+      <div className="chat-history-panel__top">
+        <div>
+          <span>
+            <HistoryOutlined />
+          </span>
+          <strong>Lịch sử chat</strong>
+        </div>
+        <p>{sessions.length} phiên đã lưu</p>
+      </div>
+
+      <button
+        className="chat-history-new-button"
+        type="button"
+        onClick={() => {
+          void onNewSession();
+        }}
+      >
+        <PlusOutlined />
+        <span>Phiên mới</span>
+      </button>
+
+      <div className="chat-session-list">
+        {sessions.length > 0 ? (
+          sessions.map((session) => (
+            <button
+              className={`chat-session-card${
+                session.id === activeSessionId ? " chat-session-card--active" : ""
+              }`}
+              key={session.id}
+              type="button"
+              onClick={() => {
+                void onSelectSession(session.id);
+              }}
+            >
+              <span>{session.title}</span>
+              <p>{session.preview}</p>
+              <time dateTime={session.updatedAt}>
+                {formatSessionTimestamp(session.updatedAt)}
+              </time>
+            </button>
+          ))
+        ) : (
+          <p className="chat-history-empty">
+            Chưa có phiên nào. Khi bạn bắt đầu chat, phiên sẽ hiện ở đây.
+          </p>
+        )}
+      </div>
+    </aside>
+  );
+}
+
+function ChatMessageBubble({ message }: { message: ChatMessage }) {
+  const isBot = message.role === "bot";
+  const displayTime = formatMessageTime(message.createdAt);
+
+  return (
+    <article className={`message-row message-row--${message.role}`}>
+      <span className="message-avatar" aria-hidden="true">
+        {isBot ? <RobotOutlined /> : <UserOutlined />}
+      </span>
+      <div className={`message message--${message.role}`}>
+        <div className="message-meta">
+          <span>{isBot ? "Coach" : "Bạn"}</span>
+          {displayTime ? (
+            <time dateTime={message.createdAt ?? undefined}>
+              {displayTime}
+            </time>
+          ) : null}
+        </div>
+        <div className="message-content">
+          {renderMessageContent(message.content)}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function CoachTypingMessage() {
+  return (
+    <article
+      className="message-row message-row--bot message-row--thinking"
+      aria-live="polite"
+    >
+      <span className="message-avatar" aria-hidden="true">
+        <RobotOutlined />
+      </span>
+      <div className="message message--bot message--typing">
+        <div className="message-meta">
+          <span>Coach</span>
+        </div>
+        <div className="typing-dots" aria-label="Coach đang trả lời">
+          <span />
+          <span />
+          <span />
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function renderMessageContent(content: string) {
+  const paragraphs = content
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+
+  return paragraphs.map((paragraph, index) => (
+    <p key={`${index}-${paragraph.slice(0, 12)}`}>{paragraph}</p>
+  ));
+}
+
+function formatMessageTime(createdAt?: string | null) {
+  if (!createdAt) {
+    return "";
+  }
+
+  const date = new Date(createdAt);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function mergeBackendChatSessions(
+  backendSessions: ChatSessionSummary[],
+  storedSessions: ChatSessionHistoryItem[],
+) {
+  const usedStoredSessionIds = new Set<string>();
+  const storedByBackendSessionId = new Map<string, ChatSessionHistoryItem>();
+  const storedByLocalSessionId = new Map<string, ChatSessionHistoryItem>();
+
+  storedSessions.forEach((session) => {
+    storedByLocalSessionId.set(session.id, session);
+    if (session.backendSessionId) {
+      storedByBackendSessionId.set(session.backendSessionId, session);
+    }
+  });
+
+  const backendItems = backendSessions.map((session) => {
+    const storedSession =
+      storedByBackendSessionId.get(session.sessionId) ||
+      storedByLocalSessionId.get(session.sessionId);
+    if (storedSession) {
+      usedStoredSessionIds.add(storedSession.id);
+    }
+
+    const createdAt =
+      session.createdAt || storedSession?.createdAt || new Date().toISOString();
+    const updatedAt = session.updatedAt || storedSession?.updatedAt || createdAt;
+
+    return {
+      id: session.sessionId,
+      backendSessionId: session.sessionId,
+      title: session.title || storedSession?.title || "Phiên chat mới",
+      preview:
+        session.preview ||
+        storedSession?.preview ||
+        buildChatSessionPreview(storedSession?.messages ?? []),
+      messageCount: session.messageCount || storedSession?.messageCount || 0,
+      createdAt,
+      updatedAt,
+      messages: cloneChatMessages(storedSession?.messages ?? []),
+    };
+  });
+
+  const localOnlyItems = storedSessions.filter(
+    (session) =>
+      !usedStoredSessionIds.has(session.id) &&
+      !backendSessions.some(
+        (backendSession) => backendSession.sessionId === session.backendSessionId,
+      ),
+  );
+
+  return [...backendItems, ...localOnlyItems];
+}
+
+function loadStoredChatSessions(): ChatSessionHistoryItem[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const rawValue = window.localStorage.getItem(CHAT_SESSION_STORAGE_KEY);
+    if (!rawValue) {
+      return [];
+    }
+
+    const parsed = JSON.parse(rawValue) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed
+      .map(normalizeStoredChatSession)
+      .filter((session): session is ChatSessionHistoryItem => Boolean(session))
+      .sort((first, second) => sortSessionsByUpdatedAt(first, second))
+      .slice(0, CHAT_SESSION_HISTORY_LIMIT);
+  } catch {
+    return [];
+  }
+}
+
+function saveStoredChatSessions(
+  sessions: ChatSessionHistoryItem[],
+): ChatSessionHistoryItem[] {
+  const nextSessions = dedupeChatSessions(sessions)
+    .sort((first, second) => sortSessionsByUpdatedAt(first, second))
+    .slice(0, CHAT_SESSION_HISTORY_LIMIT);
+
+  if (typeof window !== "undefined") {
+    try {
+      window.localStorage.setItem(
+        CHAT_SESSION_STORAGE_KEY,
+        JSON.stringify(nextSessions),
+      );
+    } catch {
+      // The chat still works if the browser refuses local storage.
+    }
+  }
+
+  return nextSessions;
+}
+
+function upsertChatSession(
+  currentSessions: ChatSessionHistoryItem[],
+  session: {
+    id: string;
+    backendSessionId?: string | null;
+    messages: ChatMessage[];
+  },
+) {
+  const baseSessions = dedupeChatSessions([
+    ...currentSessions,
+    ...loadStoredChatSessions(),
+  ]);
+  const existingSession = baseSessions.find((item) => item.id === session.id);
+  const messages = cloneChatMessages(session.messages);
+  const now = new Date().toISOString();
+  const createdAt =
+    existingSession?.createdAt || getFirstMessageTimestamp(messages) || now;
+  const updatedAt = getLastMessageTimestamp(messages) || now;
+  const nextSession: ChatSessionHistoryItem = {
+    id: session.id,
+    backendSessionId:
+      session.backendSessionId === undefined
+        ? existingSession?.backendSessionId ?? null
+        : session.backendSessionId,
+    title: buildChatSessionTitle(messages),
+    preview: buildChatSessionPreview(messages),
+    messageCount: messages.length || existingSession?.messageCount || 0,
+    createdAt,
+    updatedAt,
+    messages,
+  };
+
+  return [
+    nextSession,
+    ...baseSessions.filter(
+      (item) =>
+        item.id !== session.id &&
+        (!session.backendSessionId ||
+          item.backendSessionId !== session.backendSessionId),
+    ),
+  ];
+}
+
+function dedupeChatSessions(sessions: ChatSessionHistoryItem[]) {
+  const seenIds = new Set<string>();
+  const seenBackendSessionIds = new Set<string>();
+  const result: ChatSessionHistoryItem[] = [];
+
+  sessions.forEach((session) => {
+    if (seenIds.has(session.id)) {
+      return;
+    }
+    if (
+      session.backendSessionId &&
+      seenBackendSessionIds.has(session.backendSessionId)
+    ) {
+      return;
+    }
+
+    seenIds.add(session.id);
+    if (session.backendSessionId) {
+      seenBackendSessionIds.add(session.backendSessionId);
+    }
+    result.push(session);
+  });
+
+  return result;
+}
+
+function normalizeStoredChatSession(
+  value: unknown,
+): ChatSessionHistoryItem | null {
+  if (!isRecord(value) || typeof value.id !== "string") {
+    return null;
+  }
+
+  const rawMessages = Array.isArray(value.messages) ? value.messages : [];
+  const messages = rawMessages
+    .map(normalizeStoredChatMessage)
+    .filter((message): message is ChatMessage => Boolean(message));
+
+  const now = new Date().toISOString();
+  const createdAt =
+    typeof value.createdAt === "string"
+      ? value.createdAt
+      : getFirstMessageTimestamp(messages) || now;
+  const updatedAt =
+    typeof value.updatedAt === "string"
+      ? value.updatedAt
+      : getLastMessageTimestamp(messages) || createdAt;
+
+  return {
+    id: value.id,
+    backendSessionId:
+      typeof value.backendSessionId === "string"
+        ? value.backendSessionId
+        : null,
+    title:
+      typeof value.title === "string"
+        ? value.title
+        : buildChatSessionTitle(messages),
+    preview:
+      typeof value.preview === "string"
+        ? value.preview
+        : buildChatSessionPreview(messages),
+    messageCount:
+      typeof value.messageCount === "number" ? value.messageCount : messages.length,
+    createdAt,
+    updatedAt,
+    messages,
+  };
+}
+
+function normalizeStoredChatMessage(value: unknown): ChatMessage | null {
+  if (
+    !isRecord(value) ||
+    typeof value.id !== "string" ||
+    typeof value.content !== "string" ||
+    (value.role !== "bot" && value.role !== "user")
+  ) {
+    return null;
+  }
+
+  return {
+    id: value.id,
+    role: value.role,
+    content: value.content,
+    createdAt: typeof value.createdAt === "string" ? value.createdAt : null,
+  };
+}
+
+function buildChatSessionTitle(messages: ChatMessage[]) {
+  const firstUserMessage = messages.find(
+    (message) => message.role === "user" && message.content.trim(),
+  );
+  const firstMessage =
+    firstUserMessage ?? messages.find((message) => message.content.trim());
+
+  if (!firstMessage) {
+    return "Phiên chat mới";
+  }
+
+  return truncateSessionText(firstMessage.content, 52);
+}
+
+function buildChatSessionPreview(messages: ChatMessage[]) {
+  const lastMessage = getLastMeaningfulMessage(messages);
+  if (!lastMessage) {
+    return "Chưa có tin nhắn";
+  }
+
+  const speaker = lastMessage.role === "user" ? "Bạn: " : "Coach: ";
+  return truncateSessionText(`${speaker}${lastMessage.content}`, 84);
+}
+
+function getLastMeaningfulMessage(messages: ChatMessage[]) {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index].content.trim()) {
+      return messages[index];
+    }
+  }
+
+  return null;
+}
+
+function truncateSessionText(value: string, maxLength: number) {
+  const compactValue = value.replace(/\s+/g, " ").trim();
+  if (compactValue.length <= maxLength) {
+    return compactValue;
+  }
+
+  return `${compactValue.slice(0, Math.max(maxLength - 3, 1)).trim()}...`;
+}
+
+function formatSessionTimestamp(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat("vi-VN", {
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "2-digit",
+  }).format(date);
+}
+
+function getFirstMessageTimestamp(messages: ChatMessage[]) {
+  return messages.find((message) => message.createdAt)?.createdAt ?? null;
+}
+
+function getLastMessageTimestamp(messages: ChatMessage[]) {
+  return (
+    [...messages].reverse().find((message) => message.createdAt)?.createdAt ??
+    null
+  );
+}
+
+function sortSessionsByUpdatedAt(
+  first: ChatSessionHistoryItem,
+  second: ChatSessionHistoryItem,
+) {
+  return getTimestampValue(second.updatedAt) - getTimestampValue(first.updatedAt);
+}
+
+function getTimestampValue(value: string) {
+  const timestamp = new Date(value).getTime();
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+function cloneChatMessages(messages: ChatMessage[]) {
+  return messages.map((message) => ({ ...message }));
+}
+
+function createLocalChatSessionId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `local-chat-${crypto.randomUUID()}`;
+  }
+
+  return `local-chat-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 function wait(milliseconds: number) {
   return new Promise((resolve) => {
     window.setTimeout(resolve, milliseconds);
@@ -1063,6 +1764,7 @@ function makeMessage(role: ChatMessage["role"], content: string): ChatMessage {
     id: `${role}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     role,
     content,
+    createdAt: new Date().toISOString(),
   };
 }
 
@@ -1114,6 +1816,7 @@ function mapPersistedChatMessages(resume: ChatMemoryResume): ChatMessage[] {
     id: message.messageId,
     role: message.role === "assistant" ? "bot" : "user",
     content: normalizePersistedChatContent(message.content),
+    createdAt: message.createdAt,
   }));
 }
 
@@ -1281,7 +1984,7 @@ function buildPracticeIntentFallback(message: string): PracticeInterpretationRes
     request,
     assistantReply: shouldClarify
       ? defaultPracticeClarificationQuestion()
-      : "Minh se dua vao ho so hoc cua ban de chon bai phu hop.",
+      : "Mình sẽ dựa vào hồ sơ học của bạn để chọn bài phù hợp.",
     needsClarification: shouldClarify,
     clarificationQuestion: shouldClarify
       ? defaultPracticeClarificationQuestion()
@@ -1407,7 +2110,7 @@ function extractPracticeQuestionCount(normalized: string) {
 }
 
 function defaultPracticeClarificationQuestion() {
-  return "Minh chua ro ban muon luyen phan nao. Ban noi ro hon mot chut nhe: ngu phap, tu vung, thi qua khu, bi dong hay gioi tu?";
+  return "Mình chưa rõ bạn muốn luyện phần nào. Bạn nói rõ hơn một chút nhé: ngữ pháp, từ vựng, thì quá khứ, bị động hay giới từ?";
 }
 
 async function interpretOnboardingAnswerWithFallback(

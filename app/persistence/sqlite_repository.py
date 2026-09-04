@@ -335,10 +335,21 @@ class SQLiteLearningRepository:
             ],
         }
 
-    def get_chat_resume(self, user_id: str, limit: int = 24) -> dict[str, object]:
+    def get_chat_resume(
+        self,
+        user_id: str,
+        limit: int = 24,
+        session_id: str | None = None,
+    ) -> dict[str, object]:
         with self._connect() as connection:
             db_user_id = self._ensure_user(connection, user_id)
-            session = self._get_or_create_active_chat_session(connection, db_user_id)
+            session = (
+                self._get_chat_session_by_code(connection, db_user_id, session_id)
+                if session_id
+                else self._get_or_create_active_chat_session(connection, db_user_id)
+            )
+            if session is None:
+                raise LookupError("Chat session not found.")
             memory_row = self._get_chat_memory_row(connection, db_user_id)
             message_rows = connection.execute(
                 """
@@ -378,6 +389,62 @@ class SQLiteLearningRepository:
             "messages": messages,
         }
 
+    def list_chat_sessions(self, user_id: str, limit: int = 20) -> dict[str, object]:
+        with self._connect() as connection:
+            db_user_id = self._ensure_user(connection, user_id)
+            rows = connection.execute(
+                """
+                SELECT
+                    s.session_code,
+                    s.title,
+                    s.created_at,
+                    s.updated_at,
+                    COUNT(m.id) AS message_count,
+                    (
+                        SELECT lm.content
+                        FROM chat_messages lm
+                        WHERE lm.session_id = s.id
+                        ORDER BY lm.created_at DESC, lm.id DESC
+                        LIMIT 1
+                    ) AS preview
+                FROM chat_sessions s
+                LEFT JOIN chat_messages m ON m.session_id = s.id
+                WHERE s.user_id = ?
+                GROUP BY s.id
+                ORDER BY s.updated_at DESC, s.id DESC
+                LIMIT ?
+                """,
+                (db_user_id, limit),
+            ).fetchall()
+
+        return {
+            "sessions": [self._chat_session_summary_from_row(row) for row in rows],
+        }
+
+    def create_chat_session(self, user_id: str) -> dict[str, object]:
+        with self._connect() as connection:
+            db_user_id = self._ensure_user(connection, user_id)
+            session = self._create_chat_session(connection, db_user_id)
+            memory_row = self._get_chat_memory_row(connection, db_user_id)
+
+        facts = (
+            json.loads(memory_row["facts_json"] or "{}")
+            if memory_row is not None
+            else {}
+        )
+        summary = memory_row["summary_text"] if memory_row is not None else ""
+        return {
+            "session_id": session["session_code"],
+            "has_history": bool(summary),
+            "memory_summary": summary,
+            "extracted_facts": facts,
+            "suggested_next_question": self._build_suggested_next_question(
+                facts,
+                [],
+            ),
+            "messages": [],
+        }
+
     def save_chat_message(
         self,
         user_id: str,
@@ -397,11 +464,13 @@ class SQLiteLearningRepository:
 
         with self._connect() as connection:
             db_user_id = self._ensure_user(connection, user_id)
-            session = self._get_or_create_active_chat_session(
-                connection,
-                db_user_id,
-                session_code=session_id,
+            session = (
+                self._get_chat_session_by_code(connection, db_user_id, session_id)
+                if session_id
+                else self._get_or_create_active_chat_session(connection, db_user_id)
             )
+            if session is None:
+                raise LookupError("Chat session not found.")
             message_code = f"msg_{uuid.uuid4().hex}"
             metadata_json = json.dumps(metadata or {}, ensure_ascii=False)
             connection.execute(
@@ -438,6 +507,14 @@ class SQLiteLearningRepository:
                     int(session["id"]),
                 ),
             )
+            message_row = connection.execute(
+                """
+                SELECT message_code, role, content, created_at
+                FROM chat_messages
+                WHERE message_code = ?
+                """,
+                (message_code,),
+            ).fetchone()
 
             memory_row = self._get_chat_memory_row(connection, db_user_id)
             facts = (
@@ -457,10 +534,10 @@ class SQLiteLearningRepository:
         return {
             "session_id": session["session_code"],
             "message": {
-                "message_id": message_code,
-                "role": normalized_role,
-                "content": cleaned_content,
-                "created_at": None,
+                "message_id": message_row["message_code"],
+                "role": message_row["role"],
+                "content": message_row["content"],
+                "created_at": message_row["created_at"],
             },
             "memory_summary": summary,
             "extracted_facts": facts,
@@ -1018,20 +1095,7 @@ class SQLiteLearningRepository:
         self,
         connection: sqlite3.Connection,
         user_id: int,
-        session_code: str | None = None,
     ) -> sqlite3.Row:
-        if session_code:
-            row = connection.execute(
-                """
-                SELECT id, session_code, title, status, created_at, updated_at
-                FROM chat_sessions
-                WHERE user_id = ? AND session_code = ?
-                """,
-                (user_id, session_code),
-            ).fetchone()
-            if row is not None:
-                return row
-
         row = connection.execute(
             """
             SELECT id, session_code, title, status, created_at, updated_at
@@ -1045,6 +1109,28 @@ class SQLiteLearningRepository:
         if row is not None:
             return row
 
+        return self._create_chat_session(connection, user_id)
+
+    def _get_chat_session_by_code(
+        self,
+        connection: sqlite3.Connection,
+        user_id: int,
+        session_code: str,
+    ) -> sqlite3.Row | None:
+        return connection.execute(
+            """
+            SELECT id, session_code, title, status, created_at, updated_at
+            FROM chat_sessions
+            WHERE user_id = ? AND session_code = ?
+            """,
+            (user_id, session_code),
+        ).fetchone()
+
+    def _create_chat_session(
+        self,
+        connection: sqlite3.Connection,
+        user_id: int,
+    ) -> sqlite3.Row:
         new_session_code = f"chat_{uuid.uuid4().hex}"
         cursor = connection.execute(
             """
@@ -1539,6 +1625,17 @@ class SQLiteLearningRepository:
         if len(normalized) <= 64:
             return normalized
         return f"{normalized[:61]}..."
+
+    def _chat_session_summary_from_row(self, row: sqlite3.Row) -> dict[str, object]:
+        title = row["title"] or self._make_chat_title(row["preview"] or "")
+        return {
+            "session_id": row["session_code"],
+            "title": title or "Phien chat moi",
+            "preview": row["preview"] or "",
+            "message_count": int(row["message_count"] or 0),
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+        }
 
     def _init_db(self) -> None:
         schema = self.schema_path.read_text(encoding="utf-8")

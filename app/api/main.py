@@ -11,6 +11,7 @@ from app.api.schemas import (
     AuthTokenRequestModel,
     AuthTokenResponseModel,
     ChatMemoryResponseModel,
+    ChatSessionListResponseModel,
     ChromaDebugResponseModel,
     GeneratePracticeRequestModel,
     GeneratePracticeResponseModel,
@@ -289,6 +290,55 @@ def get_chat_resume(
     )
 
 
+@app.get(
+    "/api/users/{user_id}/chat/sessions",
+    response_model=ChatSessionListResponseModel,
+)
+def list_chat_sessions(
+    user_id: str,
+    authorization: str | None = Header(default=None),
+) -> ChatSessionListResponseModel:
+    _authorize_user(user_id, authorization)
+    return ChatSessionListResponseModel(
+        **pipeline.repository.list_chat_sessions(user_id),
+    )
+
+
+@app.post(
+    "/api/users/{user_id}/chat/sessions",
+    response_model=ChatMemoryResponseModel,
+)
+def create_chat_session(
+    user_id: str,
+    authorization: str | None = Header(default=None),
+) -> ChatMemoryResponseModel:
+    _authorize_user(user_id, authorization)
+    return ChatMemoryResponseModel(
+        **pipeline.repository.create_chat_session(user_id),
+    )
+
+
+@app.get(
+    "/api/users/{user_id}/chat/sessions/{session_id}",
+    response_model=ChatMemoryResponseModel,
+)
+def get_chat_session(
+    user_id: str,
+    session_id: str,
+    authorization: str | None = Header(default=None),
+) -> ChatMemoryResponseModel:
+    _authorize_user(user_id, authorization)
+    try:
+        return ChatMemoryResponseModel(
+            **pipeline.repository.get_chat_resume(
+                user_id,
+                session_id=session_id,
+            ),
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @app.post(
     "/api/users/{user_id}/chat/messages",
     response_model=SaveChatMessageResponseModel,
@@ -310,6 +360,8 @@ def save_chat_message(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     return SaveChatMessageResponseModel(**saved)
 
 

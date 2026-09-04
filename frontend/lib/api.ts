@@ -1,5 +1,6 @@
 import type {
   ChatMemoryResume,
+  ChatSessionSummary,
   ChromaDebugSnapshot,
   ExercisePreview,
   PersonalizationSnapshot,
@@ -260,6 +261,19 @@ export type ChatMemoryResumeResponse = {
     content: string;
     created_at?: string | null;
   }>;
+};
+
+export type ChatSessionSummaryResponse = {
+  session_id: string;
+  title: string;
+  preview: string;
+  message_count: number;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type ChatSessionListResponse = {
+  sessions: ChatSessionSummaryResponse[];
 };
 
 export type SaveChatMessageRequest = {
@@ -673,6 +687,64 @@ export async function getChatResume(userId: string): Promise<ChatMemoryResume> {
   return mapChatResume(data);
 }
 
+export async function listChatSessions(
+  userId: string,
+): Promise<ChatSessionSummary[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/users/${encodeURIComponent(userId)}/chat/sessions`,
+    {
+      headers: authHeaders(),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to load chat sessions.");
+  }
+
+  const data = (await response.json()) as ChatSessionListResponse;
+  return data.sessions.map(mapChatSessionSummary);
+}
+
+export async function createChatSession(
+  userId: string,
+): Promise<ChatMemoryResume> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/users/${encodeURIComponent(userId)}/chat/sessions`,
+    {
+      method: "POST",
+      headers: authHeaders(),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to create chat session.");
+  }
+
+  const data = (await response.json()) as ChatMemoryResumeResponse;
+  return mapChatResume(data);
+}
+
+export async function getChatSession(
+  userId: string,
+  sessionId: string,
+): Promise<ChatMemoryResume> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/users/${encodeURIComponent(
+      userId,
+    )}/chat/sessions/${encodeURIComponent(sessionId)}`,
+    {
+      headers: authHeaders(),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to load chat session.");
+  }
+
+  const data = (await response.json()) as ChatMemoryResumeResponse;
+  return mapChatResume(data);
+}
+
 export async function saveChatMessage(
   payload: SaveChatMessageRequest,
 ): Promise<ChatMemoryResume> {
@@ -756,5 +828,18 @@ function mapChatResume(data: ChatMemoryResumeResponse): ChatMemoryResume {
       content: message.content,
       createdAt: message.created_at,
     })),
+  };
+}
+
+function mapChatSessionSummary(
+  data: ChatSessionSummaryResponse,
+): ChatSessionSummary {
+  return {
+    sessionId: data.session_id,
+    title: data.title,
+    preview: data.preview,
+    messageCount: data.message_count,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
   };
 }

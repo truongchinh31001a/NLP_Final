@@ -109,6 +109,15 @@ export type ChatMemoryResume = {
   messages: PersistedChatMessage[];
 };
 
+export type ChatSessionSummary = {
+  sessionId: string;
+  title: string;
+  preview: string;
+  messageCount: number;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+};
+
 export type PersonalizationTopicStat = {
   code: string;
   label: string;
