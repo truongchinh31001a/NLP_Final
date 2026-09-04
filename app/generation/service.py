@@ -53,6 +53,7 @@ class ExerciseGenerationService:
             "learner_level": self._infer_level_from_chunks(chunks),
             "target_subtopic": plan.target_subtopic or "auto",
             "target_error_tag": plan.target_error_tag or "auto",
+            "target_skill_id": plan.target_skill_id or "auto",
             "content_theme": plan.content_theme or "none",
             "learner_summary": plan.learner_summary or "No learner history yet.",
             "retrieved_context": self._format_context(chunks),
@@ -67,13 +68,17 @@ class ExerciseGenerationService:
                 topic=plan.topic,
                 difficulty=plan.difficulty,
                 skill=exercise.skill or self._skill_for_topic(plan.topic),
-                subtopic=exercise.subtopic
-                or plan.target_subtopic
-                or self._infer_subtopic_from_chunks(chunks)
-                or self._infer_subtopic_from_seed(seed_examples),
+                subtopic=(
+                    exercise.subtopic
+                    or plan.target_subtopic
+                    or self._infer_subtopic_from_chunks(chunks)
+                    or self._infer_subtopic_from_seed(seed_examples)
+                    or "general"
+                ),
                 error_tag=exercise.error_tag
                 or plan.target_error_tag
-                or self._infer_error_tag_from_seed(seed_examples),
+                or self._infer_error_tag_from_seed(seed_examples)
+                or "general",
                 question_text=exercise.question_text,
                 options=[
                     ExerciseOption(
@@ -185,8 +190,8 @@ class ExerciseGenerationService:
                 topic=seed.topic_code,
                 difficulty=seed.difficulty,
                 skill=seed.skill,
-                subtopic=seed.subtopic,
-                error_tag=seed.error_tag,
+                subtopic=seed.subtopic or plan.target_subtopic or "general",
+                error_tag=seed.error_tag or plan.target_error_tag or "general",
                 question_text=seed.question_text,
                 options=[
                     ExerciseOption(

@@ -927,6 +927,33 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
             <p>{scoreResult.recommendation}</p>
           </div>
 
+          {scoreResult.answerDiagnoses?.some((item) => !item.isCorrect) ? (
+            <section className="coach-review-card">
+              <div className="coach-review-card__top">
+                <div>
+                  <p className="eyebrow">Error diagnosis</p>
+                  <h3>Skill-level mistakes</h3>
+                </div>
+                <span>BKT input</span>
+              </div>
+              <div className="error-diagnosis-list">
+                {scoreResult.answerDiagnoses
+                  .filter((item) => !item.isCorrect)
+                  .slice(0, 4)
+                  .map((diagnosis) => (
+                    <p key={diagnosis.exerciseId}>
+                      <strong>{formatDiagnosisLabel(diagnosis.errorType)}</strong>
+                      {" - "}
+                      {formatDiagnosisLabel(
+                        diagnosis.subtype ?? diagnosis.subtopic ?? diagnosis.skillId,
+                      )}
+                      {` (${Math.round(diagnosis.severity * 100)}%)`}
+                    </p>
+                  ))}
+              </div>
+            </section>
+          ) : null}
+
           {scoreResult.practiceReview ? (
             <section className="coach-review-card">
               <div className="coach-review-card__top">
@@ -2077,6 +2104,10 @@ function ReviewList({
 
 function formatTopic(topic: string) {
   return topic.replaceAll("_", " ");
+}
+
+function formatDiagnosisLabel(value: string) {
+  return value.replaceAll(".", " ").replaceAll("_", " ");
 }
 
 function formatDifficulty(difficulty: string) {

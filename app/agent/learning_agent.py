@@ -1,12 +1,16 @@
 from dataclasses import dataclass, field
 from concurrent.futures import TimeoutError as FutureTimeoutError
+from time import perf_counter
 from typing import Any, Callable, TypeVar
 
 from app.config import AppConfig
+from app.diagnosis.service import ErrorDiagnosisService
 from app.generation.service import ExerciseGenerationService
 from app.generation.validator import ExerciseValidator
 from app.intent.parser import IntentParser
 from app.language.translation import BilingualTextNormalizer
+from app.observability.metrics import metrics_registry
+from app.observability.tracing import get_tracer
 from app.persistence.repository import LearningRepository
 from app.personalization.service import PersonalizationService
 from app.recommendation.service import RecommendationService
@@ -47,6 +51,7 @@ class LearningAgent:
         validator: ExerciseValidator,
         recommendation: RecommendationService,
         review: PracticeReviewService,
+        diagnosis: ErrorDiagnosisService,
         max_generation_attempts: int = 2,
     ) -> None:
         self.config = config
@@ -58,8 +63,10 @@ class LearningAgent:
         self.validator = validator
         self.recommendation = recommendation
         self.review = review
+        self.diagnosis = diagnosis
         self.max_generation_attempts = max_generation_attempts
         self.text_normalizer = BilingualTextNormalizer()
+        self.tracer = get_tracer(__name__)
 
     def create_exercise_set(
         self,
@@ -250,14 +257,16 @@ class LearningAgent:
         answer_lookup = {
             answer.exercise_id: answer.selected_answer for answer in answers
         }
-        correct_count = sum(
-            1
-            for exercise in generated.exercises
-            if self._answers_match(
-                answer_lookup.get(exercise.exercise_id),
-                exercise.correct_answer,
-            )
+        answer_diagnoses = self._run_tool(
+            trace,
+            "diagnose_answers",
+            lambda: self.diagnosis.diagnose_batch(
+                generated.exercises,
+                answer_lookup,
+            ),
+            "Classified each answer into structured skill/error diagnoses.",
         )
+        correct_count = sum(1 for diagnosis in answer_diagnoses if diagnosis.is_correct)
         topic = generated.plan.topic
         total_questions = len(generated.exercises)
         score = correct_count / max(total_questions, 1)
@@ -269,14 +278,9 @@ class LearningAgent:
             total_questions=total_questions,
             weak_topics_detected=[topic] if score < 0.8 else [],
             generation_run_id=generation_run_id,
+            answer_diagnoses=answer_diagnoses,
         )
 
-        result.recommendation = self._run_tool(
-            trace,
-            "recommend_next_practice",
-            lambda: self.recommendation.recommend(result),
-            "Recommended the next practice action from the scoring result.",
-        )
         profile = self._run_tool(
             trace,
             "get_user_profile",
@@ -290,6 +294,17 @@ class LearningAgent:
             lambda: self.personalization.update_profile(profile, result),
             "Updated topic accuracy and weak topic scores.",
             {"topic": topic, "score": score},
+        )
+        result.recommendation = self._run_tool(
+            trace,
+            "recommend_next_practice",
+            lambda: self.recommendation.recommend(
+                result,
+                profile=updated_profile,
+                generated=generated,
+                selected_answers=answer_lookup,
+            ),
+            "Recommended the next practice action from mastery and answer signals.",
         )
         self._run_tool(
             trace,
@@ -305,6 +320,7 @@ class LearningAgent:
                 result,
                 generation_run_id=generation_run_id,
                 selected_answers=answer_lookup,
+                answer_diagnoses=answer_diagnoses,
             ),
             "Persisted the practice session result.",
             {"user_id": user_id, "topic": topic, "generation_run_id": generation_run_id},
@@ -318,6 +334,7 @@ class LearningAgent:
                 result=result,
                 generated=generated,
                 selected_answers=answer_lookup,
+                answer_diagnoses=answer_diagnoses,
             ),
             "Reviewed the completed session for strengths, weaknesses, and next steps.",
             {"session_code": session_code, "score": score},
@@ -348,19 +365,26 @@ class LearningAgent:
         detail: str,
         metadata: dict[str, Any] | None = None,
     ) -> T:
-        try:
-            output = action()
-        except Exception as exc:
-            trace.append(
-                AgentStep(
-                    tool=tool,
-                    status="error",
-                    detail=str(exc),
-                    metadata=metadata or {},
+        started_at = perf_counter()
+        with self.tracer.start_as_current_span(f"agent.tool.{tool}") as span:
+            span.set_attribute("agent.tool", tool)
+            try:
+                output = action()
+            except Exception as exc:
+                span.set_attribute("agent.tool.status", "error")
+                self._record_tool_metrics(tool, "error", started_at)
+                trace.append(
+                    AgentStep(
+                        tool=tool,
+                        status="error",
+                        detail=str(exc),
+                        metadata=metadata or {},
+                    )
                 )
-            )
-            raise
+                raise
 
+            span.set_attribute("agent.tool.status", "ok")
+        self._record_tool_metrics(tool, "ok", started_at)
         trace.append(
             AgentStep(
                 tool=tool,
@@ -370,6 +394,22 @@ class LearningAgent:
             )
         )
         return output
+
+    def _record_tool_metrics(
+        self,
+        tool: str,
+        status: str,
+        started_at: float,
+    ) -> None:
+        if not self.config.observability_enabled:
+            return
+        labels = {"tool": tool, "status": status}
+        metrics_registry.increment("agent_tool_calls_total", labels)
+        metrics_registry.observe(
+            "agent_tool_duration_ms",
+            (perf_counter() - started_at) * 1000,
+            labels,
+        )
 
     def _step_to_dict(self, step: AgentStep) -> dict[str, Any]:
         return {

@@ -1,7 +1,15 @@
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-from app.schemas import GeneratedExerciseSet, LearnerProfile, PracticeReview, SessionResult
+from app.learner.knowledge_tracing import BayesianKnowledgeTracer
+from app.learner.skill_graph import DEFAULT_SKILL_GRAPH
+from app.schemas import (
+    AnswerDiagnosis,
+    GeneratedExerciseSet,
+    LearnerProfile,
+    PracticeReview,
+    SessionResult,
+)
 
 
 class LearningRepository(Protocol):
@@ -23,6 +31,7 @@ class LearningRepository(Protocol):
         result: SessionResult,
         generation_run_id: str | None = None,
         selected_answers: dict[str, str] | None = None,
+        answer_diagnoses: list[AnswerDiagnosis] | None = None,
     ) -> str:
         ...
 
@@ -68,6 +77,9 @@ class InMemoryLearningRepository:
     chat_messages: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
     chat_memory: dict[str, dict[str, Any]] = field(default_factory=dict)
     practice_reviews: dict[str, PracticeReview] = field(default_factory=dict)
+    knowledge_tracer: BayesianKnowledgeTracer = field(
+        default_factory=BayesianKnowledgeTracer
+    )
 
     def get_profile(self, user_id: str) -> LearnerProfile:
         return self.profiles.setdefault(user_id, LearnerProfile(user_id=user_id))
@@ -90,8 +102,16 @@ class InMemoryLearningRepository:
         result: SessionResult,
         generation_run_id: str | None = None,
         selected_answers: dict[str, str] | None = None,
+        answer_diagnoses: list[AnswerDiagnosis] | None = None,
     ) -> str:
+        _ = answer_diagnoses
         self.session_results.append(result)
+        if generation_run_id and selected_answers is not None:
+            self._update_skill_mastery_from_answers(
+                result.user_id,
+                generation_run_id,
+                selected_answers,
+            )
         return f"inmemory-session-{len(self.session_results)}"
 
     def save_generated_exercise_set(
@@ -156,6 +176,31 @@ class InMemoryLearningRepository:
                     "last_seen_at": None,
                 }
                 for stat_key, weakness in profile.error_tag_weakness.items()
+            ],
+            "skill_mastery": [
+                {
+                    "code": skill_id,
+                    "label": DEFAULT_SKILL_GRAPH.get(skill_id).label,
+                    "topic": DEFAULT_SKILL_GRAPH.get(skill_id).topic,
+                    "skill_type": DEFAULT_SKILL_GRAPH.get(skill_id).skill_type,
+                    "cefr": DEFAULT_SKILL_GRAPH.get(skill_id).cefr,
+                    "mastery_probability": mastery,
+                    "confidence": profile.skill_confidence.get(skill_id, 0.0),
+                    "attempts_count": profile.skill_attempts.get(skill_id, 0),
+                    "correct_count": 0,
+                    "incorrect_count": 0,
+                    "weakness_score": 1.0 - mastery,
+                    "status": self._status_from_mastery(mastery),
+                    "last_practiced_at": None,
+                    "next_review_at": None,
+                    "prerequisites": list(
+                        DEFAULT_SKILL_GRAPH.get(skill_id).prerequisites
+                    ),
+                }
+                for skill_id, mastery in sorted(
+                    profile.skill_mastery.items(),
+                    key=lambda item: item[1],
+                )
             ],
         }
 
@@ -239,3 +284,41 @@ class InMemoryLearningRepository:
         if any(keyword in normalized for keyword in ["anime", "manga", "otaku"]):
             return "anime"
         return None
+
+    def _update_skill_mastery_from_answers(
+        self,
+        user_id: str,
+        generation_run_id: str,
+        selected_answers: dict[str, str],
+    ) -> None:
+        generated = self.generated_sets.get(generation_run_id)
+        if generated is None:
+            return
+
+        profile = self.get_profile(user_id)
+        for exercise in generated.exercises:
+            selected_answer = selected_answers.get(exercise.exercise_id)
+            is_correct = str(selected_answer or "").strip().lower() == str(
+                exercise.correct_answer
+            ).strip().lower()
+            skill_id = DEFAULT_SKILL_GRAPH.skill_id_for(
+                topic=exercise.topic,
+                skill_type=exercise.skill,
+                subtopic=exercise.subtopic,
+            )
+            prior = profile.skill_mastery.get(skill_id)
+            posterior = self.knowledge_tracer.update(prior, is_correct)
+            attempts = profile.skill_attempts.get(skill_id, 0) + 1
+            profile.skill_mastery[skill_id] = posterior
+            profile.skill_attempts[skill_id] = attempts
+            profile.skill_confidence[skill_id] = min(attempts / 8, 1.0)
+        self.save_profile(profile)
+
+    def _status_from_mastery(self, mastery: float) -> str:
+        if mastery < 0.4:
+            return "weak"
+        if mastery < 0.65:
+            return "learning"
+        if mastery < 0.85:
+            return "review"
+        return "mastered"

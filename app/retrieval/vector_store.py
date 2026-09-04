@@ -6,8 +6,11 @@ from langchain_core.documents import Document
 from langchain_core.vectorstores import InMemoryVectorStore
 
 from app.config import AppConfig
-from app.retrieval.embeddings import KeywordHashEmbeddings
+from app.retrieval.hybrid import ReciprocalRankFusion
+from app.retrieval.reranker import HeuristicReranker
+from app.retrieval.embeddings import build_embedding_model
 from app.retrieval.knowledge_loader import load_knowledge_documents
+from app.retrieval.sparse import SparseKeywordRetriever
 from app.schemas import KnowledgeChunk
 
 
@@ -25,7 +28,11 @@ class VectorStore(Protocol):
 class LangChainVectorStore:
     def __init__(self, config: AppConfig) -> None:
         self.config = config
-        self.embeddings = KeywordHashEmbeddings()
+        self.embeddings = build_embedding_model(config)
+        self._documents = load_knowledge_documents(self.config.knowledge_chunks_path)
+        self.sparse_retriever = SparseKeywordRetriever(self._documents)
+        self.fusion = ReciprocalRankFusion()
+        self.reranker = HeuristicReranker()
         self._seeded = False
         self._vector_store = self._build_store()
         self._seed_documents_if_needed()
@@ -39,12 +46,56 @@ class LangChainVectorStore:
     ) -> list[KnowledgeChunk]:
         subtopic_query = f" {subtopic.replace('_', ' ')}" if subtopic else ""
         query = f"{topic.replace('_', ' ')}{subtopic_query} {level}"
-        retriever = self._vector_store.as_retriever(
-            search_kwargs={"k": max(limit * 10, 50)}
-        )
-        documents = retriever.invoke(query)
+        retrieval_limit = max(limit * 8, 20)
+        mode = self.config.retrieval_mode.strip().lower()
+
+        if mode == "sparse":
+            documents = self.sparse_retriever.search(
+                query,
+                topic=topic,
+                level=level,
+                subtopic=subtopic,
+                limit=retrieval_limit,
+            )
+        else:
+            dense_documents = self._safe_dense_search(query, retrieval_limit)
+            if mode == "dense" and not dense_documents:
+                dense_documents = self._dense_search(query, retrieval_limit)
+            if mode == "dense":
+                documents = dense_documents
+            else:
+                sparse_documents = self.sparse_retriever.search(
+                    query,
+                    topic=topic,
+                    level=level,
+                    subtopic=subtopic,
+                    limit=retrieval_limit,
+                )
+                documents = self.fusion.fuse([dense_documents, sparse_documents])
+
+        if self.config.reranker_enabled:
+            documents = self.reranker.rerank(
+                documents,
+                query=query,
+                topic=topic,
+                level=level,
+                subtopic=subtopic,
+            )
+
         prioritized = self._prioritize_documents(documents, topic, level, subtopic)
         return [self._document_to_chunk(doc) for doc in prioritized[:limit]]
+
+    def _safe_dense_search(self, query: str, limit: int) -> list[Document]:
+        try:
+            return self._dense_search(query, limit)
+        except Exception:
+            return []
+
+    def _dense_search(self, query: str, limit: int) -> list[Document]:
+        retriever = self._vector_store.as_retriever(
+            search_kwargs={"k": limit}
+        )
+        return retriever.invoke(query)
 
     def _build_store(self) -> InMemoryVectorStore | Chroma:
         if self.config.vector_store_backend.lower() == "chroma":
@@ -70,7 +121,7 @@ class LangChainVectorStore:
         self._seeded = True
 
     def _seed_documents(self) -> list[Document]:
-        return load_knowledge_documents(self.config.knowledge_chunks_path)
+        return self._documents
 
     def _document_to_chunk(self, document: Document) -> KnowledgeChunk:
         metadata = dict(document.metadata)

@@ -96,6 +96,7 @@ export function getDashboardSnapshot(): DashboardSnapshot {
       numQuestions: 5,
       focusReason:
         "Focused on the strongest weak topic and kept the difficulty near the learner preference.",
+      targetSkillId: "grammar.passive_voice.past_simple_passive",
     },
     recommendations: [
       {

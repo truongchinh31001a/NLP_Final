@@ -7,7 +7,7 @@ from typing import Any
 
 from app.config import AppConfig
 from app.language.translation import BilingualTextNormalizer
-from app.schemas import GeneratedExerciseSet, PracticeReview, SessionResult
+from app.schemas import AnswerDiagnosis, GeneratedExerciseSet, PracticeReview, SessionResult
 
 
 class PracticeReviewService:
@@ -20,8 +20,13 @@ class PracticeReviewService:
         result: SessionResult,
         generated: GeneratedExerciseSet,
         selected_answers: dict[str, str],
+        answer_diagnoses: list[AnswerDiagnosis] | None = None,
     ) -> PracticeReview:
-        details = self._build_answer_details(generated, selected_answers)
+        details = self._build_answer_details(
+            generated,
+            selected_answers,
+            answer_diagnoses,
+        )
         base_review = self._build_rule_based_review(result, generated, details)
         llm_review = self._try_llm_review(result, generated, details, base_review)
         return llm_review or base_review
@@ -30,14 +35,20 @@ class PracticeReviewService:
         self,
         generated: GeneratedExerciseSet,
         selected_answers: dict[str, str],
+        answer_diagnoses: list[AnswerDiagnosis] | None,
     ) -> list[dict[str, object]]:
         details: list[dict[str, object]] = []
+        diagnosis_by_exercise = {
+            diagnosis.exercise_id: diagnosis
+            for diagnosis in answer_diagnoses or []
+        }
         for exercise in generated.exercises:
             selected = selected_answers.get(exercise.exercise_id, "")
             is_correct = self.text_normalizer.answers_match(
                 selected,
                 exercise.correct_answer,
             )
+            diagnosis = diagnosis_by_exercise.get(exercise.exercise_id)
             details.append(
                 {
                     "exercise_id": exercise.exercise_id,
@@ -47,7 +58,16 @@ class PracticeReviewService:
                     "is_correct": is_correct,
                     "topic": exercise.topic,
                     "subtopic": exercise.subtopic or "general",
-                    "error_tag": exercise.error_tag or "general",
+                    "error_tag": (
+                        diagnosis.subtype
+                        if diagnosis is not None and not diagnosis.is_correct
+                        else exercise.error_tag or "general"
+                    ),
+                    "error_type": (
+                        diagnosis.error_type if diagnosis is not None else "unknown"
+                    ),
+                    "severity": diagnosis.severity if diagnosis is not None else 0.0,
+                    "skill_id": diagnosis.skill_id if diagnosis is not None else "",
                     "explanation": exercise.explanation,
                 }
             )
@@ -63,6 +83,7 @@ class PracticeReviewService:
         correct_details = [detail for detail in details if detail["is_correct"]]
         weak_subtopics = self._top_values(wrong_details, "subtopic")
         weak_errors = self._top_values(wrong_details, "error_tag")
+        weak_error_types = self._top_values(wrong_details, "error_type")
         strong_subtopics = self._top_values(correct_details, "subtopic")
 
         if result.score >= 0.8:
@@ -94,7 +115,7 @@ class PracticeReviewService:
         weaknesses = (
             [
                 f"Hay vuong {self._label(value)}"
-                for value in [*weak_subtopics[:2], *weak_errors[:2]]
+                for value in [*weak_subtopics[:2], *weak_error_types[:1], *weak_errors[:1]]
             ]
             if wrong_details
             else ["Chua thay loi noi bat trong bai nay."]

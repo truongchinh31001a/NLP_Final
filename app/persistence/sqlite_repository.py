@@ -8,8 +8,12 @@ from pathlib import Path
 from typing import Iterator
 
 from app.config import AppConfig
+from app.learner.knowledge_tracing import BayesianKnowledgeTracer
+from app.learner.skill_graph import DEFAULT_SKILL_GRAPH, SkillNode
+from app.learner.spaced_repetition import next_review_at
 from app.language.translation import BilingualTextNormalizer
 from app.schemas import (
+    AnswerDiagnosis,
     ExerciseItem,
     ExerciseOption,
     GeneratedExerciseSet,
@@ -26,6 +30,8 @@ class SQLiteLearningRepository:
         self.db_path = Path(config.sqlite_db_path)
         self.schema_path = Path(__file__).with_name("schema.sql")
         self.text_normalizer = BilingualTextNormalizer()
+        self.skill_graph = DEFAULT_SKILL_GRAPH
+        self.knowledge_tracer = BayesianKnowledgeTracer()
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
 
@@ -106,6 +112,19 @@ class SQLiteLearningRepository:
                 """,
                 (db_user_id,),
             ).fetchall()
+            skill_rows = connection.execute(
+                """
+                SELECT
+                    sk.skill_code,
+                    m.mastery_probability,
+                    m.confidence,
+                    m.attempts_count
+                FROM user_skill_mastery m
+                JOIN skills sk ON sk.id = m.skill_id
+                WHERE m.user_id = ?
+                """,
+                (db_user_id,),
+            ).fetchall()
 
         goals = json.loads(row["goals_json"] or "[]")
         return LearnerProfile(
@@ -144,6 +163,18 @@ class SQLiteLearningRepository:
                     error_row["error_tag"],
                 ): float(error_row["weakness_score"])
                 for error_row in error_rows
+            },
+            skill_mastery={
+                skill_row["skill_code"]: float(skill_row["mastery_probability"])
+                for skill_row in skill_rows
+            },
+            skill_confidence={
+                skill_row["skill_code"]: float(skill_row["confidence"])
+                for skill_row in skill_rows
+            },
+            skill_attempts={
+                skill_row["skill_code"]: int(skill_row["attempts_count"])
+                for skill_row in skill_rows
             },
         )
 
@@ -205,6 +236,31 @@ class SQLiteLearningRepository:
                 """,
                 (db_user_id,),
             ).fetchall()
+            skill_rows = connection.execute(
+                """
+                SELECT
+                    sk.skill_code,
+                    sk.name,
+                    sk.skill_type,
+                    sk.cefr,
+                    sk.prerequisites_json,
+                    t.topic_code,
+                    m.mastery_probability,
+                    m.confidence,
+                    m.attempts_count,
+                    m.correct_count,
+                    m.incorrect_count,
+                    m.status,
+                    m.last_practiced_at,
+                    m.next_review_at
+                FROM user_skill_mastery m
+                JOIN skills sk ON sk.id = m.skill_id
+                JOIN topics t ON t.id = m.topic_id
+                WHERE m.user_id = ?
+                ORDER BY m.mastery_probability ASC, m.next_review_at ASC
+                """,
+                (db_user_id,),
+            ).fetchall()
 
         return {
             "user_id": user_id,
@@ -256,6 +312,26 @@ class SQLiteLearningRepository:
                     "last_seen_at": row["last_seen_at"],
                 }
                 for row in error_rows
+            ],
+            "skill_mastery": [
+                {
+                    "code": row["skill_code"],
+                    "label": row["name"],
+                    "topic": row["topic_code"],
+                    "skill_type": row["skill_type"],
+                    "cefr": row["cefr"],
+                    "mastery_probability": float(row["mastery_probability"]),
+                    "confidence": float(row["confidence"]),
+                    "attempts_count": int(row["attempts_count"]),
+                    "correct_count": int(row["correct_count"]),
+                    "incorrect_count": int(row["incorrect_count"]),
+                    "weakness_score": 1.0 - float(row["mastery_probability"]),
+                    "status": row["status"],
+                    "last_practiced_at": row["last_practiced_at"],
+                    "next_review_at": row["next_review_at"],
+                    "prerequisites": json.loads(row["prerequisites_json"] or "[]"),
+                }
+                for row in skill_rows
             ],
         }
 
@@ -465,6 +541,50 @@ class SQLiteLearningRepository:
                     ),
                 )
 
+            for skill_code, mastery_probability in profile.skill_mastery.items():
+                node = self.skill_graph.get(skill_code)
+                skill_id = self._ensure_skill(connection, node)
+                topic_id = self._ensure_topic(connection, node.topic)
+                confidence = profile.skill_confidence.get(skill_code, 0.0)
+                attempts_count = profile.skill_attempts.get(skill_code, 0)
+                connection.execute(
+                    """
+                    INSERT INTO user_skill_mastery (
+                        user_id,
+                        skill_id,
+                        topic_id,
+                        mastery_probability,
+                        attempts_count,
+                        confidence,
+                        status,
+                        next_review_at,
+                        updated_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT(user_id, skill_id) DO UPDATE SET
+                        topic_id = excluded.topic_id,
+                        mastery_probability = excluded.mastery_probability,
+                        attempts_count = excluded.attempts_count,
+                        confidence = excluded.confidence,
+                        status = excluded.status,
+                        next_review_at = COALESCE(
+                            user_skill_mastery.next_review_at,
+                            excluded.next_review_at
+                        ),
+                        updated_at = CURRENT_TIMESTAMP
+                    """,
+                    (
+                        db_user_id,
+                        skill_id,
+                        topic_id,
+                        mastery_probability,
+                        attempts_count,
+                        confidence,
+                        self._status_from_mastery(mastery_probability),
+                        next_review_at(mastery_probability, confidence),
+                    ),
+                )
+
     def get_generated_exercise_set(
         self,
         user_id: str,
@@ -564,6 +684,18 @@ class SQLiteLearningRepository:
             exercise_type=run["exercise_type"],
             num_questions=int(run["num_questions"]),
         )
+        first_exercise = exercises[0] if exercises else None
+        target_subtopic = first_exercise.subtopic if first_exercise else None
+        target_error_tag = first_exercise.error_tag if first_exercise else None
+        target_skill_id = self.skill_graph.skill_id_for(
+            topic=run["topic_code"],
+            skill_type=(
+                first_exercise.skill
+                if first_exercise is not None
+                else self._skill_for_topic(run["topic_code"])
+            ),
+            subtopic=target_subtopic,
+        )
         plan = PracticePlan(
             user_id=user_id,
             topic=run["topic_code"],
@@ -571,6 +703,9 @@ class SQLiteLearningRepository:
             exercise_type=run["exercise_type"],
             num_questions=int(run["num_questions"]),
             focus_reason="Loaded from persisted SQLite generation run.",
+            target_subtopic=target_subtopic,
+            target_error_tag=target_error_tag,
+            target_skill_id=target_skill_id,
         )
         return GeneratedExerciseSet(
             request=request,
@@ -696,6 +831,7 @@ class SQLiteLearningRepository:
         result: SessionResult,
         generation_run_id: str | None = None,
         selected_answers: dict[str, str] | None = None,
+        answer_diagnoses: list[AnswerDiagnosis] | None = None,
     ) -> str:
         session_code = f"sess_{uuid.uuid4().hex}"
         with self._connect() as connection:
@@ -768,6 +904,7 @@ class SQLiteLearningRepository:
                     session_id=db_session_id,
                     generation_run_db_id=generation_run_db_id,
                     selected_answers=selected_answers,
+                    answer_diagnoses=answer_diagnoses,
                 )
 
             existing = connection.execute(
@@ -1455,6 +1592,7 @@ class SQLiteLearningRepository:
                 column_name="onboarding_completed",
                 column_definition="INTEGER NOT NULL DEFAULT 0",
             )
+            self._seed_skill_graph(connection)
 
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
@@ -1543,20 +1681,30 @@ class SQLiteLearningRepository:
         session_id: int,
         generation_run_db_id: int,
         selected_answers: dict[str, str],
+        answer_diagnoses: list[AnswerDiagnosis] | None = None,
     ) -> None:
+        diagnosis_by_exercise = {
+            diagnosis.exercise_id: diagnosis
+            for diagnosis in answer_diagnoses or []
+        }
         exercise_rows = connection.execute(
             """
             SELECT
-                id,
-                client_exercise_id,
-                session_exercise_code,
-                topic_id,
-                subtopic,
-                error_tag,
-                correct_answer
-            FROM session_exercises
-            WHERE generation_run_id = ?
-            ORDER BY display_order, id
+                se.id,
+                se.client_exercise_id,
+                se.session_exercise_code,
+                se.topic_id,
+                se.exercise_type,
+                se.difficulty,
+                se.skill,
+                se.subtopic,
+                se.error_tag,
+                se.correct_answer,
+                t.topic_code
+            FROM session_exercises se
+            JOIN topics t ON t.id = se.topic_id
+            WHERE se.generation_run_id = ?
+            ORDER BY se.display_order, se.id
             """,
             (generation_run_db_id,),
         ).fetchall()
@@ -1572,7 +1720,7 @@ class SQLiteLearningRepository:
                 exercise_row["correct_answer"],
             )
             exercise_error_tag = exercise_row["error_tag"]
-            connection.execute(
+            cursor = connection.execute(
                 """
                 INSERT INTO user_answers (
                     session_id,
@@ -1591,6 +1739,16 @@ class SQLiteLearningRepository:
                     None if is_correct else exercise_error_tag or "incorrect_answer",
                 ),
             )
+            user_answer_id = int(cursor.lastrowid)
+            diagnosis = diagnosis_by_exercise.get(exercise_id)
+            if diagnosis is not None:
+                self._save_answer_diagnosis(
+                    connection=connection,
+                    user_answer_id=user_answer_id,
+                    session_id=session_id,
+                    session_exercise_id=int(exercise_row["id"]),
+                    diagnosis=diagnosis,
+                )
             self._update_subtopic_stats(
                 connection=connection,
                 user_id=user_id,
@@ -1603,6 +1761,19 @@ class SQLiteLearningRepository:
                 user_id=user_id,
                 topic_id=int(exercise_row["topic_id"]),
                 error_tag=exercise_error_tag,
+                is_correct=is_correct,
+            )
+            self._update_skill_mastery(
+                connection=connection,
+                user_id=user_id,
+                topic_id=int(exercise_row["topic_id"]),
+                topic_code=str(exercise_row["topic_code"]),
+                skill_type=str(exercise_row["skill"] or ""),
+                subtopic=exercise_row["subtopic"],
+                difficulty=exercise_row["difficulty"],
+                error_tag=exercise_error_tag,
+                session_id=session_id,
+                session_exercise_id=int(exercise_row["id"]),
                 is_correct=is_correct,
             )
 
@@ -1673,6 +1844,58 @@ class SQLiteLearningRepository:
             ),
         )
 
+    def _save_answer_diagnosis(
+        self,
+        connection: sqlite3.Connection,
+        user_answer_id: int,
+        session_id: int,
+        session_exercise_id: int,
+        diagnosis: AnswerDiagnosis,
+    ) -> None:
+        connection.execute(
+            """
+            INSERT INTO answer_diagnoses (
+                user_answer_id,
+                session_id,
+                session_exercise_id,
+                error_type,
+                skill_code,
+                topic_code,
+                subtopic,
+                subtype,
+                severity,
+                mastery_impact,
+                explanation,
+                evidence_json
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_answer_id) DO UPDATE SET
+                error_type = excluded.error_type,
+                skill_code = excluded.skill_code,
+                topic_code = excluded.topic_code,
+                subtopic = excluded.subtopic,
+                subtype = excluded.subtype,
+                severity = excluded.severity,
+                mastery_impact = excluded.mastery_impact,
+                explanation = excluded.explanation,
+                evidence_json = excluded.evidence_json
+            """,
+            (
+                user_answer_id,
+                session_id,
+                session_exercise_id,
+                diagnosis.error_type,
+                diagnosis.skill_id,
+                diagnosis.topic,
+                diagnosis.subtopic,
+                diagnosis.subtype,
+                diagnosis.severity,
+                diagnosis.mastery_impact,
+                diagnosis.explanation,
+                json.dumps(diagnosis.evidence, ensure_ascii=False),
+            ),
+        )
+
     def _update_error_stats(
         self,
         connection: sqlite3.Connection,
@@ -1733,6 +1956,151 @@ class SQLiteLearningRepository:
             ),
         )
 
+    def _update_skill_mastery(
+        self,
+        connection: sqlite3.Connection,
+        user_id: int,
+        topic_id: int,
+        topic_code: str,
+        skill_type: str,
+        subtopic: str | None,
+        difficulty: str | None,
+        error_tag: str | None,
+        session_id: int,
+        session_exercise_id: int,
+        is_correct: bool,
+    ) -> None:
+        node = self.skill_graph.resolve(
+            topic=topic_code,
+            skill_type=skill_type or self._skill_for_topic(topic_code),
+            subtopic=subtopic,
+        )
+        skill_id = self._ensure_skill(connection, node)
+        existing = connection.execute(
+            """
+            SELECT
+                mastery_probability,
+                attempts_count,
+                correct_count,
+                incorrect_count,
+                difficulty_history_json,
+                error_frequency_json
+            FROM user_skill_mastery
+            WHERE user_id = ? AND skill_id = ?
+            """,
+            (user_id, skill_id),
+        ).fetchone()
+
+        prior_mastery = (
+            float(existing["mastery_probability"])
+            if existing is not None
+            else self.knowledge_tracer.parameters.initial_mastery
+        )
+        posterior_mastery = self.knowledge_tracer.update(
+            prior_mastery,
+            is_correct,
+        )
+        attempts_count = 1
+        correct_count = int(is_correct)
+        incorrect_count = 0 if is_correct else 1
+        difficulty_history: list[str] = []
+        error_frequency: dict[str, int] = {}
+
+        if existing is not None:
+            attempts_count += int(existing["attempts_count"])
+            correct_count += int(existing["correct_count"])
+            incorrect_count += int(existing["incorrect_count"])
+            difficulty_history = self._json_list(
+                existing["difficulty_history_json"],
+            )
+            error_frequency = self._json_dict(
+                existing["error_frequency_json"],
+            )
+
+        if difficulty:
+            difficulty_history = [*difficulty_history, str(difficulty)][-20:]
+        if error_tag and not is_correct:
+            error_frequency[error_tag] = int(error_frequency.get(error_tag, 0)) + 1
+
+        confidence = min(attempts_count / 8, 1.0)
+        connection.execute(
+            """
+            INSERT INTO user_skill_mastery (
+                user_id,
+                skill_id,
+                topic_id,
+                mastery_probability,
+                attempts_count,
+                correct_count,
+                incorrect_count,
+                confidence,
+                difficulty_history_json,
+                error_frequency_json,
+                status,
+                last_practiced_at,
+                next_review_at,
+                updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(user_id, skill_id) DO UPDATE SET
+                topic_id = excluded.topic_id,
+                mastery_probability = excluded.mastery_probability,
+                attempts_count = excluded.attempts_count,
+                correct_count = excluded.correct_count,
+                incorrect_count = excluded.incorrect_count,
+                confidence = excluded.confidence,
+                difficulty_history_json = excluded.difficulty_history_json,
+                error_frequency_json = excluded.error_frequency_json,
+                status = excluded.status,
+                last_practiced_at = CURRENT_TIMESTAMP,
+                next_review_at = excluded.next_review_at,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (
+                user_id,
+                skill_id,
+                topic_id,
+                posterior_mastery,
+                attempts_count,
+                correct_count,
+                incorrect_count,
+                confidence,
+                json.dumps(difficulty_history, ensure_ascii=False),
+                json.dumps(error_frequency, ensure_ascii=False),
+                self._status_from_mastery(posterior_mastery),
+                next_review_at(posterior_mastery, confidence),
+            ),
+        )
+        connection.execute(
+            """
+            INSERT INTO user_skill_mastery_history (
+                user_id,
+                skill_id,
+                topic_id,
+                session_id,
+                session_exercise_id,
+                is_correct,
+                prior_mastery,
+                posterior_mastery,
+                difficulty,
+                error_tag
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                user_id,
+                skill_id,
+                topic_id,
+                session_id,
+                session_exercise_id,
+                int(is_correct),
+                prior_mastery,
+                posterior_mastery,
+                difficulty,
+                None if is_correct else error_tag,
+            ),
+        )
+
     def _ensure_column(
         self,
         connection: sqlite3.Connection,
@@ -1748,6 +2116,104 @@ class SQLiteLearningRepository:
             connection.execute(
                 f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_definition}"
             )
+
+    def _seed_skill_graph(self, connection: sqlite3.Connection) -> None:
+        for node in self.skill_graph.nodes.values():
+            self._ensure_skill(connection, node)
+
+    def _ensure_skill(
+        self,
+        connection: sqlite3.Connection,
+        node: SkillNode,
+    ) -> int:
+        topic_id = self._ensure_topic(connection, node.topic)
+        connection.execute(
+            """
+            INSERT INTO skills (
+                skill_code,
+                topic_id,
+                parent_skill_code,
+                name,
+                skill_type,
+                cefr,
+                description,
+                prerequisites_json
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(skill_code) DO UPDATE SET
+                topic_id = excluded.topic_id,
+                parent_skill_code = excluded.parent_skill_code,
+                name = excluded.name,
+                skill_type = excluded.skill_type,
+                cefr = excluded.cefr,
+                description = excluded.description,
+                prerequisites_json = excluded.prerequisites_json
+            """,
+            (
+                node.skill_id,
+                topic_id,
+                node.parent_id,
+                node.label,
+                node.skill_type,
+                node.cefr,
+                node.description,
+                json.dumps(list(node.prerequisites), ensure_ascii=False),
+            ),
+        )
+        row = connection.execute(
+            "SELECT id FROM skills WHERE skill_code = ?",
+            (node.skill_id,),
+        ).fetchone()
+        skill_id = int(row["id"])
+
+        for prerequisite_code in node.prerequisites:
+            prerequisite_id = self._ensure_skill(
+                connection,
+                self.skill_graph.get(prerequisite_code),
+            )
+            connection.execute(
+                """
+                INSERT INTO skill_dependencies (
+                    prerequisite_skill_id,
+                    dependent_skill_id,
+                    relation_type
+                )
+                VALUES (?, ?, 'prerequisite')
+                ON CONFLICT(prerequisite_skill_id, dependent_skill_id, relation_type)
+                DO NOTHING
+                """,
+                (prerequisite_id, skill_id),
+            )
+
+        return skill_id
+
+    def _json_list(self, raw_value: str | None) -> list[str]:
+        if not raw_value:
+            return []
+        try:
+            value = json.loads(raw_value)
+        except json.JSONDecodeError:
+            return []
+        if not isinstance(value, list):
+            return []
+        return [str(item) for item in value if str(item).strip()]
+
+    def _json_dict(self, raw_value: str | None) -> dict[str, int]:
+        if not raw_value:
+            return {}
+        try:
+            value = json.loads(raw_value)
+        except json.JSONDecodeError:
+            return {}
+        if not isinstance(value, dict):
+            return {}
+        cleaned: dict[str, int] = {}
+        for key, count in value.items():
+            try:
+                cleaned[str(key)] = int(count)
+            except (TypeError, ValueError):
+                continue
+        return cleaned
 
     def _stat_key(self, topic_code: str, detail_code: str) -> str:
         return f"{topic_code}:{detail_code}"
@@ -1778,3 +2244,12 @@ class SQLiteLearningRepository:
         if error_rate >= 0.2:
             return "watch"
         return "improving"
+
+    def _status_from_mastery(self, mastery: float) -> str:
+        if mastery < 0.4:
+            return "weak"
+        if mastery < 0.65:
+            return "learning"
+        if mastery < 0.85:
+            return "review"
+        return "mastered"

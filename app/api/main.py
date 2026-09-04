@@ -2,11 +2,14 @@ import os
 from collections import Counter
 from dataclasses import asdict
 from pathlib import Path
+from time import perf_counter
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.schemas import (
+    AuthTokenRequestModel,
+    AuthTokenResponseModel,
     ChatMemoryResponseModel,
     ChromaDebugResponseModel,
     GeneratePracticeRequestModel,
@@ -16,6 +19,7 @@ from app.api.schemas import (
     InterpretOnboardingResponseModel,
     InterpretPracticeRequestModel,
     InterpretPracticeResponseModel,
+    MetricsResponseModel,
     PersonalizationSnapshotResponseModel,
     SaveChatMessageRequestModel,
     SaveChatMessageResponseModel,
@@ -23,8 +27,12 @@ from app.api.schemas import (
     ScorePracticeResponseModel,
     UpdateUserProfileRequestModel,
     UserProfileResponseModel,
+    WorkflowGraphResponseModel,
 )
+from app.auth.service import AuthContext, AuthService
 from app.bootstrap import build_baseline_pipeline
+from app.observability.metrics import metrics_registry
+from app.observability.tracing import get_tracer, setup_tracing
 from app.retrieval.knowledge_loader import load_knowledge_chunk_records
 from app.schemas import PracticeRequest, SessionResult, SubmittedAnswer
 
@@ -34,6 +42,9 @@ app = FastAPI(
 )
 
 pipeline = build_baseline_pipeline()
+auth_service = AuthService(pipeline.config)
+setup_tracing(pipeline.config)
+tracer = get_tracer(__name__)
 
 allowed_origins = [
     origin.strip()
@@ -50,12 +61,65 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def observe_http_request(request: Request, call_next):
+    started_at = perf_counter()
+    status_code = 500
+    with tracer.start_as_current_span("http.request") as span:
+        try:
+            response = await call_next(request)
+            status_code = response.status_code
+            return response
+        finally:
+            route = request.scope.get("route")
+            route_path = getattr(route, "path", request.url.path)
+            span.set_attribute("http.request.method", request.method)
+            span.set_attribute("http.route", route_path)
+            span.set_attribute("http.response.status_code", status_code)
+            if pipeline.config.observability_enabled:
+                labels = {
+                    "method": request.method,
+                    "path": route_path,
+                    "status": status_code,
+                }
+                metrics_registry.increment("http_requests_total", labels)
+                metrics_registry.observe(
+                    "http_request_duration_ms",
+                    (perf_counter() - started_at) * 1000,
+                    labels,
+                )
+
+
 @app.get("/api/health", response_model=HealthResponseModel)
 def healthcheck() -> HealthResponseModel:
     return HealthResponseModel(
         status="ok",
         generator_backend=pipeline.generator.backend_name,
+        repository_backend=pipeline.config.learning_repository_backend,
+        vector_store_backend=pipeline.config.vector_store_backend,
+        auth_mode=pipeline.config.auth_mode,
+        observability_enabled=pipeline.config.observability_enabled,
+        otel_enabled=pipeline.config.otel_enabled,
     )
+
+
+@app.post("/api/auth/dev-token", response_model=AuthTokenResponseModel)
+def create_dev_auth_token(payload: AuthTokenRequestModel) -> AuthTokenResponseModel:
+    return AuthTokenResponseModel(
+        access_token=auth_service.issue_token(payload.user_id),
+        user_id=payload.user_id,
+        expires_in_seconds=pipeline.config.auth_token_ttl_seconds,
+    )
+
+
+@app.get("/api/debug/metrics", response_model=MetricsResponseModel)
+def debug_metrics() -> MetricsResponseModel:
+    return MetricsResponseModel(**metrics_registry.snapshot())
+
+
+@app.get("/api/debug/workflow", response_model=WorkflowGraphResponseModel)
+def debug_workflow() -> WorkflowGraphResponseModel:
+    return WorkflowGraphResponseModel(**pipeline.workflow_graph.as_dict())
 
 
 @app.get("/api/debug/chroma", response_model=ChromaDebugResponseModel)
@@ -66,7 +130,9 @@ def debug_chroma() -> ChromaDebugResponseModel:
 @app.post("/api/practice/generate", response_model=GeneratePracticeResponseModel)
 def generate_practice(
     payload: GeneratePracticeRequestModel,
+    authorization: str | None = Header(default=None),
 ) -> GeneratePracticeResponseModel:
+    _authorize_user(payload.user_id, authorization)
     request_overrides = _practice_request_overrides(payload)
     generated = pipeline.create_exercise_set(
         user_id=payload.user_id,
@@ -82,7 +148,12 @@ def generate_practice(
         score=max(len(generated.exercises) - 1, 0)
         / max(len(generated.exercises), 1),
     )
-    preview_result.recommendation = pipeline.recommendation.recommend(preview_result)
+    profile = pipeline.repository.get_profile(payload.user_id)
+    preview_result.recommendation = pipeline.recommendation.recommend(
+        preview_result,
+        profile=profile,
+        generated=generated,
+    )
 
     return GeneratePracticeResponseModel(
         generation_run_id=generated.generation_run_id,
@@ -96,7 +167,11 @@ def generate_practice(
 
 
 @app.post("/api/practice/score", response_model=ScorePracticeResponseModel)
-def score_practice(payload: ScorePracticeRequestModel) -> ScorePracticeResponseModel:
+def score_practice(
+    payload: ScorePracticeRequestModel,
+    authorization: str | None = Header(default=None),
+) -> ScorePracticeResponseModel:
+    _authorize_user(payload.user_id, authorization)
     try:
         result = pipeline.score_submission(
             user_id=payload.user_id,
@@ -125,7 +200,9 @@ def score_practice(payload: ScorePracticeRequestModel) -> ScorePracticeResponseM
 def update_user_profile(
     user_id: str,
     payload: UpdateUserProfileRequestModel,
+    authorization: str | None = Header(default=None),
 ) -> UserProfileResponseModel:
+    _authorize_user(user_id, authorization)
     profile = pipeline.repository.get_profile(user_id)
 
     if payload.display_name is not None:
@@ -162,8 +239,9 @@ def update_user_profile(
 def interpret_onboarding_answer(
     user_id: str,
     payload: InterpretOnboardingRequestModel,
+    authorization: str | None = Header(default=None),
 ) -> InterpretOnboardingResponseModel:
-    _ = user_id
+    _authorize_user(user_id, authorization)
     interpretation = pipeline.interpret_onboarding_answer(
         message=payload.message,
         current_answers=payload.current_answers,
@@ -179,7 +257,9 @@ def interpret_onboarding_answer(
 def interpret_practice_request(
     user_id: str,
     payload: InterpretPracticeRequestModel,
+    authorization: str | None = Header(default=None),
 ) -> InterpretPracticeResponseModel:
+    _authorize_user(user_id, authorization)
     interpretation = pipeline.interpret_practice_request(
         user_id=user_id,
         message=payload.message,
@@ -199,7 +279,11 @@ def interpret_practice_request(
     "/api/users/{user_id}/chat/resume",
     response_model=ChatMemoryResponseModel,
 )
-def get_chat_resume(user_id: str) -> ChatMemoryResponseModel:
+def get_chat_resume(
+    user_id: str,
+    authorization: str | None = Header(default=None),
+) -> ChatMemoryResponseModel:
+    _authorize_user(user_id, authorization)
     return ChatMemoryResponseModel(
         **pipeline.repository.get_chat_resume(user_id),
     )
@@ -212,7 +296,9 @@ def get_chat_resume(user_id: str) -> ChatMemoryResponseModel:
 def save_chat_message(
     user_id: str,
     payload: SaveChatMessageRequestModel,
+    authorization: str | None = Header(default=None),
 ) -> SaveChatMessageResponseModel:
+    _authorize_user(user_id, authorization)
     try:
         saved = pipeline.repository.save_chat_message(
             user_id=user_id,
@@ -233,7 +319,9 @@ def save_chat_message(
 )
 def get_personalization_snapshot(
     user_id: str,
+    authorization: str | None = Header(default=None),
 ) -> PersonalizationSnapshotResponseModel:
+    _authorize_user(user_id, authorization)
     snapshot = pipeline.repository.get_personalization_snapshot(user_id)
     profile = pipeline.repository.get_profile(user_id)
     next_plan = pipeline.personalization.build_plan(
@@ -262,6 +350,16 @@ def _clean_list(values: list[str]) -> list[str]:
     return cleaned
 
 
+def _authorize_user(
+    user_id: str,
+    authorization: str | None,
+) -> AuthContext:
+    try:
+        return auth_service.authorize(user_id, authorization)
+    except PermissionError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+
+
 def _build_chroma_debug_snapshot() -> dict:
     config = pipeline.config
     persist_directory = str(Path(config.chroma_persist_directory))
@@ -274,6 +372,9 @@ def _build_chroma_debug_snapshot() -> dict:
     raw_knowledge_count = _safe_raw_knowledge_count(config.knowledge_chunks_path)
     base_snapshot = {
         "configured_backend": config.vector_store_backend,
+        "retrieval_mode": config.retrieval_mode,
+        "embedding_backend": config.embedding_backend,
+        "reranker_enabled": config.reranker_enabled,
         "using_chroma_backend": config.vector_store_backend.lower() == "chroma",
         "collection_name": config.chroma_collection_name,
         "persist_directory": persist_directory,
@@ -286,14 +387,25 @@ def _build_chroma_debug_snapshot() -> dict:
         "total_chunks": 0,
     }
 
+    if config.vector_store_backend.lower() != "chroma":
+        return {
+            **base_snapshot,
+            "is_available": True,
+            "status_message": (
+                f"Vector backend is {config.vector_store_backend}; "
+                "Chroma collection debug is not applicable."
+            ),
+            "error": None,
+        }
+
     try:
         from langchain_chroma import Chroma
 
-        from app.retrieval.embeddings import KeywordHashEmbeddings
+        from app.retrieval.embeddings import build_embedding_model
 
         vector_store = Chroma(
             collection_name=config.chroma_collection_name,
-            embedding_function=KeywordHashEmbeddings(),
+            embedding_function=build_embedding_model(config),
             persist_directory=persist_directory,
         )
         payload = vector_store.get(include=["metadatas", "documents"])

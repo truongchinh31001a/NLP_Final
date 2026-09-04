@@ -1,5 +1,7 @@
 from app.config import AppConfig
 from app.agent.learning_agent import LearningAgent
+from app.agent.workflow_graph import LearningWorkflowGraph
+from app.diagnosis.service import ErrorDiagnosisService
 from app.generation.service import ExerciseGenerationService
 from app.generation.validator import ExerciseValidator
 from app.intent.interpreter import (
@@ -28,6 +30,7 @@ class PracticePipeline:
         validator: ExerciseValidator,
         recommendation: RecommendationService,
         review: PracticeReviewService,
+        diagnosis: ErrorDiagnosisService,
         onboarding: OnboardingInterpreter,
         practice_intent: PracticeIntentInterpreter,
     ) -> None:
@@ -40,8 +43,10 @@ class PracticePipeline:
         self.validator = validator
         self.recommendation = recommendation
         self.review = review
+        self.diagnosis = diagnosis
         self.onboarding = onboarding
         self.practice_intent = practice_intent
+        self.workflow_graph = LearningWorkflowGraph()
         self.agent = LearningAgent(
             config=config,
             repository=repository,
@@ -52,6 +57,7 @@ class PracticePipeline:
             validator=validator,
             recommendation=recommendation,
             review=review,
+            diagnosis=diagnosis,
         )
 
     def create_exercise_set(

@@ -32,6 +32,7 @@ import { getPersonalizationSnapshot } from "@/lib/api";
 import type {
   PersonalizationErrorStat,
   PersonalizationSnapshot,
+  PersonalizationSkillMastery,
   PersonalizationSubtopicStat,
   PersonalizationTopicStat,
 } from "@/lib/types";
@@ -76,6 +77,8 @@ export function PersonalizationDashboard() {
       return {
         totalAttempts: 0,
         weightedAccuracy: 0,
+        averageMastery: 0,
+        topWeakSkill: null as PersonalizationSkillMastery | null,
         topWeakSubtopic: null as PersonalizationSubtopicStat | null,
         topError: null as PersonalizationErrorStat | null,
       };
@@ -94,6 +97,13 @@ export function PersonalizationDashboard() {
       totalAttempts,
       weightedAccuracy:
         totalAttempts > 0 ? totalCorrect / Math.max(totalAttempts, 1) : 0,
+      averageMastery: snapshot.skillMastery.length
+        ? snapshot.skillMastery.reduce(
+            (sum, item) => sum + item.masteryProbability,
+            0,
+          ) / snapshot.skillMastery.length
+        : 0,
+      topWeakSkill: snapshot.skillMastery[0] ?? null,
       topWeakSubtopic: snapshot.subtopicStats[0] ?? null,
       topError: snapshot.errorStats[0] ?? null,
     };
@@ -216,6 +226,65 @@ export function PersonalizationDashboard() {
     },
   ];
 
+  const skillColumns: ColumnsType<PersonalizationSkillMastery> = [
+    {
+      title: "Skill",
+      dataIndex: "label",
+      key: "label",
+      render: (label, row) => (
+        <Space direction="vertical" size={0}>
+          <Typography.Text strong>{label}</Typography.Text>
+          <Typography.Text type="secondary">
+            {formatCode(row.topic)} - {row.cefr ?? "CEFR n/a"}
+          </Typography.Text>
+        </Space>
+      ),
+    },
+    {
+      title: "Mastery",
+      dataIndex: "masteryProbability",
+      key: "masteryProbability",
+      render: (mastery) => (
+        <Progress
+          percent={toPercent(Number(mastery))}
+          size="small"
+          strokeColor="#2454a6"
+        />
+      ),
+    },
+    {
+      title: "Confidence",
+      dataIndex: "confidence",
+      key: "confidence",
+      render: (confidence) => `${toPercent(Number(confidence))}%`,
+      width: 110,
+    },
+    {
+      title: "Attempts",
+      dataIndex: "attemptsCount",
+      key: "attemptsCount",
+      width: 100,
+    },
+    {
+      title: "Next Review",
+      dataIndex: "nextReviewAt",
+      key: "nextReviewAt",
+      render: (value) => formatReviewDate(value),
+      width: 150,
+    },
+    {
+      title: "Status",
+      dataIndex: "status",
+      key: "status",
+      render: (status, row) => (
+        <Tag color={weaknessColor(row.weaknessScore)}>
+          {status ?? "learning"}
+        </Tag>
+      ),
+      width: 120,
+    },
+  ];
+
   return (
     <ConfigProvider
       theme={{
@@ -300,6 +369,9 @@ export function PersonalizationDashboard() {
                     size="small"
                     strokeColor="#147447"
                   />
+                  <Typography.Text type="secondary">
+                    Avg mastery {toPercent(summary.averageMastery)}%
+                  </Typography.Text>
                 </Card>
               </Col>
               <Col lg={6} sm={12} xs={24}>
@@ -307,7 +379,11 @@ export function PersonalizationDashboard() {
                   <Statistic
                     prefix={<FireOutlined />}
                     title="Top Weakness"
-                    value={summary.topWeakSubtopic?.label ?? "No data"}
+                    value={
+                      summary.topWeakSkill?.label ??
+                      summary.topWeakSubtopic?.label ??
+                      "No data"
+                    }
                     valueStyle={{ fontSize: 18 }}
                   />
                   {summary.topError ? (
@@ -351,6 +427,11 @@ export function PersonalizationDashboard() {
                         {formatCode(snapshot.nextPlan.targetErrorTag)}
                       </Tag>
                     ) : null}
+                    {snapshot.nextPlan.targetSkillId ? (
+                      <Tag color="purple">
+                        {formatCode(snapshot.nextPlan.targetSkillId)}
+                      </Tag>
+                    ) : null}
                   </Space>
                 </Col>
                 <Col lg={10} xs={24}>
@@ -375,6 +456,17 @@ export function PersonalizationDashboard() {
               </Card>
             ) : (
               <Row gutter={[16, 16]}>
+                <Col span={24}>
+                  <Card title="Skill Mastery (BKT)">
+                    <Table
+                      columns={skillColumns}
+                      dataSource={snapshot.skillMastery}
+                      pagination={false}
+                      rowKey="code"
+                      size="middle"
+                    />
+                  </Card>
+                </Col>
                 <Col lg={12} xs={24}>
                   <Card title="Weak Subtopics va Mastery">
                     <Table
@@ -433,4 +525,18 @@ function weaknessColor(score: number) {
 
 function formatCode(value: string) {
   return value.replaceAll("_", " ");
+}
+
+function formatReviewDate(value?: string | null) {
+  if (!value) {
+    return "Not scheduled";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
 }

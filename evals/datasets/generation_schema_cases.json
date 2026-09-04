@@ -1,0 +1,53 @@
+[
+  {
+    "case_id": "valid_mcq_batch",
+    "expected_count": 1,
+    "is_valid": true,
+    "exercises": [
+      {
+        "exercise_id": "gen_valid_001",
+        "exercise_type": "grammar_mcq",
+        "topic": "tenses",
+        "difficulty": "easy",
+        "skill": "grammar",
+        "subtopic": "present_simple_habits",
+        "error_tag": "subject_verb_agreement",
+        "question_text": "She ____ coffee every morning.",
+        "correct_answer": "B",
+        "explanation": "Use present simple for habits; third-person singular adds s.",
+        "options": [
+          {"label": "A", "text": "drink", "is_correct": false},
+          {"label": "B", "text": "drinks", "is_correct": true},
+          {"label": "C", "text": "is drinking", "is_correct": false},
+          {"label": "D", "text": "drank", "is_correct": false}
+        ]
+      }
+    ]
+  },
+  {
+    "case_id": "invalid_mcq_two_correct_options",
+    "expected_count": 1,
+    "is_valid": false,
+    "exercises": [
+      {
+        "exercise_id": "gen_invalid_001",
+        "exercise_type": "grammar_mcq",
+        "topic": "tenses",
+        "difficulty": "easy",
+        "skill": "grammar",
+        "subtopic": "present_simple_habits",
+        "error_tag": "subject_verb_agreement",
+        "question_text": "She ____ coffee every morning.",
+        "correct_answer": "B",
+        "explanation": "Use present simple for habits.",
+        "options": [
+          {"label": "A", "text": "drink", "is_correct": true},
+          {"label": "B", "text": "drinks", "is_correct": true},
+          {"label": "C", "text": "is drinking", "is_correct": false},
+          {"label": "D", "text": "drank", "is_correct": false}
+        ]
+      }
+    ]
+  }
+]
+

@@ -1,4 +1,21 @@
 services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: english-exercise-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-english_tutor}
+      POSTGRES_USER: ${POSTGRES_USER:-english_tutor}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-english_tutor}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U english_tutor -d english_tutor"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
   ollama:
     image: ollama/ollama:latest
     container_name: english-exercise-ollama
@@ -17,13 +34,26 @@ services:
       dockerfile: Dockerfile.backend
     container_name: english-exercise-backend
     depends_on:
+      postgres:
+        condition: service_healthy
       ollama:
         condition: service_started
     environment:
       CORS_ORIGINS: http://localhost:3000
-      LEARNING_REPOSITORY_BACKEND: sqlite
+      LEARNING_REPOSITORY_BACKEND: ${LEARNING_REPOSITORY_BACKEND:-sqlite}
       SQLITE_DB_PATH: /workspace/data/sqlite/app.db
+      POSTGRES_DATABASE_URL: ${POSTGRES_DATABASE_URL:-postgresql://english_tutor:english_tutor@postgres:5432/english_tutor}
       VECTOR_STORE_BACKEND: ${VECTOR_STORE_BACKEND:-chroma}
+      RETRIEVAL_MODE: ${RETRIEVAL_MODE:-hybrid}
+      RERANKER_ENABLED: ${RERANKER_ENABLED:-true}
+      EMBEDDING_BACKEND: ${EMBEDDING_BACKEND:-keyword_hash}
+      PGVECTOR_DATABASE_URL: ${PGVECTOR_DATABASE_URL:-postgresql://english_tutor:english_tutor@postgres:5432/english_tutor}
+      PGVECTOR_TABLE_NAME: ${PGVECTOR_TABLE_NAME:-rag_documents}
+      PGVECTOR_EMBEDDING_DIMENSION: ${PGVECTOR_EMBEDDING_DIMENSION:-0}
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}
+      CHROMA_COLLECTION_NAME: ${CHROMA_COLLECTION_NAME:-english_exercise_kb}
+      CHROMA_PERSIST_DIRECTORY: ${CHROMA_PERSIST_DIRECTORY:-/workspace/data/vector_store/chroma}
       LLM_BACKEND: ${LLM_BACKEND:-ollama}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b}
@@ -33,6 +63,13 @@ services:
       ONBOARDING_LLM_TIMEOUT_SECONDS: ${ONBOARDING_LLM_TIMEOUT_SECONDS:-35}
       PRACTICE_INTENT_LLM_TIMEOUT_SECONDS: ${PRACTICE_INTENT_LLM_TIMEOUT_SECONDS:-25}
       SEED_FIRST_GENERATION: ${SEED_FIRST_GENERATION:-false}
+      AUTH_MODE: ${AUTH_MODE:-disabled}
+      AUTH_TOKEN_SECRET: ${AUTH_TOKEN_SECRET:-change-me-before-enabling-auth}
+      AUTH_TOKEN_TTL_SECONDS: ${AUTH_TOKEN_TTL_SECONDS:-86400}
+      OBSERVABILITY_ENABLED: ${OBSERVABILITY_ENABLED:-true}
+      OTEL_ENABLED: ${OTEL_ENABLED:-false}
+      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-adaptive-ai-english-tutor}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
     volumes:
       - ./data:/workspace/data
     ports:
@@ -44,6 +81,7 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+        NEXT_PUBLIC_AUTH_TOKEN: ${NEXT_PUBLIC_AUTH_TOKEN:-}
     container_name: english-exercise-frontend
     depends_on:
       - backend
@@ -51,4 +89,5 @@ services:
       - "3000:3000"
 
 volumes:
+  postgres_data:
   ollama_data:

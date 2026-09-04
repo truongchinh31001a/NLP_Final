@@ -53,6 +53,7 @@ export type PracticePlanPreview = {
   numQuestions: number;
   focusReason: string;
   contentTheme?: string | null;
+  targetSkillId?: string | null;
 };
 
 export type ScoreResult = {
@@ -64,7 +65,22 @@ export type ScoreResult = {
   recommendation: string;
   generationRunId?: string;
   sessionCode?: string;
+  answerDiagnoses?: AnswerDiagnosis[];
   practiceReview?: PracticeReview | null;
+};
+
+export type AnswerDiagnosis = {
+  exerciseId: string;
+  isCorrect: boolean;
+  errorType: string;
+  skillId: string;
+  topic: string;
+  subtopic?: string | null;
+  subtype?: string | null;
+  severity: number;
+  masteryImpact: number;
+  explanation: string;
+  evidence: Record<string, unknown>;
 };
 
 export type PracticeReview = {
@@ -130,6 +146,24 @@ export type PersonalizationErrorStat = {
   lastSeenAt?: string | null;
 };
 
+export type PersonalizationSkillMastery = {
+  code: string;
+  label: string;
+  topic: string;
+  skillType: string;
+  cefr?: string | null;
+  masteryProbability: number;
+  confidence: number;
+  attemptsCount: number;
+  correctCount: number;
+  incorrectCount: number;
+  weaknessScore: number;
+  status?: string | null;
+  lastPracticedAt?: string | null;
+  nextReviewAt?: string | null;
+  prerequisites: string[];
+};
+
 export type PersonalizationSnapshot = {
   userId: string;
   displayName: string;
@@ -141,9 +175,11 @@ export type PersonalizationSnapshot = {
   topicStats: PersonalizationTopicStat[];
   subtopicStats: PersonalizationSubtopicStat[];
   errorStats: PersonalizationErrorStat[];
+  skillMastery: PersonalizationSkillMastery[];
   nextPlan: PracticePlanPreview & {
     targetSubtopic?: string | null;
     targetErrorTag?: string | null;
+    targetSkillId?: string | null;
     learnerSummary?: string;
   };
 };
@@ -160,6 +196,9 @@ export type ChromaDebugChunk = {
 
 export type ChromaDebugSnapshot = {
   configuredBackend: string;
+  retrievalMode: string;
+  embeddingBackend: string;
+  rerankerEnabled: boolean;
   usingChromaBackend: boolean;
   collectionName: string;
   persistDirectory: string;

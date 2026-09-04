@@ -18,6 +18,15 @@ class ExerciseValidator:
         if not exercise.explanation.strip():
             raise ValueError("Exercise explanation must not be empty.")
 
+        if not exercise.skill.strip():
+            raise ValueError("Exercise skill metadata must not be empty.")
+
+        if not (exercise.subtopic or "").strip():
+            raise ValueError("Exercise subtopic metadata must not be empty.")
+
+        if not (exercise.error_tag or "").strip():
+            raise ValueError("Exercise error_tag metadata must not be empty.")
+
         if exercise.exercise_type == "fill_blank":
             if not exercise.correct_answer.strip():
                 raise ValueError("Fill-in-the-blank exercises require a correct answer.")

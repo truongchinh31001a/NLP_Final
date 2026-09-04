@@ -1,0 +1,75 @@
+[
+  {
+    "case_id": "diag_wrong_tense_past_simple",
+    "exercise": {
+      "exercise_id": "diag_001",
+      "exercise_type": "grammar_mcq",
+      "topic": "tenses",
+      "difficulty": "easy",
+      "skill": "grammar",
+      "subtopic": "past_simple_finished_time",
+      "error_tag": "wrong_tense",
+      "question_text": "I ____ my homework last night.",
+      "correct_answer": "B",
+      "explanation": "Use past simple with finished time expressions like last night.",
+      "options": [
+        {"label": "A", "text": "finish", "is_correct": false},
+        {"label": "B", "text": "finished", "is_correct": true},
+        {"label": "C", "text": "have finished", "is_correct": false},
+        {"label": "D", "text": "am finishing", "is_correct": false}
+      ]
+    },
+    "selected_answer": "A",
+    "expected_error_type": "verb_tense",
+    "expected_skill_id": "grammar.tenses.past_simple_finished_time"
+  },
+  {
+    "case_id": "diag_missing_be_passive",
+    "exercise": {
+      "exercise_id": "diag_002",
+      "exercise_type": "grammar_mcq",
+      "topic": "passive_voice",
+      "difficulty": "easy",
+      "skill": "grammar",
+      "subtopic": "present_simple_passive",
+      "error_tag": "missing_be",
+      "question_text": "The room ____ every day.",
+      "correct_answer": "B",
+      "explanation": "Present simple passive uses am/is/are + past participle.",
+      "options": [
+        {"label": "A", "text": "cleans", "is_correct": false},
+        {"label": "B", "text": "is cleaned", "is_correct": true},
+        {"label": "C", "text": "cleaned", "is_correct": false},
+        {"label": "D", "text": "cleaning", "is_correct": false}
+      ]
+    },
+    "selected_answer": "A",
+    "expected_error_type": "auxiliary",
+    "expected_skill_id": "grammar.passive_voice.present_simple_passive"
+  },
+  {
+    "case_id": "diag_vocab_meaning",
+    "exercise": {
+      "exercise_id": "diag_003",
+      "exercise_type": "vocabulary_mcq",
+      "topic": "vocabulary",
+      "difficulty": "medium",
+      "skill": "vocabulary",
+      "subtopic": "collocations",
+      "error_tag": "vocabulary_meaning_confusion",
+      "question_text": "David still ____ contact with old school friends.",
+      "correct_answer": "D",
+      "explanation": "The collocation is keep contact with somebody.",
+      "options": [
+        {"label": "A", "text": "catches", "is_correct": false},
+        {"label": "B", "text": "brings", "is_correct": false},
+        {"label": "C", "text": "takes", "is_correct": false},
+        {"label": "D", "text": "keeps", "is_correct": true}
+      ]
+    },
+    "selected_answer": "A",
+    "expected_error_type": "vocabulary_meaning",
+    "expected_skill_id": "vocabulary.vocabulary.collocations"
+  }
+]
+

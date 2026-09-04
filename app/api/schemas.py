@@ -45,6 +45,17 @@ class GeneratePracticeResponseModel(BaseModel):
     agent_trace: list[dict] = Field(default_factory=list)
 
 
+class AuthTokenRequestModel(BaseModel):
+    user_id: str = Field(min_length=1, max_length=120)
+
+
+class AuthTokenResponseModel(BaseModel):
+    token_type: str = "bearer"
+    access_token: str
+    user_id: str
+    expires_in_seconds: int
+
+
 class SubmittedAnswerModel(BaseModel):
     exercise_id: str
     selected_answer: str
@@ -67,6 +78,20 @@ class PracticeReviewResponseModel(BaseModel):
     raw_response: str = ""
 
 
+class AnswerDiagnosisResponseModel(BaseModel):
+    exercise_id: str
+    is_correct: bool
+    error_type: str
+    skill_id: str
+    topic: str
+    subtopic: str | None = None
+    subtype: str | None = None
+    severity: float
+    mastery_impact: float
+    explanation: str
+    evidence: dict[str, Any] = Field(default_factory=dict)
+
+
 class ScorePracticeResponseModel(BaseModel):
     topic: str
     score: float
@@ -76,6 +101,7 @@ class ScorePracticeResponseModel(BaseModel):
     recommendation: str
     generation_run_id: str
     session_code: str
+    answer_diagnoses: list[AnswerDiagnosisResponseModel] = Field(default_factory=list)
     practice_review: PracticeReviewResponseModel | None = None
 
 
@@ -133,6 +159,9 @@ class UserProfileResponseModel(BaseModel):
     weak_subtopics: dict[str, float]
     subtopic_accuracy: dict[str, float]
     error_tag_weakness: dict[str, float]
+    skill_mastery: dict[str, float] = Field(default_factory=dict)
+    skill_confidence: dict[str, float] = Field(default_factory=dict)
+    skill_attempts: dict[str, int] = Field(default_factory=dict)
 
 
 class ChatMessageResponseModel(BaseModel):
@@ -204,6 +233,24 @@ class PersonalizationErrorStatModel(BaseModel):
     last_seen_at: str | None = None
 
 
+class PersonalizationSkillMasteryModel(BaseModel):
+    code: str
+    label: str
+    topic: str
+    skill_type: str
+    cefr: str | None = None
+    mastery_probability: float
+    confidence: float
+    attempts_count: int
+    correct_count: int
+    incorrect_count: int
+    weakness_score: float
+    status: str | None = None
+    last_practiced_at: str | None = None
+    next_review_at: str | None = None
+    prerequisites: list[str] = Field(default_factory=list)
+
+
 class PersonalizationSnapshotResponseModel(BaseModel):
     user_id: str
     display_name: str
@@ -215,12 +262,32 @@ class PersonalizationSnapshotResponseModel(BaseModel):
     topic_stats: list[PersonalizationTopicStatModel]
     subtopic_stats: list[PersonalizationSubtopicStatModel]
     error_stats: list[PersonalizationErrorStatModel]
+    skill_mastery: list[PersonalizationSkillMasteryModel] = Field(
+        default_factory=list
+    )
     next_plan: dict
 
 
 class HealthResponseModel(BaseModel):
     status: str
     generator_backend: str
+    repository_backend: str
+    vector_store_backend: str
+    auth_mode: str
+    observability_enabled: bool
+    otel_enabled: bool
+
+
+class MetricsResponseModel(BaseModel):
+    counters: dict[str, int]
+    timers: dict[str, dict[str, Any]]
+
+
+class WorkflowGraphResponseModel(BaseModel):
+    engine: str
+    nodes: list[dict[str, Any]]
+    generation_edges: list[dict[str, Any]]
+    scoring_edges: list[dict[str, Any]]
 
 
 class ChromaDebugChunkModel(BaseModel):
@@ -235,6 +302,9 @@ class ChromaDebugChunkModel(BaseModel):
 
 class ChromaDebugResponseModel(BaseModel):
     configured_backend: str
+    retrieval_mode: str
+    embedding_backend: str
+    reranker_enabled: bool
     using_chroma_backend: bool
     collection_name: str
     persist_directory: str

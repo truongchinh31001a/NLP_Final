@@ -7,6 +7,16 @@ import type {
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+const AUTH_TOKEN = process.env.NEXT_PUBLIC_AUTH_TOKEN;
+
+function authHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  return AUTH_TOKEN
+    ? {
+        ...extra,
+        Authorization: `Bearer ${AUTH_TOKEN}`,
+      }
+    : extra;
+}
 
 export type GeneratePracticeRequest = {
   userId: string;
@@ -32,6 +42,7 @@ export type GeneratePracticeResponse = {
     num_questions: number;
     focus_reason: string;
     content_theme?: string | null;
+    target_skill_id?: string | null;
   };
   exercises: Array<{
     exercise_id: string;
@@ -79,6 +90,19 @@ export type ScorePracticeResponse = {
   recommendation: string;
   generation_run_id: string;
   session_code: string;
+  answer_diagnoses?: Array<{
+    exercise_id: string;
+    is_correct: boolean;
+    error_type: string;
+    skill_id: string;
+    topic: string;
+    subtopic?: string | null;
+    subtype?: string | null;
+    severity: number;
+    mastery_impact: number;
+    explanation: string;
+    evidence: Record<string, unknown>;
+  }>;
   practice_review?: {
     review_code: string;
     evaluator: string;
@@ -133,6 +157,23 @@ export type PersonalizationSnapshotResponse = {
     status?: string | null;
     last_seen_at?: string | null;
   }>;
+  skill_mastery?: Array<{
+    code: string;
+    label: string;
+    topic: string;
+    skill_type: string;
+    cefr?: string | null;
+    mastery_probability: number;
+    confidence: number;
+    attempts_count: number;
+    correct_count: number;
+    incorrect_count: number;
+    weakness_score: number;
+    status?: string | null;
+    last_practiced_at?: string | null;
+    next_review_at?: string | null;
+    prerequisites: string[];
+  }>;
   next_plan: {
     topic: string;
     difficulty: string;
@@ -142,6 +183,7 @@ export type PersonalizationSnapshotResponse = {
     content_theme?: string | null;
     target_subtopic?: string | null;
     target_error_tag?: string | null;
+    target_skill_id?: string | null;
     learner_summary?: string;
   };
 };
@@ -244,6 +286,9 @@ export type SaveChatMessageResponse = {
 
 export type ChromaDebugResponse = {
   configured_backend: string;
+  retrieval_mode: string;
+  embedding_backend: string;
+  reranker_enabled: boolean;
   using_chroma_backend: boolean;
   collection_name: string;
   persist_directory: string;
@@ -278,6 +323,7 @@ export async function generatePractice(
     numQuestions: number;
     focusReason: string;
     contentTheme?: string | null;
+    targetSkillId?: string | null;
   };
   recommendation?: string;
   generatorBackend?: string;
@@ -285,9 +331,7 @@ export async function generatePractice(
 }> {
   const response = await fetch(`${API_BASE_URL}/api/practice/generate`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({
       user_id: payload.userId,
       message: payload.message,
@@ -314,6 +358,7 @@ export async function generatePractice(
       numQuestions: data.plan.num_questions,
       focusReason: data.plan.focus_reason,
       contentTheme: data.plan.content_theme,
+      targetSkillId: data.plan.target_skill_id,
     },
     exercises: data.exercises.map((exercise) => ({
       id: exercise.exercise_id,
@@ -359,12 +404,23 @@ export async function scorePractice(
     nextSteps: string[];
     nextPracticePrompt: string;
   } | null;
+  answerDiagnoses?: Array<{
+    exerciseId: string;
+    isCorrect: boolean;
+    errorType: string;
+    skillId: string;
+    topic: string;
+    subtopic?: string | null;
+    subtype?: string | null;
+    severity: number;
+    masteryImpact: number;
+    explanation: string;
+    evidence: Record<string, unknown>;
+  }>;
 }> {
   const response = await fetch(`${API_BASE_URL}/api/practice/score`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({
       user_id: payload.userId,
       generation_run_id: payload.generationRunId,
@@ -390,6 +446,19 @@ export async function scorePractice(
     recommendation: data.recommendation,
     generationRunId: data.generation_run_id,
     sessionCode: data.session_code,
+    answerDiagnoses: (data.answer_diagnoses ?? []).map((diagnosis) => ({
+      exerciseId: diagnosis.exercise_id,
+      isCorrect: diagnosis.is_correct,
+      errorType: diagnosis.error_type,
+      skillId: diagnosis.skill_id,
+      topic: diagnosis.topic,
+      subtopic: diagnosis.subtopic,
+      subtype: diagnosis.subtype,
+      severity: diagnosis.severity,
+      masteryImpact: diagnosis.mastery_impact,
+      explanation: diagnosis.explanation,
+      evidence: diagnosis.evidence,
+    })),
     practiceReview: data.practice_review
       ? {
           reviewCode: data.practice_review.review_code,
@@ -409,6 +478,9 @@ export async function getPersonalizationSnapshot(
 ): Promise<PersonalizationSnapshot> {
   const response = await fetch(
     `${API_BASE_URL}/api/users/${encodeURIComponent(userId)}/personalization`,
+    {
+      headers: authHeaders(),
+    },
   );
 
   if (!response.ok) {
@@ -459,6 +531,23 @@ export async function getPersonalizationSnapshot(
       status: item.status,
       lastSeenAt: item.last_seen_at,
     })),
+    skillMastery: (data.skill_mastery ?? []).map((item) => ({
+      code: item.code,
+      label: item.label,
+      topic: item.topic,
+      skillType: item.skill_type,
+      cefr: item.cefr,
+      masteryProbability: item.mastery_probability,
+      confidence: item.confidence,
+      attemptsCount: item.attempts_count,
+      correctCount: item.correct_count,
+      incorrectCount: item.incorrect_count,
+      weaknessScore: item.weakness_score,
+      status: item.status,
+      lastPracticedAt: item.last_practiced_at,
+      nextReviewAt: item.next_review_at,
+      prerequisites: item.prerequisites,
+    })),
     nextPlan: {
       topic: data.next_plan.topic,
       difficulty: data.next_plan.difficulty,
@@ -467,6 +556,7 @@ export async function getPersonalizationSnapshot(
       focusReason: data.next_plan.focus_reason,
       targetSubtopic: data.next_plan.target_subtopic,
       targetErrorTag: data.next_plan.target_error_tag,
+      targetSkillId: data.next_plan.target_skill_id,
       learnerSummary: data.next_plan.learner_summary,
       contentTheme: data.next_plan.content_theme,
     },
@@ -480,9 +570,7 @@ export async function updateUserProfile(
     `${API_BASE_URL}/api/users/${encodeURIComponent(payload.userId)}/profile`,
     {
       method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         display_name: payload.displayName,
         level: payload.level,
@@ -509,9 +597,7 @@ export async function interpretOnboardingAnswer(
     `${API_BASE_URL}/api/users/${encodeURIComponent(payload.userId)}/onboarding/interpret`,
     {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         message: payload.message,
         current_answers: payload.currentAnswers,
@@ -541,9 +627,7 @@ export async function interpretPracticeRequest(
     `${API_BASE_URL}/api/users/${encodeURIComponent(payload.userId)}/practice/interpret`,
     {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         message: payload.message,
       }),
@@ -576,6 +660,9 @@ export async function interpretPracticeRequest(
 export async function getChatResume(userId: string): Promise<ChatMemoryResume> {
   const response = await fetch(
     `${API_BASE_URL}/api/users/${encodeURIComponent(userId)}/chat/resume`,
+    {
+      headers: authHeaders(),
+    },
   );
 
   if (!response.ok) {
@@ -593,9 +680,7 @@ export async function saveChatMessage(
     `${API_BASE_URL}/api/users/${encodeURIComponent(payload.userId)}/chat/messages`,
     {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         session_id: payload.sessionId,
         role: payload.role,
@@ -631,6 +716,9 @@ export async function getChromaDebugSnapshot(): Promise<ChromaDebugSnapshot> {
   const data = (await response.json()) as ChromaDebugResponse;
   return {
     configuredBackend: data.configured_backend,
+    retrievalMode: data.retrieval_mode,
+    embeddingBackend: data.embedding_backend,
+    rerankerEnabled: data.reranker_enabled,
     usingChromaBackend: data.using_chroma_backend,
     collectionName: data.collection_name,
     persistDirectory: data.persist_directory,

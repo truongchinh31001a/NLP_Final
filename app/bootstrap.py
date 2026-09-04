@@ -1,4 +1,5 @@
 from app.config import AppConfig
+from app.diagnosis.service import ErrorDiagnosisService
 from app.generation.seed_bank import SeedExerciseBank
 from app.generation.service import ExerciseGenerationService
 from app.generation.validator import ExerciseValidator
@@ -18,12 +19,8 @@ from app.review.service import PracticeReviewService
 
 def build_baseline_pipeline() -> PracticePipeline:
     config = AppConfig()
-    repository = (
-        InMemoryLearningRepository()
-        if config.learning_repository_backend.lower() == "inmemory"
-        else SQLiteLearningRepository(config)
-    )
-    vector_store = LangChainVectorStore(config)
+    repository = _build_repository(config)
+    vector_store = _build_vector_store(config)
     model_factory = LangChainModelFactory(config)
 
     parser = IntentParser(config)
@@ -39,6 +36,7 @@ def build_baseline_pipeline() -> PracticePipeline:
     validator = ExerciseValidator()
     recommendation = RecommendationService()
     review = PracticeReviewService(config)
+    diagnosis = ErrorDiagnosisService()
     onboarding = OnboardingInterpreter(config)
     practice_intent = PracticeIntentInterpreter(config, parser)
 
@@ -52,6 +50,31 @@ def build_baseline_pipeline() -> PracticePipeline:
         validator=validator,
         recommendation=recommendation,
         review=review,
+        diagnosis=diagnosis,
         onboarding=onboarding,
         practice_intent=practice_intent,
     )
+
+
+def _build_repository(config: AppConfig):
+    backend = config.learning_repository_backend.strip().lower()
+    if backend == "inmemory":
+        return InMemoryLearningRepository()
+    if backend in {"postgres", "postgresql"}:
+        from app.persistence.postgres_repository import PostgreSQLLearningRepository
+
+        return PostgreSQLLearningRepository(config)
+    if backend == "sqlite":
+        return SQLiteLearningRepository(config)
+    raise ValueError(
+        "Unsupported LEARNING_REPOSITORY_BACKEND. Use sqlite, inmemory, or postgres."
+    )
+
+
+def _build_vector_store(config: AppConfig):
+    backend = config.vector_store_backend.strip().lower()
+    if backend == "pgvector":
+        from app.retrieval.pgvector_store import PgVectorKnowledgeStore
+
+        return PgVectorKnowledgeStore(config)
+    return LangChainVectorStore(config)

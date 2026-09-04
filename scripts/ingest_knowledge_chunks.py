@@ -10,7 +10,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from app.config import AppConfig
-from app.retrieval.embeddings import KeywordHashEmbeddings
+from app.retrieval.embeddings import build_embedding_model
 from app.retrieval.knowledge_loader import load_knowledge_documents
 
 
@@ -53,7 +53,7 @@ def main() -> None:
 
     vector_store = Chroma(
         collection_name=args.collection,
-        embedding_function=KeywordHashEmbeddings(),
+        embedding_function=build_embedding_model(AppConfig()),
         persist_directory=str(persist_dir),
     )
 

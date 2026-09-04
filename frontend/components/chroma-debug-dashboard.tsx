@@ -183,6 +183,11 @@ export function ChromaDebugDashboard() {
                   <Tag color={snapshot.usingChromaBackend ? "green" : "orange"}>
                     backend: {snapshot.configuredBackend}
                   </Tag>
+                  <Tag color="blue">mode: {snapshot.retrievalMode}</Tag>
+                  <Tag color="geekblue">embedding: {snapshot.embeddingBackend}</Tag>
+                  <Tag color={snapshot.rerankerEnabled ? "green" : "default"}>
+                    reranker: {snapshot.rerankerEnabled ? "on" : "off"}
+                  </Tag>
                 </Card>
               </Col>
               <Col lg={6} sm={12} xs={24}>

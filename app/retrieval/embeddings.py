@@ -1,7 +1,10 @@
 import hashlib
+import os
 import re
 
 from langchain_core.embeddings import Embeddings
+
+from app.config import AppConfig
 
 
 class KeywordHashEmbeddings(Embeddings):
@@ -32,3 +35,48 @@ class KeywordHashEmbeddings(Embeddings):
             vector[index] += sign
 
         return vector
+
+
+def build_embedding_model(config: AppConfig) -> Embeddings:
+    backend = config.embedding_backend.strip().lower()
+    if backend in {"keyword_hash", "hash", "fallback", "local"}:
+        return KeywordHashEmbeddings()
+    if backend == "openai":
+        return _build_openai_embeddings(config)
+    if backend == "ollama":
+        return _build_ollama_embeddings(config)
+    if backend == "auto":
+        if os.getenv("OPENAI_API_KEY"):
+            return _build_openai_embeddings(config)
+        return KeywordHashEmbeddings()
+
+    raise ValueError(
+        "Unsupported EMBEDDING_BACKEND. Use auto, openai, ollama, or keyword_hash."
+    )
+
+
+def _build_openai_embeddings(config: AppConfig) -> Embeddings:
+    try:
+        from langchain_openai import OpenAIEmbeddings
+    except ImportError as exc:
+        raise RuntimeError(
+            "EMBEDDING_BACKEND=openai requires the `langchain-openai` package. "
+            "Install dependencies with `pip install -r requirements.txt`."
+        ) from exc
+
+    return OpenAIEmbeddings(model=config.openai_embedding_model)
+
+
+def _build_ollama_embeddings(config: AppConfig) -> Embeddings:
+    try:
+        from langchain_ollama import OllamaEmbeddings
+    except ImportError as exc:
+        raise RuntimeError(
+            "EMBEDDING_BACKEND=ollama requires the `langchain-ollama` package. "
+            "Install dependencies with `pip install -r requirements.txt`."
+        ) from exc
+
+    return OllamaEmbeddings(
+        model=config.ollama_embedding_model,
+        base_url=config.ollama_base_url,
+    )

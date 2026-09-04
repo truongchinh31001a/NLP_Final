@@ -26,6 +26,7 @@ class PracticePlan:
     focus_reason: str
     target_subtopic: str | None = None
     target_error_tag: str | None = None
+    target_skill_id: str | None = None
     content_theme: str | None = None
     learner_summary: str = ""
 
@@ -44,6 +45,28 @@ class LearnerProfile:
     weak_subtopics: dict[str, float] = field(default_factory=dict)
     subtopic_accuracy: dict[str, float] = field(default_factory=dict)
     error_tag_weakness: dict[str, float] = field(default_factory=dict)
+    skill_mastery: dict[str, float] = field(default_factory=dict)
+    skill_confidence: dict[str, float] = field(default_factory=dict)
+    skill_attempts: dict[str, int] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class SkillMasterySnapshot:
+    code: str
+    label: str
+    topic: str
+    skill_type: str
+    cefr: str | None
+    mastery_probability: float
+    confidence: float
+    attempts_count: int
+    correct_count: int
+    incorrect_count: int
+    weakness_score: float
+    status: str | None = None
+    last_practiced_at: str | None = None
+    next_review_at: str | None = None
+    prerequisites: list[str] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -97,6 +120,21 @@ class SubmittedAnswer:
 
 
 @dataclass(slots=True)
+class AnswerDiagnosis:
+    exercise_id: str
+    is_correct: bool
+    error_type: str
+    skill_id: str
+    topic: str
+    subtopic: str | None = None
+    subtype: str | None = None
+    severity: float = 0.0
+    mastery_impact: float = 0.0
+    explanation: str = ""
+    evidence: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
 class PracticeReview:
     review_code: str
     evaluator: str
@@ -119,4 +157,5 @@ class SessionResult:
     recommendation: str = ""
     generation_run_id: str = ""
     session_code: str = ""
+    answer_diagnoses: list[AnswerDiagnosis] = field(default_factory=list)
     practice_review: PracticeReview | None = None

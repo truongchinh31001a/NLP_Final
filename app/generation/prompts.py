@@ -31,6 +31,7 @@ def build_generation_prompt(format_instructions: str) -> ChatPromptTemplate:
                     "learner_level: {learner_level}\n"
                     "target_subtopic: {target_subtopic}\n"
                     "target_error_tag: {target_error_tag}\n"
+                    "target_skill_id: {target_skill_id}\n"
                     "content_theme: {content_theme}\n"
                     "learner_summary:\n{learner_summary}\n"
                     "retrieved_context:\n{retrieved_context}"

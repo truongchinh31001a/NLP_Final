@@ -43,6 +43,8 @@ pnpm-debug.log*
 dist/
 build/
 .cache/
+evals/reports/*.json
+!evals/reports/.gitkeep
 
 # OS and editor files
 .DS_Store

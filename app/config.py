@@ -16,6 +16,13 @@ def _bool_env(name: str, default: bool) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _int_env(name: str, default: int) -> int:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return int(value)
+
+
 @dataclass(slots=True)
 class AppConfig:
     app_name: str = "Personalized English Exercise Chatbot"
@@ -27,6 +34,13 @@ class AppConfig:
         "sqlite",
     )
     sqlite_db_path: str = os.getenv("SQLITE_DB_PATH", "./data/sqlite/app.db")
+    postgres_database_url: str = os.getenv(
+        "POSTGRES_DATABASE_URL",
+        os.getenv(
+            "DATABASE_URL",
+            "postgresql://english_tutor:english_tutor@localhost:5432/english_tutor",
+        ),
+    )
     retrieval_top_k: int = 3
     knowledge_chunks_path: str = os.getenv(
         "KNOWLEDGE_CHUNKS_PATH",
@@ -57,5 +71,41 @@ class AppConfig:
         5.0,
     )
     vector_store_backend: str = os.getenv("VECTOR_STORE_BACKEND", "inmemory")
-    chroma_collection_name: str = "english_exercise_kb"
-    chroma_persist_directory: str = "./data/vector_store/chroma"
+    retrieval_mode: str = os.getenv("RETRIEVAL_MODE", "hybrid")
+    reranker_enabled: bool = _bool_env("RERANKER_ENABLED", True)
+    embedding_backend: str = os.getenv("EMBEDDING_BACKEND", "keyword_hash")
+    pgvector_database_url: str = os.getenv(
+        "PGVECTOR_DATABASE_URL",
+        os.getenv(
+            "POSTGRES_DATABASE_URL",
+            "postgresql://english_tutor:english_tutor@localhost:5432/english_tutor",
+        ),
+    )
+    pgvector_table_name: str = os.getenv("PGVECTOR_TABLE_NAME", "rag_documents")
+    pgvector_embedding_dimension: int = _int_env(
+        "PGVECTOR_EMBEDDING_DIMENSION",
+        0,
+    )
+    openai_embedding_model: str = os.getenv(
+        "OPENAI_EMBEDDING_MODEL",
+        "text-embedding-3-small",
+    )
+    ollama_embedding_model: str = os.getenv(
+        "OLLAMA_EMBEDDING_MODEL",
+        "nomic-embed-text",
+    )
+    chroma_collection_name: str = os.getenv(
+        "CHROMA_COLLECTION_NAME",
+        "english_exercise_kb",
+    )
+    chroma_persist_directory: str = os.getenv(
+        "CHROMA_PERSIST_DIRECTORY",
+        "./data/vector_store/chroma",
+    )
+    auth_mode: str = os.getenv("AUTH_MODE", "disabled")
+    auth_token_secret: str = os.getenv("AUTH_TOKEN_SECRET", "dev-secret-change-me")
+    auth_token_ttl_seconds: int = _int_env("AUTH_TOKEN_TTL_SECONDS", 86400)
+    observability_enabled: bool = _bool_env("OBSERVABILITY_ENABLED", True)
+    otel_enabled: bool = _bool_env("OTEL_ENABLED", False)
+    otel_service_name: str = os.getenv("OTEL_SERVICE_NAME", "adaptive-ai-english-tutor")
+    otel_exporter_otlp_endpoint: str = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")

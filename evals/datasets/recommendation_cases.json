@@ -1,0 +1,60 @@
+[
+  {
+    "case_id": "recommend_recent_missed_skill",
+    "result": {
+      "user_id": "eval-user",
+      "topic": "tenses",
+      "score": 0.5,
+      "correct_count": 1,
+      "total_questions": 2
+    },
+    "profile": {
+      "skill_mastery": {
+        "grammar.tenses.past_simple_finished_time": 0.38
+      }
+    },
+    "exercises": [
+      {
+        "exercise_id": "rec_001",
+        "exercise_type": "grammar_mcq",
+        "topic": "tenses",
+        "difficulty": "easy",
+        "skill": "grammar",
+        "subtopic": "past_simple_finished_time",
+        "error_tag": "wrong_tense",
+        "question_text": "I ____ my homework last night.",
+        "correct_answer": "B",
+        "explanation": "Use past simple with finished time.",
+        "options": [
+          {"label": "A", "text": "finish", "is_correct": false},
+          {"label": "B", "text": "finished", "is_correct": true},
+          {"label": "C", "text": "have finished", "is_correct": false},
+          {"label": "D", "text": "am finishing", "is_correct": false}
+        ]
+      }
+    ],
+    "selected_answers": {
+      "rec_001": "A"
+    },
+    "expected_contains": ["Past Simple Finished Time", "easy"]
+  },
+  {
+    "case_id": "recommend_profile_weak_skill",
+    "result": {
+      "user_id": "eval-user",
+      "topic": "passive_voice",
+      "score": 0.9,
+      "correct_count": 9,
+      "total_questions": 10
+    },
+    "profile": {
+      "skill_mastery": {
+        "grammar.passive_voice.present_simple_passive": 0.55
+      }
+    },
+    "exercises": [],
+    "selected_answers": {},
+    "expected_contains": ["Present Simple Passive", "medium"]
+  }
+]
+
