@@ -17,12 +17,15 @@ direction is to make the AI core more explicit and measurable:
 - Structured answer-level error diagnosis for mastery and review feedback.
 - LLM-backed tutor responses for open conversation/explanations with offline
   context-aware fallbacks.
+- Reading and writing activities with activity lifecycle, submit flow, and
+  rubric/comprehension feedback.
 - Topic, subtopic, error-pattern, and skill-level personalization dashboard.
 - Offline AI evaluation scripts for retrieval, generation, diagnosis, and
   recommendation checks.
 - Optional PostgreSQL repository backend and pgvector retrieval backend.
 - Optional signed bearer-token auth for multi-user data isolation.
 - In-process metrics plus optional OpenTelemetry tracing.
+- Production-like env profile with auth/debug gates and CI eval thresholds.
 - GitHub Actions CI for backend tests/evals and frontend lint/build.
 - FastAPI backend with a Next.js frontend.
 
@@ -88,8 +91,9 @@ docker compose up --build
 ```
 
 Docker Compose starts PostgreSQL with pgvector, Ollama, the FastAPI backend, and
-the Next.js frontend. SQLite/Chroma remain the default app backends unless you
-set the backend environment variables below.
+the Next.js frontend. SQLite/Chroma remain the default app storage/vector-store
+backends, while Docker demo retrieval uses Ollama semantic embeddings by
+default.
 Inside Docker, the backend calls Ollama at `http://ollama:11434`. The compose
 file exposes container Ollama on host port `11435` for debugging so it does not
 get confused with a separate host Ollama running on `11434`.
@@ -147,6 +151,17 @@ curl http://localhost:8000/api/debug/workflow
 curl http://localhost:8000/api/debug/metrics
 ```
 
+Smoke checks:
+
+```bash
+python scripts/smoke_conversation_flow.py --base-url http://localhost:8000
+python scripts/smoke_docker_stack.py
+python scripts/smoke_pgvector_retrieval.py
+```
+
+The smoke scripts do not start services. They verify a backend/Docker stack that
+is already running.
+
 Optional OpenTelemetry:
 
 ```bash
@@ -155,10 +170,25 @@ OTEL_SERVICE_NAME=adaptive-ai-english-tutor
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
 ```
 
-## Embedding Backends
+Production hardening:
+
+```bash
+DEPLOYMENT_ENVIRONMENT=production
+AUTH_MODE=demo_token
+AUTH_TOKEN_SECRET=<32+ random chars>
+AUTH_DEV_TOKEN_ENABLED=false
+DEBUG_ENDPOINTS_ENABLED=false
+```
+
+See `docs/production_hardening.md` and the env profiles in `env/` for the
+local, Docker demo, and production-like runtime paths.
+
+## Embedding And Retrieval Backends
 
 The default embedding backend is `keyword_hash` so the project can run offline.
-For semantic retrieval, set one of:
+Docker demo uses `EMBEDDING_BACKEND=ollama` with
+`OLLAMA_EMBEDDING_MODEL=nomic-embed-text`. For semantic retrieval outside
+Docker, set one of:
 
 ```bash
 EMBEDDING_BACKEND=openai
@@ -181,6 +211,9 @@ RERANKER_ENABLED=true
 
 Use `RETRIEVAL_MODE=dense` or `RETRIEVAL_MODE=sparse` when you want to isolate
 one retrieval path during debugging or evaluation.
+
+See `docs/retrieval_backends.md` for the full backend matrix, hybrid fusion
+behavior, reranker behavior, and pgvector smoke commands.
 
 When changing embedding dimensions, use a new `CHROMA_COLLECTION_NAME` or rebuild
 the Chroma collection:
@@ -206,6 +239,15 @@ environment, run the non-retrieval checks:
 
 ```bash
 python scripts/run_evals.py --skip-retrieval
+```
+
+The eval suite includes tutor-response checks for naturalness guardrails,
+repeated-menu avoidance, off-topic bridging, and learning-focus selections.
+Optional live comparison can be run when the target backend is configured:
+
+```bash
+python scripts/run_evals.py --skip-retrieval --tutor-live-backends ollama
+python scripts/run_evals.py --skip-retrieval --tutor-live-backends openai
 ```
 
 Frontend checks:

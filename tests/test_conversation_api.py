@@ -274,6 +274,10 @@ class ConversationApiTests(unittest.TestCase):
             accepted["activity"]["plan"]["topic"],
             accepted["recommendation"]["topic"],
         )
+        self.assertTrue(accepted["recommendation"]["evidence"]["candidate_scores"])
+        accepted_metadata = accepted["activity"]["metadata"]["accepted_recommendation"]
+        self.assertEqual(accepted_metadata["recommendation_id"], recommendation_id)
+        self.assertTrue(accepted_metadata["evidence"]["candidate_scores"])
 
     def test_legacy_practice_score_wraps_activity_submission(self) -> None:
         conversation = self._create_conversation("learner")
@@ -310,6 +314,74 @@ class ConversationApiTests(unittest.TestCase):
         )
         self.assertIsNotNone(activity)
         self.assertEqual(activity.status, LearningActivityStatus.COMPLETED)
+
+    def test_reading_activity_lifecycle_via_conversation_api(self) -> None:
+        conversation = self._create_conversation("learner")
+        created = self._send_message(
+            conversation["conversation_id"],
+            "doc truoc di",
+        )
+
+        self.assertEqual(created["intent"], "READING")
+        self.assertEqual(created["ui_action"], "reading.start")
+        self.assertEqual(created["activity"]["type"], "READING")
+        self.assertTrue(created["activity"]["metadata"]["passage"])
+        answers = self._correct_answers(created["activity"])
+
+        submit_response = self.client.post(
+            f"/api/activities/{created['activity']['activity_id']}/submit",
+            json={"user_id": "learner", "answers": answers},
+        )
+
+        self.assertEqual(submit_response.status_code, 200)
+        submitted = submit_response.json()
+        self.assertEqual(submitted["ui_action"], "reading.result")
+        self.assertEqual(submitted["activity"]["status"], "COMPLETED")
+        self.assertEqual(submitted["result"]["score"], 1.0)
+
+    def test_writing_activity_lifecycle_via_conversation_api(self) -> None:
+        conversation = self._create_conversation("learner")
+        created = self._send_message(
+            conversation["conversation_id"],
+            "viet truoc nhe",
+        )
+
+        self.assertEqual(created["intent"], "WRITING")
+        self.assertEqual(created["ui_action"], "writing.start")
+        self.assertEqual(created["activity"]["type"], "WRITING")
+        self.assertTrue(created["activity"]["metadata"]["writing_prompt"])
+
+        submit_response = self.client.post(
+            f"/api/activities/{created['activity']['activity_id']}/submit",
+            json={
+                "user_id": "learner",
+                "writing_text": (
+                    "I study English every evening. I read a short story and "
+                    "write five new words because I want to improve."
+                ),
+            },
+        )
+
+        self.assertEqual(submit_response.status_code, 200)
+        submitted = submit_response.json()
+        self.assertEqual(submitted["ui_action"], "writing.result")
+        self.assertEqual(submitted["activity"]["status"], "COMPLETED")
+        self.assertTrue(submitted["activity"]["metadata"]["corrected_version"])
+        self.assertEqual(submitted["result"]["topic"], "writing")
+        self.assertTrue(submitted["result"]["practice_review"])
+
+    def test_debug_endpoint_gate_keeps_ops_observability_available(self) -> None:
+        original_debug_enabled = api_main.pipeline.config.debug_endpoints_enabled
+        api_main.pipeline.config.debug_endpoints_enabled = False
+        try:
+            debug_response = self.client.get("/api/debug/metrics")
+            ops_response = self.client.get("/api/ops/observability")
+        finally:
+            api_main.pipeline.config.debug_endpoints_enabled = original_debug_enabled
+
+        self.assertEqual(debug_response.status_code, 404)
+        self.assertEqual(ops_response.status_code, 200)
+        self.assertEqual(ops_response.json()["status"], "ok")
 
     def test_missing_conversation_returns_404(self) -> None:
         response = self.client.post(

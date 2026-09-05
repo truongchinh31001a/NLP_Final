@@ -20,21 +20,45 @@ The goal is **not to rewrite the entire project**, but to keep the existing prod
 - Evaluate retrieval, generation, recommendation, and learning effectiveness
 - Operate as a production-oriented AI system
 
+### Current implementation snapshot - 2026-09-05
+
+The chat-flow refactor checklist is now implemented through Phase 11. The
+project is no longer just a "chat to generate exercises" app; it now has the
+foundation of a conversation platform:
+
+- Conversation API, `ConversationService`, and rule-first `ConversationRouter`
+- Intent capabilities for `PRACTICE`, `EXPLAIN`, `REVIEW`, `PROGRESS`,
+  `PROFILE_UPDATE`, and `GENERAL`
+- `LearningActivity` lifecycle and `activity_id` as the primary practice
+  identity
+- Backend-owned generation, validation, scoring, diagnosis, mastery update,
+  review, and recommendation continuation
+- Progressive learner profiling instead of a mandatory onboarding gate
+- Frontend migration to conversation/activity state, with local exercise and
+  scoring fallbacks removed
+- LLM-backed tutor responses for `GENERAL` and `EXPLAIN`, plus bounded
+  context-aware fallback behavior
+- Docker Compose path for backend-to-Ollama calls through the Docker network
+
+The remaining roadmap should focus less on conversation plumbing and more on
+AI quality, production confidence, and broader learning activity types.
+
 ---
 
-# 2. Main Problems in the Current Version
+# 2. Current Gaps After The Chat-Flow Refactor
 
-| Current component | Current limitation | Recommended upgrade |
+| Area | Current status | Recommended next upgrade |
 |---|---|---|
-| KeywordHashEmbeddings | Not true semantic embeddings | Real embedding model |
-| Chroma retrieval | Basic vector retrieval | Hybrid retrieval + reranker |
-| RecommendationService | Mostly score thresholds | Adaptive recommendation engine |
-| Personalization | Latest score can dominate learner state | Persistent mastery model |
-| LearningAgent | Fixed orchestration workflow | Stateful bounded agent |
-| Review | Basic review + LLM support | Structured error diagnosis |
-| SQLite | Suitable for demo | PostgreSQL |
-| Tests | Limited coverage | Unit + integration + AI evaluation |
-| GitHub repo | Academic-project style | Portfolio-quality repository |
+| Conversation platform | Implemented through `ConversationRouter`, `ConversationService`, canonical conversation APIs, and learning activities | Add richer multi-turn tutor policies and manual smoke coverage |
+| Tutor response | `GENERAL` and `EXPLAIN` can use LLM-backed responses with safe fallbacks | Add qualitative evals for naturalness, repetition, scope control, and Vietnamese/English switching |
+| Embeddings | Configurable `keyword_hash`, OpenAI, and Ollama paths exist | Use a real semantic embedding model by default in production profiles |
+| Retrieval | Dense/sparse/hybrid retrieval and heuristic reranking exist | Add stronger reranker evaluation and source-grounded answer checks |
+| Recommendation | Structured recommendation and accept flow exist | Move toward ranking by mastery gap, forgetting risk, goals, and prerequisite readiness |
+| Learner model | BKT-style mastery, skill graph, confidence, history, and review timing exist | Calibrate mastery parameters with eval data and add spaced-review policies |
+| Error diagnosis | Structured diagnosis is persisted and shown in review | Improve diagnosis quality with examples, rubrics, and regression datasets |
+| Activity model | Practice is now a `LearningActivity` with `activity_id` | Add first-class reading, listening, speaking, and writing activity types |
+| Production runtime | Docker Compose includes FastAPI, Next.js, PostgreSQL/pgvector, and Ollama | Add production deployment hardening, real observability, and security checks |
+| Tests | Backend unit tests and frontend lint/build are green in the checklist | Add integration/e2e smoke tests and AI quality eval gates |
 
 ---
 
@@ -797,27 +821,27 @@ adaptive-ai-english-tutor/
 
 # 15. Priority Roadmap
 
-| Priority | Upgrade | Value |
-|---|---|---|
-| P0 | Root README + architecture documentation | ⭐⭐⭐ |
-| P0 | Real embedding model | ⭐⭐⭐⭐⭐ |
-| P0 | Skill taxonomy | ⭐⭐⭐⭐⭐ |
-| P0 | Exercise-skill tagging | ⭐⭐⭐⭐⭐ |
-| P0 | Learner mastery model | ⭐⭐⭐⭐⭐ |
-| P1 | Error diagnosis engine | ⭐⭐⭐⭐⭐ |
-| P1 | Adaptive recommendation engine | ⭐⭐⭐⭐⭐ |
-| P1 | Hybrid RAG | ⭐⭐⭐⭐ |
-| P1 | Reranker | ⭐⭐⭐⭐ |
-| P1 | Evaluation framework | ⭐⭐⭐⭐⭐ |
-| P2 | LangGraph orchestration | ⭐⭐⭐⭐ |
-| P2 | PostgreSQL + pgvector | ⭐⭐⭐⭐ |
-| P2 | Authentication + multi-user | ⭐⭐⭐ |
-| P2 | OpenTelemetry | ⭐⭐⭐⭐ |
-| P2 | CI/CD + regression evaluation | ⭐⭐⭐⭐ |
-| P3 | Speech-to-text | ⭐⭐⭐ |
-| P3 | Text-to-speech | ⭐⭐⭐ |
-| P3 | Free conversation tutor | ⭐⭐⭐ |
-| P3 | Kubernetes / scaling | ⭐⭐ |
+| Priority | Upgrade | Current status | Next action |
+|---|---|---|---|
+| P0 | Root README + architecture documentation | Done | Keep docs aligned with the implemented conversation/activity architecture |
+| P0 | Skill taxonomy | Done | Expand coverage as new activity types are added |
+| P0 | Exercise-skill tagging | Done | Add stricter validation/evals for generated items |
+| P0 | Learner mastery model | Done | Calibrate BKT parameters and review intervals with real usage data |
+| P0 | Conversation platform | Done through checklist Phase 11 | Manual smoke and richer tutor-response evals |
+| P1 | Error diagnosis engine | Implemented | Improve diagnosis rubrics and add regression datasets |
+| P1 | Adaptive recommendation engine | Implemented baseline | Upgrade ranking with forgetting risk, goals, and prerequisite readiness |
+| P1 | Hybrid RAG | Implemented baseline | Benchmark retrieval quality and tune reranking |
+| P1 | Evaluation framework | Implemented baseline | Add conversation-quality, grounding, and repetition evals |
+| P1 | Real semantic embedding model | Optional provider path exists | Choose production default and document setup clearly |
+| P2 | LangGraph orchestration | Contract/workflow implemented | Decide whether to move more runtime orchestration into graph nodes |
+| P2 | PostgreSQL + pgvector | Optional Docker/runtime path exists | Add smoke tests against containerized Postgres/pgvector |
+| P2 | Authentication + multi-user | Demo-token mode implemented | Harden auth model before real deployment |
+| P2 | OpenTelemetry | Optional tracing implemented | Wire metrics/traces into real dashboards |
+| P2 | CI/CD + regression evaluation | Implemented baseline | Add AI eval thresholds as required checks |
+| P3 | Reading/listening/speaking/writing activities | Domain enum exists; practice is first-class | Build dedicated activity services and UI panels |
+| P3 | Speech-to-text | Not started | Add when speaking/listening becomes a product priority |
+| P3 | Text-to-speech | Not started | Add when listening/speaking activities need audio output |
+| P3 | Kubernetes / scaling | Not started | Defer until deployment scale requires it |
 
 ---
 
@@ -904,7 +928,170 @@ PostgreSQL/pgvector runtime requires a running Postgres server with the
 
 ---
 
-# 16. Suggested Development Phases
+## Conversation Platform Implementation Status - 2026-09-05
+
+Current repository status after `checklist.md`:
+
+- Conversation domain boundaries are implemented with `ConversationIntent`,
+  `ConversationTurnContext`, `PendingClarification`, and `LearningActivity`.
+- `ConversationRouter` routes learner turns before practice interpretation,
+  keeping review/progress/explanation/profile/general chat out of the generic
+  practice parser.
+- New conversation APIs are implemented:
+  `POST /api/conversations`, `GET /api/conversations`,
+  `GET /api/conversations/{id}`, and
+  `POST /api/conversations/{id}/messages`.
+- Practice generation and submission are wrapped in the activity lifecycle.
+  Compatibility endpoints remain, but the canonical flow uses `activity_id`.
+- Review, progress, explanation, profile update, and general tutor responses
+  are implemented as separate backend capabilities.
+- Frontend state is split into conversation state and activity state; local
+  exercise generation/scoring fallbacks have been removed.
+- Structured recommendations can be accepted directly without reparsing a text
+  prompt as a new generic practice request.
+- `GENERAL` and `EXPLAIN` responses can use the configured tutor-response LLM,
+  with bounded context-aware fallback behavior when the model is unavailable.
+- Short learner choices such as `doc truoc di` are handled as learning-focus
+  selections instead of repeating the previous menu.
+- Docker Compose is configured so backend calls Ollama through
+  `http://ollama:11434` inside the Docker network.
+
+Known follow-up items from the checklist:
+
+- Verify manually in the browser: create a conversation, generate practice,
+  submit by `activity_id`, ask for mistake review, ask progress, start a new
+  chat, and confirm learner state persists.
+- Finish auditing that `generation_run_id` is only trace/debug identity and
+  never the primary business identity.
+- Add PostgreSQL/pgvector smoke coverage once the containerized DB is part of
+  the regular test path.
+- Add AI quality evals for naturalness, repetition, grounding, and tutoring
+  scope control.
+
+---
+
+# 16. Development Phases
+
+The original phase list below was written before the chat-flow refactor. After
+`checklist.md`, most of that foundation is implemented. Treat the next list as
+the active roadmap, and the older phase list as historical context.
+
+## Active Next Phases - After `checklist.md`
+
+### Phase A - Manual Smoke And Contract Hardening
+
+Status after Phase 12 implementation:
+
+- Contract docs, `generation_run_id` audit, Docker smoke script, and API smoke
+  script are added.
+- Manual browser smoke is still pending because it must be run against the real
+  UI/runtime.
+
+Objectives:
+
+- Run the full browser smoke path: create conversation, generate practice,
+  submit by `activity_id`, review a wrong answer, ask progress, start a new
+  chat, and confirm learner state persists.
+- Audit all remaining `generation_run_id` usage and keep it as trace/debug
+  identity only.
+- Add contract notes for legacy `/api/practice/*` wrappers versus canonical
+  conversation/activity endpoints.
+- Add a PostgreSQL/pgvector smoke path for Docker Compose.
+
+Deliverable:
+
+```text
+Conversation/activity platform is verified end-to-end, not only by unit tests.
+```
+
+### Phase B - Tutor Response Quality Evaluation
+
+Status after Phase 13 implementation:
+
+- Offline tutor response dataset, checks, eval runner integration, and optional
+  live backend comparison path are added.
+
+Objectives:
+
+- Add a small eval dataset for natural tutor chat, explanation, off-topic
+  bridging, scope control, and repetition avoidance.
+- Include Vietnamese short replies such as `doc truoc di`, `nghe truoc`,
+  `viet truoc`, and ambiguous complaints such as `nghe ki phet`.
+- Track fallback rate, LLM timeout rate, repeated-menu rate, and answer
+  naturalness.
+- Compare Ollama and OpenAI response behavior with the same payload format.
+
+Deliverable:
+
+```text
+Tutor conversation quality can be measured before and after prompt/code changes.
+```
+
+### Phase C - Production Retrieval And Grounding
+
+Objectives:
+
+- Choose a production embedding default for Docker/local development.
+- Expand retrieval evals with topic, subtopic, CEFR, and source-grounding
+  checks.
+- Tune hybrid retrieval and reranking against the eval dataset.
+- Require grounded citations/context for explanation answers where relevant.
+
+Deliverable:
+
+```text
+RAG quality is measured and stable enough for portfolio/demo use.
+```
+
+### Phase D - Adaptive Recommendation Depth
+
+Objectives:
+
+- Improve next-activity ranking with mastery gap, forgetting risk, prerequisite
+  readiness, learner goals, and recent performance.
+- Calibrate BKT/mastery parameters with observed answer history.
+- Add spaced-review policies using `next_review_at`.
+- Evaluate recommendation acceptance and repeated-error reduction.
+
+Deliverable:
+
+```text
+Recommendations become meaningfully adaptive instead of just plausible.
+```
+
+### Phase E - First-Class Reading/Listening/Speaking/Writing Activities
+
+Objectives:
+
+- Turn the existing `LearningActivityType` enum values into real activity
+  services and UI panels.
+- Start with reading: passage, vocabulary support, comprehension questions,
+  and explanation.
+- Add writing correction with rubric-based feedback.
+- Add listening/speaking later when audio/STT/TTS is a product priority.
+
+Deliverable:
+
+```text
+The tutor supports multiple learning activity types, not only practice quizzes.
+```
+
+### Phase F - Production Hardening
+
+Objectives:
+
+- Harden auth beyond demo-token mode.
+- Wire OpenTelemetry metrics/traces into dashboards.
+- Add AI eval thresholds to CI once eval data is stable.
+- Prepare deployment docs, security checks, and environment profiles.
+
+Deliverable:
+
+```text
+The project is ready to present as a production-oriented adaptive AI tutor.
+```
+
+## Historical Pre-Checklist Phases
 
 ## Phase 0 — Repository Cleanup
 

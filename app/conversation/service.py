@@ -5,6 +5,11 @@ from app.activities.practice_service import (
     PracticeActivityGeneration,
     PracticeActivityService,
 )
+from app.activities.literacy_service import (
+    LiteracyActivityGeneration,
+    ReadingActivityService,
+    WritingActivityService,
+)
 from app.config import AppConfig
 from app.conversation.router import ConversationRouter
 from app.conversation.schemas import ConversationRoute, ConversationTurnResult
@@ -48,6 +53,8 @@ class ConversationService:
         self.profile_update_service: ProfileUpdateService | None = None
         self.progressive_profile_service: ProgressiveProfileService | None = None
         self.general_tutor_service: GeneralTutorService | None = None
+        self.reading_activity_service: ReadingActivityService | None = None
+        self.writing_activity_service: WritingActivityService | None = None
 
     def create_conversation(self, user_id: str) -> dict[str, Any]:
         resume = self.repository.create_chat_session(user_id)
@@ -294,6 +301,47 @@ class ConversationService:
                     "generation_run_id": generated.generated.generation_run_id,
                 },
             )
+        if (
+            route.intent == ConversationIntent.READING
+            and self.reading_activity_service is not None
+        ):
+            generated = self.reading_activity_service.create_reading_activity(
+                user_id=user_id,
+                raw_text=message,
+                conversation_id=context.conversation_id,
+                topic=str(route.slots.get("topic") or "") or None,
+            )
+            return TutorCapabilityResult(
+                assistant_reply=route.assistant_reply
+                or "Minh da chuan bi mot bai doc ngan cho ban.",
+                ui_action="reading.start",
+                activity=self._literacy_generation_payload(generated),
+                metadata={
+                    "activity_id": generated.activity.activity_id,
+                    "generation_run_id": (
+                        generated.generated.generation_run_id
+                        if generated.generated is not None
+                        else None
+                    ),
+                },
+            )
+        if (
+            route.intent == ConversationIntent.WRITING
+            and self.writing_activity_service is not None
+        ):
+            generated = self.writing_activity_service.create_writing_activity(
+                user_id=user_id,
+                raw_text=message,
+                conversation_id=context.conversation_id,
+                topic=str(route.slots.get("topic") or "") or None,
+            )
+            return TutorCapabilityResult(
+                assistant_reply=route.assistant_reply
+                or "Minh da mo mot bai viet ngan de minh sua theo rubric.",
+                ui_action="writing.start",
+                activity=self._literacy_generation_payload(generated),
+                metadata={"activity_id": generated.activity.activity_id},
+            )
         if route.intent == ConversationIntent.EXPLAIN and self.explain_service is not None:
             return self.explain_service.explain(route=route, context=context)
         if route.intent == ConversationIntent.REVIEW and self.review_service is not None:
@@ -332,6 +380,8 @@ class ConversationService:
             return "clarification.ask"
         actions = {
             ConversationIntent.PRACTICE: "practice.interpret",
+            ConversationIntent.READING: "reading.start",
+            ConversationIntent.WRITING: "writing.start",
             ConversationIntent.EXPLAIN: "explain.respond",
             ConversationIntent.REVIEW: "review.open",
             ConversationIntent.PROGRESS: "progress.open",
@@ -372,6 +422,30 @@ class ConversationService:
                 "recommendation": generated.recommendation,
             }
         )
+
+    def _literacy_generation_payload(
+        self,
+        generated: LiteracyActivityGeneration,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            **asdict(generated.activity),
+            "recommendation": generated.recommendation,
+            "next_activity_suggestion": None,
+        }
+        if generated.generated is not None:
+            payload.update(
+                {
+                    "request": asdict(generated.generated.request),
+                    "plan": asdict(generated.generated.plan),
+                    "exercises": [
+                        asdict(exercise)
+                        for exercise in generated.generated.exercises
+                    ],
+                }
+            )
+        else:
+            payload.update({"request": None, "plan": None, "exercises": []})
+        return self._json_safe(payload)
 
     def _assistant_metadata(
         self,

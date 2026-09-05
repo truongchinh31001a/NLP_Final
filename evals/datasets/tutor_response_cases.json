@@ -1,0 +1,143 @@
+[
+  {
+    "case_id": "learning_focus_reading",
+    "message": "doc truoc di",
+    "context": {
+      "active_intent": "GENERAL",
+      "profile": {
+        "level": "beginner",
+        "preferred_difficulty": "easy"
+      }
+    },
+    "expected": {
+      "intent": "READING",
+      "learning_focus": "reading",
+      "must_contain_any": ["reading", "doc"],
+      "must_not_contain": ["noi nghe doc viet", "ban muon tap noi nghe doc hay viet"],
+      "require_vietnamese_tutor_text": true,
+      "max_chars": 600
+    }
+  },
+  {
+    "case_id": "learning_focus_listening",
+    "message": "nghe truoc",
+    "context": {
+      "active_intent": "GENERAL"
+    },
+    "expected": {
+      "intent": "GENERAL",
+      "response_source": "guided-choice",
+      "learning_focus": "listening",
+      "must_contain_any": ["listening", "nghe"],
+      "must_not_contain": ["noi nghe doc viet", "ban muon tap noi nghe doc hay viet"],
+      "require_vietnamese_tutor_text": true,
+      "max_chars": 600
+    }
+  },
+  {
+    "case_id": "learning_focus_writing",
+    "message": "viet truoc nhe",
+    "context": {
+      "active_intent": "GENERAL"
+    },
+    "expected": {
+      "intent": "WRITING",
+      "learning_focus": "writing",
+      "must_contain_any": ["writing", "viet"],
+      "must_not_contain": ["noi nghe doc viet", "ban muon tap noi nghe doc hay viet"],
+      "require_vietnamese_tutor_text": true,
+      "max_chars": 600
+    }
+  },
+  {
+    "case_id": "learning_focus_speaking",
+    "message": "noi truoc di",
+    "context": {
+      "active_intent": "GENERAL"
+    },
+    "expected": {
+      "intent": "GENERAL",
+      "response_source": "guided-choice",
+      "learning_focus": "speaking",
+      "must_contain_any": ["speaking", "noi"],
+      "must_not_contain": ["noi nghe doc viet", "ban muon tap noi nghe doc hay viet"],
+      "require_vietnamese_tutor_text": true,
+      "max_chars": 600
+    }
+  },
+  {
+    "case_id": "listening_complaint_not_focus",
+    "message": "nghe ki phet",
+    "context": {
+      "active_intent": "GENERAL"
+    },
+    "expected": {
+      "intent": "GENERAL",
+      "response_source": "context-fallback",
+      "must_contain_any": ["minh nghe", "tieng anh", "hoc"],
+      "must_not_contain": ["bat dau voi listening", "noi nghe doc viet"],
+      "forbid_learning_focus": true,
+      "require_vietnamese_tutor_text": true,
+      "max_chars": 600
+    }
+  },
+  {
+    "case_id": "greeting_study_suggestion",
+    "message": "Chao ban, hom nay minh hoc gi?",
+    "context": {
+      "profile": {
+        "display_name": "Minh",
+        "weak_topics": {
+          "passive_voice": 0.9
+        }
+      }
+    },
+    "expected": {
+      "intent": "GENERAL",
+      "response_source": "context-fallback",
+      "must_contain_any": ["passive voice", "hoc", "ngu phap"],
+      "must_not_contain": ["noi nghe doc viet"],
+      "require_vietnamese_tutor_text": true,
+      "max_chars": 650
+    }
+  },
+  {
+    "case_id": "thanks_contextual",
+    "message": "Cam on ban",
+    "context": {},
+    "expected": {
+      "intent": "GENERAL",
+      "response_source": "context-fallback",
+      "must_contain_any": ["khong co gi", "minh co the"],
+      "must_not_contain": ["noi nghe doc viet"],
+      "require_vietnamese_tutor_text": true,
+      "max_chars": 600
+    }
+  },
+  {
+    "case_id": "off_topic_bridge",
+    "message": "Thoi tiet hom nay sao?",
+    "context": {},
+    "expected": {
+      "intent": "GENERAL",
+      "response_source": "context-fallback",
+      "must_contain_any": ["tieng anh", "tu vung", "mau cau"],
+      "must_not_contain": ["troi mua", "nhiet do", "du bao"],
+      "require_vietnamese_tutor_text": true,
+      "max_chars": 650
+    }
+  },
+  {
+    "case_id": "explain_past_perfect",
+    "message": "Past Perfect dung khi nao?",
+    "context": {},
+    "expected": {
+      "intent": "EXPLAIN",
+      "response_source": "rule-fallback",
+      "must_contain_any": ["past perfect", "had v3", "had + v3"],
+      "must_not_contain": ["tao bai", "practice.start"],
+      "require_vietnamese_tutor_text": true,
+      "max_chars": 900
+    }
+  }
+]

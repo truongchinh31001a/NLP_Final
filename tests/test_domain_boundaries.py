@@ -27,6 +27,8 @@ class DomainBoundaryModelTests(unittest.TestCase):
             [intent.value for intent in ConversationIntent],
             [
                 "PRACTICE",
+                "READING",
+                "WRITING",
                 "EXPLAIN",
                 "REVIEW",
                 "PROGRESS",

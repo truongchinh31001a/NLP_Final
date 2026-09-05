@@ -149,6 +149,30 @@ class PostgreSQLLearningRepository:
 
         return activity
 
+    def update_learning_activity_metadata(
+        self,
+        user_id: str,
+        activity_id: str,
+        metadata: dict[str, Any],
+    ) -> LearningActivity:
+        with self._connect() as connection:
+            row = self._get_activity_row(connection, user_id, activity_id)
+            if row is None:
+                raise LookupError(f"Learning activity not found: {activity_id}")
+            activity = self._activity_from_payload(row["activity_json"])
+            activity.metadata.update(metadata)
+            activity.updated_at = self._now_text(connection)
+            self._save_activity_payload(connection, activity)
+            self._record_activity_event(
+                connection,
+                activity.activity_id,
+                "METADATA_UPDATED",
+                activity.status,
+                {"metadata_keys": sorted(metadata.keys())},
+            )
+
+        return activity
+
     def attach_generated_exercise_set_to_activity(
         self,
         user_id: str,
@@ -1457,8 +1481,13 @@ class PostgreSQLLearningRepository:
                 subtopic=exercise.subtopic,
             )
             prior = profile.skill_mastery.get(skill_id)
-            posterior = self.knowledge_tracer.update(prior, is_correct)
-            attempts = profile.skill_attempts.get(skill_id, 0) + 1
+            previous_attempts = profile.skill_attempts.get(skill_id, 0)
+            posterior = self.knowledge_tracer.update(
+                prior,
+                is_correct,
+                attempts_count=previous_attempts,
+            )
+            attempts = previous_attempts + 1
             profile.skill_mastery[skill_id] = posterior
             profile.skill_attempts[skill_id] = attempts
             profile.skill_confidence[skill_id] = min(attempts / 8, 1.0)

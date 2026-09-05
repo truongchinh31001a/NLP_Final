@@ -6,6 +6,12 @@ from app.activities.practice_service import (
     PracticeActivityService,
     PracticeActivitySubmission,
 )
+from app.activities.literacy_service import (
+    LiteracyActivityGeneration,
+    ReadingActivityService,
+    WritingActivityService,
+    WritingActivitySubmission,
+)
 from app.conversation.router import ConversationRouter
 from app.conversation.schemas import ConversationRoute, ConversationTurnResult
 from app.conversation.service import ConversationService
@@ -96,8 +102,22 @@ class PracticePipeline:
             repository=repository,
             agent=self.agent,
         )
+        self.reading_activity_service = ReadingActivityService(
+            config=config,
+            repository=repository,
+        )
+        self.writing_activity_service = WritingActivityService(
+            config=config,
+            repository=repository,
+        )
         self.conversation_service.practice_activity_service = (
             self.practice_activity_service
+        )
+        self.conversation_service.reading_activity_service = (
+            self.reading_activity_service
+        )
+        self.conversation_service.writing_activity_service = (
+            self.writing_activity_service
         )
         self.conversation_service.explain_service = TutorExplainService(
             config=config,
@@ -145,6 +165,7 @@ class PracticePipeline:
         conversation_id: str | None = None,
         request_overrides: PracticeRequest | None = None,
         skip_request_parser: bool = False,
+        metadata: dict | None = None,
     ) -> PracticeActivityGeneration:
         return self.practice_activity_service.create_practice_activity(
             user_id=user_id,
@@ -152,6 +173,7 @@ class PracticePipeline:
             conversation_id=conversation_id,
             request_overrides=request_overrides,
             skip_request_parser=skip_request_parser,
+            metadata=metadata,
         )
 
     def submit_practice_activity(
@@ -165,6 +187,49 @@ class PracticePipeline:
             user_id=user_id,
             activity_id=activity_id,
             answers=answers,
+        )
+
+    def create_reading_activity(
+        self,
+        *,
+        user_id: str,
+        raw_text: str,
+        conversation_id: str | None = None,
+        topic: str | None = None,
+    ) -> LiteracyActivityGeneration:
+        return self.reading_activity_service.create_reading_activity(
+            user_id=user_id,
+            raw_text=raw_text,
+            conversation_id=conversation_id,
+            topic=topic,
+        )
+
+    def create_writing_activity(
+        self,
+        *,
+        user_id: str,
+        raw_text: str,
+        conversation_id: str | None = None,
+        topic: str | None = None,
+    ) -> LiteracyActivityGeneration:
+        return self.writing_activity_service.create_writing_activity(
+            user_id=user_id,
+            raw_text=raw_text,
+            conversation_id=conversation_id,
+            topic=topic,
+        )
+
+    def submit_writing_activity(
+        self,
+        *,
+        user_id: str,
+        activity_id: str,
+        writing_text: str,
+    ) -> WritingActivitySubmission:
+        return self.writing_activity_service.submit_writing_activity(
+            user_id=user_id,
+            activity_id=activity_id,
+            writing_text=writing_text,
         )
 
     def score_submission(
@@ -233,6 +298,14 @@ class PracticePipeline:
             conversation_id=conversation_id or recommendation.conversation_id,
             request_overrides=request,
             skip_request_parser=True,
+            metadata={
+                "accepted_recommendation": {
+                    "recommendation_id": recommendation.recommendation_id,
+                    "source_activity_id": recommendation.source_activity_id,
+                    "reason": recommendation.reason,
+                    "evidence": recommendation.evidence,
+                },
+            },
         )
         return recommendation, generated
 

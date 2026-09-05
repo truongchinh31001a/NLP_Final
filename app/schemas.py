@@ -5,6 +5,8 @@ from typing import Any
 
 class ConversationIntent(str, Enum):
     PRACTICE = "PRACTICE"
+    READING = "READING"
+    WRITING = "WRITING"
     EXPLAIN = "EXPLAIN"
     REVIEW = "REVIEW"
     PROGRESS = "PROGRESS"
@@ -18,6 +20,7 @@ class LearningActivityType(str, Enum):
     CALIBRATION = "CALIBRATION"
     QUIZ = "QUIZ"
     READING = "READING"
+    WRITING = "WRITING"
     CONVERSATION_EXERCISE = "CONVERSATION_EXERCISE"
 
 
@@ -232,6 +235,7 @@ class ActivityRecommendation:
     source_activity_id: str | None = None
     conversation_id: str | None = None
     prompt: str = ""
+    evidence: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)

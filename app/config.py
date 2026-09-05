@@ -23,9 +23,21 @@ def _int_env(name: str, default: int) -> int:
     return int(value)
 
 
+def _deployment_environment() -> str:
+    return os.getenv(
+        "DEPLOYMENT_ENVIRONMENT",
+        os.getenv("DEPLOYMENT_ENV", "local"),
+    ).strip().lower()
+
+
+def _non_production_default() -> bool:
+    return _deployment_environment() not in {"prod", "production"}
+
+
 @dataclass(slots=True)
 class AppConfig:
     app_name: str = "Personalized English Exercise Chatbot"
+    deployment_environment: str = _deployment_environment()
     default_level: str = "beginner"
     default_difficulty: str = "easy"
     default_num_questions: int = 5
@@ -121,7 +133,19 @@ class AppConfig:
     auth_mode: str = os.getenv("AUTH_MODE", "disabled")
     auth_token_secret: str = os.getenv("AUTH_TOKEN_SECRET", "dev-secret-change-me")
     auth_token_ttl_seconds: int = _int_env("AUTH_TOKEN_TTL_SECONDS", 86400)
+    auth_dev_token_enabled: bool = _bool_env(
+        "AUTH_DEV_TOKEN_ENABLED",
+        _non_production_default(),
+    )
+    debug_endpoints_enabled: bool = _bool_env(
+        "DEBUG_ENDPOINTS_ENABLED",
+        _non_production_default(),
+    )
     observability_enabled: bool = _bool_env("OBSERVABILITY_ENABLED", True)
     otel_enabled: bool = _bool_env("OTEL_ENABLED", False)
     otel_service_name: str = os.getenv("OTEL_SERVICE_NAME", "adaptive-ai-english-tutor")
     otel_exporter_otlp_endpoint: str = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+    ai_eval_thresholds_path: str = os.getenv(
+        "AI_EVAL_THRESHOLDS_PATH",
+        "evals/thresholds.json",
+    )

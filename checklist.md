@@ -1,4 +1,4 @@
-# Checklist refactor chat flow
+﻿# Checklist refactor chat flow
 
 Checklist này được lập từ `chat_flow_redesign_refactor_plan.md` sau khi đối chiếu với hiện trạng repo. Mục tiêu là refactor dần từ flow "chat để tạo bài tập" sang nền tảng hội thoại có nhiều learning activity, nhưng vẫn giữ các phần đang chạy ổn như RAG, generator, validator, scorer, diagnosis, recommendation và chat session.
 
@@ -10,7 +10,7 @@ Checklist này được lập từ `chat_flow_redesign_refactor_plan.md` sau khi
 - [x] `LearningAgent` đã có retry generation, validate, seed-bank fallback backend, diagnosis, mastery update, recommendation và practice review.
 - [x] SQLite repository đã có bảng chat, generation run, practice session, answers, diagnoses, reviews, topic/subtopic/error/skill stats.
 - [x] PostgreSQL repository đang dùng JSONB tables cho profile, generated runs, practice sessions, chat sessions/messages/memory.
-- [x] Backend test đã xanh; sau Phase 11 `python -m unittest discover tests` chạy 60 tests pass.
+- [x] Backend test đã xanh; sau Phase 13 `python -m unittest discover tests` chạy 65 tests pass.
 - [x] Đã xử lý nhánh `GENERAL` và `EXPLAIN` để ưu tiên LLM-backed response khi có cấu hình, fallback theo context khi không có LLM.
 
 ## Nguyên Tắc Khi Làm
@@ -240,16 +240,145 @@ File dự kiến:
 - `README.md`
 - `docs/frontend_nextjs_architecture.md`
 
+## Phase 12 - Manual Smoke And Contract Hardening
+
+- [x] Add reproducible manual browser smoke checklist and API smoke script.
+- [ ] Run manual browser smoke: create conversation, generate practice, submit by `activity_id`, ask review for a wrong answer, ask progress, create New Chat, confirm profile/mastery/preferences persist.
+- [x] Audit all remaining `generation_run_id` usage and classify each use as trace/debug/observability or compatibility-only response field.
+- [x] Remove or refactor any remaining business logic that still treats `generation_run_id` as the primary practice/activity identity.
+- [x] Document canonical endpoints versus compatibility endpoints: `/api/conversations/*`, `/api/activities/*`, `/api/recommendations/*` versus legacy `/api/practice/*`.
+- [x] Add/verify Docker Compose smoke path for PostgreSQL repository backend.
+- [x] Add/verify Docker Compose smoke path for pgvector retrieval backend.
+- [x] Add a short smoke checklist in docs for Docker Ollama route: backend uses `http://ollama:11434`, host debug uses configured host port.
+- [ ] Run `python scripts/smoke_docker_stack.py` and `python scripts/smoke_conversation_flow.py` against a running Docker stack.
+
+File du kien:
+
+- `checklist.md`
+- `README.md`
+- `docs/docker_setup.md`
+- `docs/manual_smoke_checklist.md`
+- `docs/conversation_activity_contract.md`
+- `docs/generation_run_id_audit.md`
+- `docs/chat_flow_phase0_contract.md`
+- `scripts/smoke_conversation_flow.py`
+- `scripts/smoke_docker_stack.py`
+- `app/api/main.py`
+- `app/orchestrator/pipeline.py`
+- `frontend/components/chat-workbench.tsx`
+
+## Phase 13 - Tutor Response Quality Evaluation
+
+- [x] Add eval dataset for natural tutor chat, explanation, off-topic bridge, tutoring scope control, and repetition avoidance.
+- [x] Include regression cases: `doc truoc di`, `nghe truoc`, `viet truoc`, `noi truoc`, `nghe ki phet`, greetings, thanks, and unrelated chat.
+- [x] Add evaluator/check script for repeated menu responses, empty responses, too-long responses, wrong-language responses, and off-scope answers.
+- [x] Track response source distribution: `llm`, `context-fallback`, `guided-choice`, timeout/failure fallback.
+- [x] Add optional Ollama and OpenAI-compatible backend comparison path with the same tutor payload format.
+- [x] Add docs explaining when rule-first router is used and when LLM response generation is used.
+
+File du kien:
+
+- `evals/`
+- `scripts/run_evals.py`
+- `evals/datasets/tutor_response_cases.json`
+- `app/tutor/service.py`
+- `app/llm/factory.py`
+- `tests/test_conversation_capabilities.py`
+- `tests/test_tutor_response_evals.py`
+- `README.md`
+
+## Phase 14 - Production Retrieval And Grounding
+
+- [x] Choose a production/default semantic embedding profile for local Docker and documented demo setup.
+- [x] Expand retrieval evals with topic, subtopic, CEFR, source, and expected chunk checks.
+- [x] Tune hybrid retrieval scoring and reranker behavior against eval data.
+- [x] Add source-grounding checks for `EXPLAIN` responses when retrieved context is available.
+- [x] Document retrieval backends: keyword hash, Ollama/OpenAI embeddings, pgvector, sparse retrieval, hybrid fusion, reranker.
+- [x] Add smoke/contract tests for pgvector retrieval when Docker Postgres is available.
+
+File du kien:
+
+- `app/retrieval/`
+- `app/embeddings/`
+- `scripts/evaluate_retrieval.py`
+- `evals/retrieval/`
+- `docs/`
+- `docker-compose.yml`
+
+## Phase 15 - Adaptive Recommendation Depth
+
+- [x] Improve next-activity ranking with mastery gap, forgetting risk, prerequisite readiness, learner goals, recent performance, and difficulty match.
+- [x] Calibrate BKT/mastery parameters from answer history and error recurrence.
+- [x] Add spaced-review policy using `next_review_at`.
+- [x] Persist recommendation evidence so UI can explain why a recommendation was chosen.
+- [x] Evaluate recommendation acceptance and repeated-error reduction.
+- [x] Add tests proving accepted recommendations do not go back through generic prompt parsing.
+
+File du kien:
+
+- `app/recommendation/service.py`
+- `app/learner/`
+- `app/review/service.py`
+- `app/persistence/`
+- `frontend/components/chat-workbench.tsx`
+- `tests/`
+
+## Phase 16 - First-Class Reading, Writing, Listening, Speaking Activities
+
+- [x] Turn `LearningActivityType.READING` into a real service: passage, vocabulary support, comprehension questions, explanation, and result.
+- [x] Add frontend activity panel for reading that renders passage and comprehension workflow inside the conversation.
+- [x] Add writing correction activity with rubric-based feedback, corrected version, and target skill diagnosis.
+- [x] Keep listening/speaking as explicit follow-up subphases until audio/STT/TTS is selected.
+- [x] Extend router/general tutor so short focus choices can create or offer the correct activity type instead of only replying conversationally.
+- [x] Add tests for reading and writing activity lifecycle, persistence, API payloads, and UI data mapping.
+
+File du kien:
+
+- `app/activities/`
+- `app/conversation/router.py`
+- `app/tutor/service.py`
+- `app/api/main.py`
+- `app/api/schemas.py`
+- `frontend/lib/types.ts`
+- `frontend/lib/api.ts`
+- `frontend/components/chat-workbench.tsx`
+- `tests/`
+
+## Phase 17 - Production Hardening
+
+- [x] Harden auth beyond demo-token mode before any real deployment.
+- [x] Wire OpenTelemetry metrics/traces into a real dashboard path.
+- [x] Add AI eval thresholds to CI once eval datasets are stable.
+- [x] Add security/dependency checks to CI.
+- [x] Prepare environment profiles for local, docker-demo, and production-like runs.
+- [x] Document deployment path and required secrets/runtime services.
+
+File du kien:
+
+- `.github/workflows/ci.yml`
+- `app/auth/`
+- `app/observability/`
+- `docker-compose.yml`
+- `.env.example`
+- `README.md`
+- `docs/`
+
 ## Test Matrix Mỗi Phase
 
 - [x] Backend unit: `python -m unittest discover tests`.
 - [x] Router examples: 7 câu mẫu trong plan phải route đúng intent.
-- [ ] Persistence: in-memory và SQLite luôn có test tương đương; PostgreSQL có smoke test hoặc contract test nếu chưa chạy DB.
+- [x] Persistence: in-memory và SQLite luôn có test tương đương; PostgreSQL có smoke test hoặc contract test nếu chưa chạy DB.
 - [x] API: practice happy path, submit happy path, review latest activity, progress snapshot, profile update.
 - [x] Tutor response: `GENERAL`/`EXPLAIN` có test cho LLM-enabled path và fallback context-aware path.
 - [x] Frontend static: `cd frontend && npm run lint`.
 - [x] Frontend build: `cd frontend && npm run build`.
 - [ ] Manual smoke: mở chat, tạo bài, nộp bài, hỏi "Tại sao câu 2 sai?", hỏi "Tôi đang yếu phần nào?", bấm "New Chat", kiểm tra learner state còn giữ.
+- [x] Docker smoke path: backend, frontend, PostgreSQL/pgvector, Ollama container route.
+- [x] AI eval: tutor naturalness, repeated-menu avoidance, off-topic bridge, scope control, grounded explanation.
+- [x] Retrieval eval: Recall@K/MRR/NDCG plus metadata/source-grounding checks.
+- [x] Recommendation eval: accepted recommendation creates activity directly and reduces repeated weak-skill errors.
+- [x] Activity eval: reading/writing activity lifecycle, persistence, API payload, frontend rendering.
+- [x] Production hardening: auth, observability, CI eval thresholds, dependency/security checks.
 
 ## Thứ Tự Làm Đề Xuất
 
@@ -268,6 +397,26 @@ File dự kiến:
 - [x] 10.1 Cleanup legacy và cập nhật docs.
 - [x] 11.1 LLM-backed natural response cho `GENERAL`.
 - [x] 11.2 Cải thiện `EXPLAIN` dùng LLM/RAG, giữ rule fallback.
+- [ ] 12.1 Manual smoke full conversation/activity flow.
+- [x] 12.2 Audit `generation_run_id` identity usage.
+- [x] 12.3 Contract docs for canonical API vs legacy compatibility API.
+- [x] 12.4 Docker smoke for PostgreSQL/pgvector/Ollama.
+- [ ] 12.5 Run Docker/API smoke against live stack.
+- [x] 13.1 Tutor response eval dataset.
+- [x] 13.2 Tutor response eval runner and metrics.
+- [x] 13.3 Compare Ollama/OpenAI tutor-response behavior.
+- [x] 14.1 Production embedding profile decision.
+- [x] 14.2 Retrieval/reranker eval expansion.
+- [x] 14.3 Grounding checks for explanation responses.
+- [x] 15.1 Recommendation ranking upgrade.
+- [x] 15.2 BKT/spaced-review calibration.
+- [x] 15.3 Recommendation effectiveness eval.
+- [ ] 16.1 Reading activity service and UI.
+- [ ] 16.2 Writing correction activity service and UI.
+- [ ] 16.3 Listening/speaking activity design notes.
+- [ ] 17.1 Auth hardening.
+- [ ] 17.2 Observability dashboard path.
+- [ ] 17.3 CI security checks and AI eval thresholds.
 
 ## Definition Of Done
 
@@ -280,5 +429,5 @@ File dự kiến:
 - [x] Frontend không còn local fallback bài tập/chấm điểm.
 - [x] Chat tự do không còn trả một form cố định; phản hồi phải dựa trên message/context.
 - [x] Explain không chỉ đọc bảng hard-code khi có LLM/RAG khả dụng.
-- [ ] `generation_run_id` chỉ còn trong trace/debug/observability.
+- [x] `generation_run_id` chỉ còn trong trace/debug/observability hoặc legacy compatibility.
 - [x] Tests backend xanh và frontend lint/build xanh.

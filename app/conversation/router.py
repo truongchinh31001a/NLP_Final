@@ -226,6 +226,38 @@ class ConversationRouter:
 
         learning_focus = self._learning_focus_selection(normalized, context)
         if learning_focus is not None:
+            if learning_focus == "reading":
+                return ConversationRoute(
+                    intent=ConversationIntent.READING,
+                    confidence=0.84,
+                    source="rule-based",
+                    reason="Learner selected reading as the next learning focus.",
+                    slots={
+                        "learning_focus": learning_focus,
+                        "selection_kind": "learning_focus",
+                        "topic": "reading",
+                    },
+                    assistant_reply=(
+                        "Ok, minh chuyen sang doc: doc doan ngan truoc, "
+                        "roi tra loi vai cau hoi hieu bai."
+                    ),
+                )
+            if learning_focus == "writing":
+                return ConversationRoute(
+                    intent=ConversationIntent.WRITING,
+                    confidence=0.84,
+                    source="rule-based",
+                    reason="Learner selected writing as the next learning focus.",
+                    slots={
+                        "learning_focus": learning_focus,
+                        "selection_kind": "learning_focus",
+                        "topic": "writing",
+                    },
+                    assistant_reply=(
+                        "Ok, minh mo bai viet ngan de ban viet thu, "
+                        "sau do minh se sua theo rubric."
+                    ),
+                )
             return ConversationRoute(
                 intent=ConversationIntent.GENERAL,
                 confidence=0.82,
@@ -234,7 +266,14 @@ class ConversationRouter:
                 slots={
                     "learning_focus": learning_focus,
                     "selection_kind": "learning_focus",
+                    "planned_activity": learning_focus,
                 },
+                assistant_reply=(
+                    "Minh ghi nhan focus nay, nhung listening/speaking can "
+                    "chon audio, STT/TTS truoc khi bat thanh activity that."
+                )
+                if learning_focus in {"listening", "speaking"}
+                else "",
             )
 
         llm_route = self._try_llm_route(message=message, context=context)
@@ -403,8 +442,8 @@ class ConversationRouter:
         prompt = (
             "Classify this English tutor chat turn. Return strict JSON only with "
             "intent, confidence, reason, slots, needs_clarification. "
-            "Allowed intent values: PRACTICE, EXPLAIN, REVIEW, PROGRESS, "
-            "PROFILE_UPDATE, GENERAL. Prefer non-PRACTICE unless the learner asks "
+            "Allowed intent values: PRACTICE, READING, WRITING, EXPLAIN, REVIEW, "
+            "PROGRESS, PROFILE_UPDATE, GENERAL. Prefer non-PRACTICE unless the learner asks "
             "for an exercise, quiz, test, or continuing practice.\n"
             f"INPUT={json.dumps(payload, ensure_ascii=False)}"
         )

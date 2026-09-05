@@ -71,7 +71,10 @@ class LangChainVectorStore:
                     subtopic=subtopic,
                     limit=retrieval_limit,
                 )
-                documents = self.fusion.fuse([dense_documents, sparse_documents])
+                documents = self.fusion.fuse(
+                    [dense_documents, sparse_documents],
+                    weights=[0.45, 0.55],
+                )
 
         if self.config.reranker_enabled:
             documents = self.reranker.rerank(

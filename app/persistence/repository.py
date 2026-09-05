@@ -41,6 +41,14 @@ class LearningRepository(Protocol):
     ) -> LearningActivity:
         ...
 
+    def update_learning_activity_metadata(
+        self,
+        user_id: str,
+        activity_id: str,
+        metadata: dict[str, Any],
+    ) -> LearningActivity:
+        ...
+
     def attach_generated_exercise_set_to_activity(
         self,
         user_id: str,
@@ -208,6 +216,23 @@ class InMemoryLearningRepository:
             activity.completed_at = now
         self._sync_active_activity(activity)
         self._record_activity_event(activity, "STATUS_CHANGED")
+        return activity
+
+    def update_learning_activity_metadata(
+        self,
+        user_id: str,
+        activity_id: str,
+        metadata: dict[str, Any],
+    ) -> LearningActivity:
+        activity = self._require_learning_activity(user_id, activity_id)
+        activity.metadata.update(metadata)
+        activity.updated_at = self._now()
+        self._sync_active_activity(activity)
+        self._record_activity_event(
+            activity,
+            "METADATA_UPDATED",
+            {"metadata_keys": sorted(metadata.keys())},
+        )
         return activity
 
     def attach_generated_exercise_set_to_activity(
@@ -837,8 +862,13 @@ class InMemoryLearningRepository:
                 subtopic=exercise.subtopic,
             )
             prior = profile.skill_mastery.get(skill_id)
-            posterior = self.knowledge_tracer.update(prior, is_correct)
-            attempts = profile.skill_attempts.get(skill_id, 0) + 1
+            previous_attempts = profile.skill_attempts.get(skill_id, 0)
+            posterior = self.knowledge_tracer.update(
+                prior,
+                is_correct,
+                attempts_count=previous_attempts,
+            )
+            attempts = previous_attempts + 1
             profile.skill_mastery[skill_id] = posterior
             profile.skill_attempts[skill_id] = attempts
             profile.skill_confidence[skill_id] = min(attempts / 8, 1.0)

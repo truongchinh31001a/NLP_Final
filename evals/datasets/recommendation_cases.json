@@ -36,7 +36,13 @@
     "selected_answers": {
       "rec_001": "A"
     },
-    "expected_contains": ["Past Simple Finished Time", "easy"]
+    "expected_contains": ["Past Simple Finished Time", "easy"],
+    "expected_evidence": {
+      "selected_skill": "grammar.tenses.past_simple_finished_time",
+      "signals": ["recent_miss"],
+      "min_recent_misses": 1,
+      "requires_evidence": true
+    }
   },
   {
     "case_id": "recommend_profile_weak_skill",
@@ -54,7 +60,55 @@
     },
     "exercises": [],
     "selected_answers": {},
-    "expected_contains": ["Present Simple Passive", "medium"]
+    "expected_contains": ["Present Simple Passive", "medium"],
+    "expected_evidence": {
+      "selected_skill": "grammar.passive_voice.present_simple_passive",
+      "signals": ["mastery_gap"],
+      "requires_evidence": true
+    }
+  },
+  {
+    "case_id": "recommend_due_spaced_review",
+    "result": {
+      "user_id": "eval-user",
+      "topic": "passive_voice",
+      "score": 0.86,
+      "correct_count": 6,
+      "total_questions": 7
+    },
+    "profile": {
+      "skill_mastery": {
+        "grammar.passive_voice.present_simple_passive": 0.72
+      }
+    },
+    "personalization_snapshot": {
+      "skill_mastery": [
+        {
+          "code": "grammar.passive_voice.present_simple_passive",
+          "label": "Present Simple Passive",
+          "topic": "passive_voice",
+          "skill_type": "grammar",
+          "cefr": "A2",
+          "mastery_probability": 0.72,
+          "confidence": 0.8,
+          "attempts_count": 9,
+          "correct_count": 6,
+          "incorrect_count": 3,
+          "weakness_score": 0.28,
+          "status": "review",
+          "last_practiced_at": "2000-01-01T00:00:00+00:00",
+          "next_review_at": "2000-01-02T00:00:00+00:00",
+          "prerequisites": ["grammar.tenses.present_simple_habits"]
+        }
+      ]
+    },
+    "exercises": [],
+    "selected_answers": {},
+    "expected_contains": ["Present Simple Passive", "spaced review"],
+    "expected_evidence": {
+      "selected_skill": "grammar.passive_voice.present_simple_passive",
+      "signals": ["spaced_review"],
+      "requires_evidence": true
+    }
   }
 ]
-

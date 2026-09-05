@@ -184,6 +184,50 @@ class ConversationCapabilityTests(unittest.TestCase):
             "xem tien do, hoac noi chu de muon luyen tiep.",
         )
 
+    def test_reading_focus_creates_reading_activity(self) -> None:
+        conversation = self.pipeline.create_conversation("learner")
+
+        result = self.pipeline.handle_conversation_message(
+            user_id="learner",
+            conversation_id=conversation["conversation_id"],
+            message="doc truoc di",
+        )
+
+        self.assertEqual(result.intent.value, "READING")
+        self.assertEqual(result.ui_action, "reading.start")
+        self.assertEqual(result.activity["type"], "READING")
+        self.assertEqual(result.activity["status"], "READY")
+        self.assertTrue(result.activity["metadata"]["passage"])
+        self.assertEqual(len(result.activity["exercises"]), 3)
+
+    def test_writing_focus_creates_and_submits_writing_activity(self) -> None:
+        conversation = self.pipeline.create_conversation("learner")
+        created = self.pipeline.handle_conversation_message(
+            user_id="learner",
+            conversation_id=conversation["conversation_id"],
+            message="viet truoc nhe",
+        )
+
+        self.assertEqual(created.intent.value, "WRITING")
+        self.assertEqual(created.ui_action, "writing.start")
+        self.assertEqual(created.activity["type"], "WRITING")
+        self.assertTrue(created.activity["metadata"]["writing_prompt"])
+
+        submitted = self.pipeline.submit_writing_activity(
+            user_id="learner",
+            activity_id=created.activity["activity_id"],
+            writing_text=(
+                "I study English every evening. I read a short story and write "
+                "new words because this habit helps me remember vocabulary."
+            ),
+        )
+
+        self.assertEqual(submitted.activity.status.value, "COMPLETED")
+        self.assertTrue(submitted.result.session_code)
+        self.assertIsNotNone(submitted.result.practice_review)
+        self.assertTrue(submitted.activity.metadata["corrected_version"])
+        self.assertIn("rubric_scores", submitted.activity.metadata)
+
     def test_general_tutor_service_uses_llm_response_when_available(self) -> None:
         fake_llm = FakeTutorLLM(
             "LLM general: hom nay minh goi y luyen passive voice vi do la diem yeu.",
@@ -240,7 +284,7 @@ class ConversationCapabilityTests(unittest.TestCase):
             "thanks",
         )
 
-    def test_general_tutor_accepts_learning_focus_selection(self) -> None:
+    def test_audio_learning_focus_selection_stays_in_general_until_audio_stack_exists(self) -> None:
         fake_llm = FakeTutorLLM("Bad menu repeat.")
         self.pipeline.conversation_service.general_tutor_service = GeneralTutorService(
             config=self.pipeline.config,
@@ -251,18 +295,18 @@ class ConversationCapabilityTests(unittest.TestCase):
         result = self.pipeline.handle_conversation_message(
             user_id="learner",
             conversation_id=conversation["conversation_id"],
-            message="\u0111\u1ecdc tr\u01b0\u1edbc \u0111i",
+            message="noi truoc di",
         )
 
         self.assertEqual(result.ui_action, "conversation.reply")
-        self.assertIn("reading", result.assistant_reply)
-        self.assertIn("doan tieng Anh", result.assistant_reply)
+        self.assertIn("speaking", result.assistant_reply)
+        self.assertIn("STT/TTS", result.assistant_reply)
         self.assertNotIn("noi, nghe, doc hay viet", result.assistant_reply.lower())
         self.assertFalse(fake_llm.calls)
         capability = result.assistant_message["metadata"]["capability"]
         self.assertEqual(capability["response_source"], "guided-choice")
-        self.assertEqual(capability["learning_focus"], "reading")
-        self.assertEqual(capability["matched_template"], "learning_focus_reading")
+        self.assertEqual(capability["learning_focus"], "speaking")
+        self.assertEqual(capability["matched_template"], "learning_focus_speaking")
 
 
 if __name__ == "__main__":

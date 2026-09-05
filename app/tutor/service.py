@@ -522,14 +522,14 @@ class GeneralTutorService:
                 "tu moi va cau kho."
             ),
             "listening": (
-                f"Ok, minh bat dau voi listening truoc. Ban gui transcript/link audio "
-                f"neu co; neu chua co, minh se tao mot doan hoi thoai ngan muc "
-                f"{level}/{preferred} de ban nghe y chinh, tu khoa va cach phat am."
+                f"Ok, minh ghi nhan listening la focus tiep theo. Activity nghe that "
+                f"can chon audio/STT/TTS truoc; tam thoi ban co the gui transcript "
+                f"hoac link audio de minh bien thanh bai nghe muc {level}/{preferred}."
             ),
             "speaking": (
-                f"Ok, minh bat dau voi speaking truoc. Ban chon mot tinh huong ngan "
-                f"hoac de minh goi y tinh huong muc {level}/{preferred}; minh se dua "
-                "mau cau tu nhien roi minh va ban hoi-dap tung luot."
+                f"Ok, minh ghi nhan speaking la focus tiep theo. Activity noi that "
+                f"can chon audio/STT/TTS truoc; tam thoi minh co the tao role-play "
+                f"bang text muc {level}/{preferred} de ban tap cau tra loi."
             ),
             "writing": (
                 f"Ok, minh bat dau voi writing truoc. Ban gui mot cau/doan ngan muon "

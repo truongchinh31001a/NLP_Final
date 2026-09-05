@@ -26,6 +26,28 @@ class LearnerModelTests(unittest.TestCase):
         self.assertGreater(tracer.update(0.35, True), 0.35)
         self.assertLess(tracer.update(0.35, False), 0.35)
 
+    def test_bkt_calibrates_from_history_and_error_recurrence(self) -> None:
+        tracer = BayesianKnowledgeTracer()
+
+        default_incorrect = tracer.update(0.7, False)
+        repeated_incorrect = tracer.update(
+            0.7,
+            False,
+            attempts_count=10,
+            repeated_error_count=4,
+        )
+        calibrated = tracer.parameters_for_history(
+            attempts_count=10,
+            repeated_error_count=4,
+        )
+
+        self.assertLess(repeated_incorrect, default_incorrect)
+        self.assertNotEqual(
+            calibrated.learn_probability,
+            tracer.parameters.learn_probability,
+        )
+        self.assertLessEqual(calibrated.guess_probability, tracer.parameters.guess_probability)
+
     def test_skill_graph_resolves_prerequisite_readiness(self) -> None:
         readiness = DEFAULT_SKILL_GRAPH.prerequisite_readiness(
             "grammar.tenses.past_simple_finished_time",

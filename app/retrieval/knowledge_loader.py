@@ -19,6 +19,13 @@ REQUIRED_KNOWLEDGE_FIELDS = {
 }
 
 
+CEFR_BY_LEVEL = {
+    "beginner": "A1",
+    "intermediate": "B1",
+    "advanced": "B2",
+}
+
+
 def load_knowledge_chunk_records(path: str | Path) -> list[dict[str, Any]]:
     source_path = Path(path)
     if not source_path.exists():
@@ -55,12 +62,15 @@ def load_knowledge_documents(path: str | Path) -> list[Document]:
 
 
 def knowledge_record_to_document(record: dict[str, Any]) -> Document:
+    level = str(record["level"])
+    cefr = str(record.get("cefr") or CEFR_BY_LEVEL.get(level, "A1"))
     page_content = "\n".join(
         part
         for part in [
             f"Topic: {record['topic_code'].replace('_', ' ')}",
             f"Subtopic: {str(record['subtopic']).replace('_', ' ')}",
-            f"Level: {record['level']}",
+            f"Level: {level}",
+            f"CEFR: {cefr}",
             f"Skill: {record['skill']}",
             f"Content: {record['content']}",
             f"Formula: {record.get('formula', '')}",
@@ -75,7 +85,8 @@ def knowledge_record_to_document(record: dict[str, Any]) -> Document:
         "topic_code": record["topic_code"],
         "subtopic": record["subtopic"],
         "skill": record["skill"],
-        "level": record["level"],
+        "level": level,
+        "cefr": cefr,
         "language": record["language"],
         "source": record["source"],
         "formula": record.get("formula", ""),

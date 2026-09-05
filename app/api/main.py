@@ -28,6 +28,7 @@ from app.api.schemas import (
     InterpretPracticeRequestModel,
     InterpretPracticeResponseModel,
     MetricsResponseModel,
+    ObservabilityDashboardResponseModel,
     PersonalizationSnapshotResponseModel,
     RecommendationAcceptResponseModel,
     RecommendationListResponseModel,
@@ -43,6 +44,7 @@ from app.api.schemas import (
 )
 from app.auth.service import AuthContext, AuthService
 from app.activities.practice_service import PracticeActivitySubmission
+from app.activities.literacy_service import WritingActivitySubmission
 from app.bootstrap import build_baseline_pipeline
 from app.conversation.schemas import ConversationRoute, ConversationTurnResult
 from app.observability.metrics import metrics_registry
@@ -50,6 +52,7 @@ from app.observability.tracing import get_tracer, setup_tracing
 from app.retrieval.knowledge_loader import load_knowledge_chunk_records
 from app.schemas import (
     ActivityRecommendation,
+    LearningActivityType,
     PendingClarification,
     PracticeRequest,
     SubmittedAnswer,
@@ -113,10 +116,12 @@ async def observe_http_request(request: Request, call_next):
 def healthcheck() -> HealthResponseModel:
     return HealthResponseModel(
         status="ok",
+        deployment_environment=pipeline.config.deployment_environment,
         generator_backend=pipeline.generator.backend_name,
         repository_backend=pipeline.config.learning_repository_backend,
         vector_store_backend=pipeline.config.vector_store_backend,
         auth_mode=pipeline.config.auth_mode,
+        debug_endpoints_enabled=pipeline.config.debug_endpoints_enabled,
         observability_enabled=pipeline.config.observability_enabled,
         otel_enabled=pipeline.config.otel_enabled,
     )
@@ -124,6 +129,8 @@ def healthcheck() -> HealthResponseModel:
 
 @app.post("/api/auth/dev-token", response_model=AuthTokenResponseModel)
 def create_dev_auth_token(payload: AuthTokenRequestModel) -> AuthTokenResponseModel:
+    if not pipeline.config.auth_dev_token_enabled:
+        raise HTTPException(status_code=404, detail="Dev token endpoint is disabled.")
     return AuthTokenResponseModel(
         access_token=auth_service.issue_token(payload.user_id),
         user_id=payload.user_id,
@@ -133,17 +140,41 @@ def create_dev_auth_token(payload: AuthTokenRequestModel) -> AuthTokenResponseMo
 
 @app.get("/api/debug/metrics", response_model=MetricsResponseModel)
 def debug_metrics() -> MetricsResponseModel:
+    _require_debug_endpoint_enabled()
     return MetricsResponseModel(**metrics_registry.snapshot())
 
 
 @app.get("/api/debug/workflow", response_model=WorkflowGraphResponseModel)
 def debug_workflow() -> WorkflowGraphResponseModel:
+    _require_debug_endpoint_enabled()
     return WorkflowGraphResponseModel(**pipeline.workflow_graph.as_dict())
 
 
 @app.get("/api/debug/chroma", response_model=ChromaDebugResponseModel)
 def debug_chroma() -> ChromaDebugResponseModel:
+    _require_debug_endpoint_enabled()
     return ChromaDebugResponseModel(**_build_chroma_debug_snapshot())
+
+
+@app.get(
+    "/api/ops/observability",
+    response_model=ObservabilityDashboardResponseModel,
+)
+def ops_observability(
+    user_id: str | None = Query(default=None),
+    authorization: str | None = Header(default=None),
+) -> ObservabilityDashboardResponseModel:
+    _authorize_ops_request(user_id, authorization)
+    return ObservabilityDashboardResponseModel(
+        status="ok",
+        deployment_environment=pipeline.config.deployment_environment,
+        service_name=pipeline.config.otel_service_name,
+        metrics=MetricsResponseModel(**metrics_registry.snapshot()),
+        observability_enabled=pipeline.config.observability_enabled,
+        otel_enabled=pipeline.config.otel_enabled,
+        otel_exporter_otlp_endpoint=pipeline.config.otel_exporter_otlp_endpoint,
+        debug_endpoints_enabled=pipeline.config.debug_endpoints_enabled,
+    )
 
 
 @app.post("/api/conversations", response_model=ConversationDetailResponseModel)
@@ -306,6 +337,23 @@ def submit_activity(
 ) -> ActivitySubmitResponseModel:
     _authorize_user(payload.user_id, authorization)
     try:
+        activity = pipeline.repository.get_learning_activity(
+            payload.user_id,
+            activity_id,
+        )
+        if activity is None:
+            raise LookupError(f"Learning activity not found: {activity_id}")
+        if activity.type == LearningActivityType.WRITING:
+            if not payload.writing_text or not payload.writing_text.strip():
+                raise ValueError("writing_text is required for writing activities.")
+            writing_submission = pipeline.submit_writing_activity(
+                user_id=payload.user_id,
+                activity_id=activity_id,
+                writing_text=payload.writing_text,
+            )
+            return _writing_activity_submit_response(writing_submission)
+        if not payload.answers:
+            raise ValueError("answers are required for practice and reading activities.")
         submission = pipeline.submit_practice_activity(
             user_id=payload.user_id,
             activity_id=activity_id,
@@ -575,6 +623,25 @@ def _authorize_user(
         raise HTTPException(status_code=401, detail=str(exc)) from exc
 
 
+def _authorize_ops_request(
+    user_id: str | None,
+    authorization: str | None,
+) -> None:
+    if not auth_service.requires_authentication:
+        return
+    if not user_id:
+        raise HTTPException(
+            status_code=401,
+            detail="user_id is required when auth is enabled.",
+        )
+    _authorize_user(user_id, authorization)
+
+
+def _require_debug_endpoint_enabled() -> None:
+    if not pipeline.config.debug_endpoints_enabled:
+        raise HTTPException(status_code=404, detail="Debug endpoints are disabled.")
+
+
 def _conversation_turn_response(
     result: ConversationTurnResult,
 ) -> ConversationMessageTurnResponseModel:
@@ -634,7 +701,34 @@ def _activity_submit_response(
             for exercise_id, selected_answer in submission.selected_answers.items()
         ],
         next_activity_suggestion=submission.next_activity_suggestion,
-        ui_action="practice.result",
+        ui_action=(
+            "reading.result"
+            if submission.activity.type == LearningActivityType.READING
+            else "practice.result"
+        ),
+    )
+
+
+def _writing_activity_submit_response(
+    submission: WritingActivitySubmission,
+) -> ActivitySubmitResponseModel:
+    result_payload = asdict(submission.result)
+    activity_payload = {
+        **asdict(submission.activity),
+        "request": None,
+        "plan": None,
+        "exercises": [],
+        "result": result_payload,
+        "recommendation": submission.result.recommendation,
+        "next_activity_suggestion": submission.next_activity_suggestion,
+    }
+    return ActivitySubmitResponseModel(
+        activity=activity_payload,
+        result=result_payload,
+        exercises=[],
+        answers=[],
+        next_activity_suggestion=submission.next_activity_suggestion,
+        ui_action="writing.result",
     )
 
 

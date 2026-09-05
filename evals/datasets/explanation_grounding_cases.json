@@ -1,0 +1,24 @@
+[
+  {
+    "case_id": "explain_passive_uses_retrieved_source",
+    "message": "Passive voice la gi?",
+    "concept": "passive_voice",
+    "chunk": {
+      "chunk_id": "grammar_passive_002",
+      "topic": "passive_voice",
+      "level": "beginner",
+      "content": "Present simple passive uses am, is, or are with the past participle.",
+      "source": "teacher_authored_mvp_notes",
+      "metadata": {
+        "subtopic": "present_simple_passive",
+        "cefr": "A1"
+      }
+    },
+    "expected": {
+      "response_source": "rule-fallback",
+      "source": "teacher_authored_mvp_notes",
+      "chunk_id": "grammar_passive_002",
+      "must_contain_any": ["tai lieu lien quan", "am is are", "past participle"]
+    }
+  }
+]

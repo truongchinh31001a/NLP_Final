@@ -69,6 +69,7 @@ export type NextActivitySuggestion = {
   numQuestions?: number | null;
   reason?: string;
   prompt?: string;
+  evidence?: Record<string, unknown>;
 };
 
 export type ScoreResult = {

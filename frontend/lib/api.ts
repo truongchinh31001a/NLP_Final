@@ -140,6 +140,7 @@ export type NextActivitySuggestionResponse = {
   num_questions?: number | null;
   reason?: string | null;
   prompt?: string | null;
+  evidence?: Record<string, unknown> | null;
 };
 
 export type PersonalizationSnapshotResponse = {
@@ -385,10 +386,11 @@ export type ConversationMessageTurnResponse = {
 export type SubmitActivityRequest = {
   userId: string;
   activityId: string;
-  answers: Array<{
+  answers?: Array<{
     exerciseId: string;
     selectedAnswer: string;
   }>;
+  writingText?: string;
 };
 
 export type ActivitySubmitResponse = {
@@ -648,10 +650,11 @@ export async function submitActivity(
       headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         user_id: payload.userId,
-        answers: payload.answers.map((answer) => ({
+        answers: (payload.answers ?? []).map((answer) => ({
           exercise_id: answer.exerciseId,
           selected_answer: answer.selectedAnswer,
         })),
+        writing_text: payload.writingText,
       }),
     },
   );
@@ -1353,6 +1356,7 @@ function mapNextActivitySuggestion(
     numQuestions: getNumber(rawSuggestion.num_questions),
     reason: getString(rawSuggestion.reason) ?? undefined,
     prompt: getString(rawSuggestion.prompt) ?? undefined,
+    evidence: isRecord(rawSuggestion.evidence) ? rawSuggestion.evidence : undefined,
   };
 }
 

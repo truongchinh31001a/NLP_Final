@@ -1,5 +1,9 @@
 # Chat Flow Phase 0 Compatibility Contract
 
+Current contract after the chat-flow refactor is documented in
+`docs/conversation_activity_contract.md`. This file remains as the historical
+Phase 0 baseline for legacy endpoint compatibility.
+
 Tài liệu này ghi lại contract hiện tại trước khi refactor chat flow. Các phase sau có thể thêm API mới, nhưng không nên làm hỏng các contract legacy này nếu chưa có bước migration frontend rõ ràng.
 
 ## Practice Generate

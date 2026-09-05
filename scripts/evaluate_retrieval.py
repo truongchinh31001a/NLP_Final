@@ -24,7 +24,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--queries",
         default="./data/evaluation/retrieval_eval_queries.csv",
-        help="CSV with query, expected_topic, expected_level columns.",
+        help=(
+            "CSV with query, expected_topic, expected_level, and optional "
+            "expected_subtopic/expected_cefr/expected_source/expected_chunk_ids columns."
+        ),
     )
     parser.add_argument(
         "--knowledge",
@@ -70,6 +73,12 @@ def load_queries(path: str | Path) -> list[dict[str, str]]:
         rows = [dict(row) for row in csv.DictReader(csv_file)]
 
     required = {"query", "expected_topic", "expected_level"}
+    optional = {
+        "expected_subtopic",
+        "expected_cefr",
+        "expected_source",
+        "expected_chunk_ids",
+    }
     for index, row in enumerate(rows):
         missing = required - set(row)
         if missing:
@@ -78,7 +87,8 @@ def load_queries(path: str | Path) -> list[dict[str, str]]:
             row[field] = row[field].strip()
             if not row[field]:
                 raise ValueError(f"Query row {index} has empty field: {field}")
-        row["expected_subtopic"] = row.get("expected_subtopic", "").strip()
+        for field in optional:
+            row[field] = row.get(field, "").strip()
     return rows
 
 
@@ -108,7 +118,14 @@ def main() -> None:
         retrieved = retrieval.retrieve(plan, query_row["expected_level"])
         topics = [chunk.topic for chunk in retrieved]
         levels = [chunk.level for chunk in retrieved]
+        subtopics = [
+            str(chunk.metadata.get("subtopic") or "")
+            for chunk in retrieved
+        ]
+        cefrs = [str(chunk.metadata.get("cefr") or "") for chunk in retrieved]
+        sources = [chunk.source for chunk in retrieved]
         chunk_ids = [chunk.chunk_id for chunk in retrieved]
+        expected_chunk_ids = parse_chunk_ids(query_row.get("expected_chunk_ids", ""))
         relevance = [int(topic == query_row["expected_topic"]) for topic in topics]
         level_relevance = [
             int(
@@ -117,23 +134,111 @@ def main() -> None:
             )
             for topic, level in zip(topics, levels)
         ]
+        subtopic_relevance = [
+            int(
+                optional_text_matches(
+                    actual=subtopic,
+                    expected=query_row.get("expected_subtopic", ""),
+                )
+            )
+            for subtopic in subtopics
+        ]
+        cefr_relevance = [
+            int(
+                optional_text_matches(
+                    actual=cefr,
+                    expected=query_row.get("expected_cefr", ""),
+                )
+            )
+            for cefr in cefrs
+        ]
+        source_relevance = [
+            int(
+                optional_text_matches(
+                    actual=source,
+                    expected=query_row.get("expected_source", ""),
+                )
+            )
+            for source in sources
+        ]
+        metadata_relevance = [
+            int(
+                metadata_matches(
+                    topic=topic,
+                    level=level,
+                    subtopic=subtopic,
+                    cefr=cefr,
+                    source=source,
+                    expected=query_row,
+                )
+            )
+            for topic, level, subtopic, cefr, source in zip(
+                topics,
+                levels,
+                subtopics,
+                cefrs,
+                sources,
+            )
+        ]
+        chunk_relevance = [
+            int(chunk_id in expected_chunk_ids)
+            for chunk_id in chunk_ids
+        ]
         rows.append(
             {
                 "query": query_row["query"],
                 "expected_topic": query_row["expected_topic"],
                 "expected_level": query_row["expected_level"],
+                "expected_subtopic": query_row.get("expected_subtopic", ""),
+                "expected_cefr": query_row.get("expected_cefr", ""),
+                "expected_source": query_row.get("expected_source", ""),
+                "expected_chunk_ids": expected_chunk_ids,
                 "top_1_topic": topics[0] if topics else "",
                 "top_1_level": levels[0] if levels else "",
+                "top_1_subtopic": subtopics[0] if subtopics else "",
+                "top_1_cefr": cefrs[0] if cefrs else "",
+                "top_1_source": sources[0] if sources else "",
                 "top_k_topics": topics,
                 "top_k_levels": levels,
+                "top_k_subtopics": subtopics,
+                "top_k_cefrs": cefrs,
+                "top_k_sources": sources,
                 "top_k_chunk_ids": chunk_ids,
                 "precision_at_k": precision_at_k(relevance, args.top_k),
                 "recall_at_k": recall_at_k(relevance),
                 "mrr": reciprocal_rank(relevance),
                 "ndcg_at_k": ndcg_at_k(relevance),
                 "level_precision_at_k": precision_at_k(level_relevance, args.top_k),
+                "subtopic_precision_at_k": precision_at_k(
+                    subtopic_relevance,
+                    args.top_k,
+                ),
+                "cefr_precision_at_k": precision_at_k(cefr_relevance, args.top_k),
+                "source_precision_at_k": precision_at_k(
+                    source_relevance,
+                    args.top_k,
+                ),
+                "metadata_precision_at_k": precision_at_k(
+                    metadata_relevance,
+                    args.top_k,
+                ),
+                "metadata_recall_at_k": recall_at_k(metadata_relevance),
+                "expected_chunk_recall_at_k": (
+                    recall_at_k(chunk_relevance) if expected_chunk_ids else 0.0
+                ),
+                "expected_chunk_mrr": (
+                    reciprocal_rank(chunk_relevance) if expected_chunk_ids else 0.0
+                ),
                 "top_1_match": bool(relevance and relevance[0]),
+                "top_1_metadata_match": bool(
+                    metadata_relevance and metadata_relevance[0]
+                ),
+                "top_1_expected_chunk_match": bool(
+                    chunk_relevance and chunk_relevance[0]
+                ),
                 "top_k_match": any(relevance),
+                "top_k_metadata_match": any(metadata_relevance),
+                "top_k_expected_chunk_match": any(chunk_relevance),
             }
         )
 
@@ -166,6 +271,17 @@ def build_report(
             "mrr": mean_float(rows, "mrr"),
             "ndcg_at_k": mean_float(rows, "ndcg_at_k"),
             "level_precision_at_k": mean_float(rows, "level_precision_at_k"),
+            "subtopic_precision_at_k": mean_float(rows, "subtopic_precision_at_k"),
+            "cefr_precision_at_k": mean_float(rows, "cefr_precision_at_k"),
+            "source_precision_at_k": mean_float(rows, "source_precision_at_k"),
+            "metadata_precision_at_k": mean_float(rows, "metadata_precision_at_k"),
+            "metadata_recall_at_k": mean_float(rows, "metadata_recall_at_k"),
+            "top_1_metadata_match": mean_bool(rows, "top_1_metadata_match"),
+            "expected_chunk_recall_at_k": mean_float(
+                rows,
+                "expected_chunk_recall_at_k",
+            ),
+            "expected_chunk_mrr": mean_float(rows, "expected_chunk_mrr"),
         },
         "top_1_topic_match_by_expected_topic": {
             topic: {
@@ -219,6 +335,49 @@ def mean_bool(rows: list[dict[str, object]], key: str) -> float:
     return sum(1 for row in rows if row[key]) / len(rows)
 
 
+def parse_chunk_ids(value: str) -> list[str]:
+    return [
+        item.strip()
+        for item in str(value or "").replace(";", "|").split("|")
+        if item.strip()
+    ]
+
+
+def optional_text_matches(*, actual: str, expected: str) -> bool:
+    expected = str(expected or "").strip()
+    if not expected:
+        return True
+    actual = str(actual or "").strip()
+    return actual == expected or actual.startswith(expected) or expected.startswith(actual)
+
+
+def metadata_matches(
+    *,
+    topic: str,
+    level: str,
+    subtopic: str,
+    cefr: str,
+    source: str,
+    expected: dict[str, str],
+) -> bool:
+    return (
+        topic == expected["expected_topic"]
+        and level == expected["expected_level"]
+        and optional_text_matches(
+            actual=subtopic,
+            expected=expected.get("expected_subtopic", ""),
+        )
+        and optional_text_matches(
+            actual=cefr,
+            expected=expected.get("expected_cefr", ""),
+        )
+        and optional_text_matches(
+            actual=source,
+            expected=expected.get("expected_source", ""),
+        )
+    )
+
+
 def print_report(report: dict[str, object]) -> None:
     metrics = report["metrics"]
     assert isinstance(metrics, dict)
@@ -231,14 +390,24 @@ def print_report(report: dict[str, object]) -> None:
 
 
 def print_misses(rows: list[dict[str, object]]) -> None:
-    misses = [row for row in rows if not row["top_k_match"]]
+    misses = [
+        row
+        for row in rows
+        if not row["top_k_match"]
+        or not row["top_k_metadata_match"]
+        or (
+            row["expected_chunk_ids"]
+            and not row["top_k_expected_chunk_match"]
+        )
+    ]
     if not misses:
         return
-    print("\nTop-k misses:")
+    print("\nTop-k/metadata misses:")
     for row in misses:
         print(
             f"- {row['query']} | expected={row['expected_topic']} "
-            f"| got={row['top_k_topics']} | chunks={row['top_k_chunk_ids']}"
+            f"/ {row['expected_subtopic']} | got={row['top_k_topics']} "
+            f"/ {row['top_k_subtopics']} | chunks={row['top_k_chunk_ids']}"
         )
 
 

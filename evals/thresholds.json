@@ -1,0 +1,8 @@
+{
+  "generation": 1.0,
+  "diagnosis": 1.0,
+  "recommendation": 1.0,
+  "tutor_response": 1.0,
+  "explanation_grounding": 1.0,
+  "retrieval": 0.95
+}

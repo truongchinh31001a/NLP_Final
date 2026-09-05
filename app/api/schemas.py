@@ -73,7 +73,8 @@ class ScorePracticeRequestModel(BaseModel):
 
 class SubmitActivityRequestModel(BaseModel):
     user_id: str = Field(min_length=1)
-    answers: list[SubmittedAnswerModel] = Field(min_length=1)
+    answers: list[SubmittedAnswerModel] = Field(default_factory=list)
+    writing_text: str | None = Field(default=None, max_length=8000)
 
 
 class PracticeReviewResponseModel(BaseModel):
@@ -194,6 +195,7 @@ class ActivityRecommendationResponseModel(BaseModel):
     source_activity_id: str | None = None
     conversation_id: str | None = None
     prompt: str = ""
+    evidence: dict[str, Any] = Field(default_factory=dict)
 
 
 class LearningActivityResponseModel(BaseModel):
@@ -433,10 +435,12 @@ class PersonalizationSnapshotResponseModel(BaseModel):
 
 class HealthResponseModel(BaseModel):
     status: str
+    deployment_environment: str
     generator_backend: str
     repository_backend: str
     vector_store_backend: str
     auth_mode: str
+    debug_endpoints_enabled: bool
     observability_enabled: bool
     otel_enabled: bool
 
@@ -444,6 +448,17 @@ class HealthResponseModel(BaseModel):
 class MetricsResponseModel(BaseModel):
     counters: dict[str, int]
     timers: dict[str, dict[str, Any]]
+
+
+class ObservabilityDashboardResponseModel(BaseModel):
+    status: str
+    deployment_environment: str
+    service_name: str
+    metrics: MetricsResponseModel
+    observability_enabled: bool
+    otel_enabled: bool
+    otel_exporter_otlp_endpoint: str
+    debug_endpoints_enabled: bool
 
 
 class WorkflowGraphResponseModel(BaseModel):

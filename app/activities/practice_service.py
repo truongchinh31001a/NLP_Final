@@ -51,6 +51,7 @@ class PracticeActivityService:
         conversation_id: str | None = None,
         request_overrides: PracticeRequest | None = None,
         skip_request_parser: bool = False,
+        metadata: dict[str, Any] | None = None,
     ) -> PracticeActivityGeneration:
         resolved_conversation_id = self._ensure_conversation(
             user_id,
@@ -75,6 +76,7 @@ class PracticeActivityService:
                         if request_overrides is not None
                         else None
                     ),
+                    **(metadata or {}),
                 },
             ),
         )
@@ -178,8 +180,13 @@ class PracticeActivityService:
         activity = self.repository.get_learning_activity(user_id, activity_id)
         if activity is None:
             raise LookupError(f"Learning activity not found: {activity_id}")
-        if activity.type != LearningActivityType.PRACTICE:
-            raise ValueError("Learning activity is not a practice activity.")
+        if activity.type not in {
+            LearningActivityType.PRACTICE,
+            LearningActivityType.READING,
+        }:
+            raise ValueError(
+                "Learning activity is not a practice or reading activity.",
+            )
         if activity.status in {
             LearningActivityStatus.CANCELLED,
             LearningActivityStatus.FAILED,
@@ -212,15 +219,27 @@ class PracticeActivityService:
         selected_answers: dict[str, str] | None = None,
     ) -> dict[str, Any] | None:
         profile = self.repository.get_profile(result.user_id)
+        snapshot = self._safe_personalization_snapshot(result.user_id)
         recommendation = self.agent.recommendation.build_next_activity_recommendation(
             result=result,
             profile=profile,
             generated=generated,
             selected_answers=selected_answers,
+            personalization_snapshot=snapshot,
             source_activity_id=result.activity_id or generated.activity_id,
             conversation_id=self._conversation_id_for_result(result, generated),
         )
         return asdict(recommendation)
+
+    def _safe_personalization_snapshot(
+        self,
+        user_id: str,
+    ) -> dict[str, object] | None:
+        try:
+            snapshot = self.repository.get_personalization_snapshot(user_id)
+        except Exception:
+            return None
+        return snapshot if isinstance(snapshot, dict) else None
 
     def _conversation_id_for_result(
         self,

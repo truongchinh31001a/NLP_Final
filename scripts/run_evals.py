@@ -1,5 +1,6 @@
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -10,16 +11,31 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from app.diagnosis.service import ErrorDiagnosisService
+from app.config import AppConfig
+from app.conversation.schemas import ConversationRoute
+from app.conversation.router import ConversationRouter
 from app.generation.validator import ExerciseValidator
+from app.intent.interpreter import PracticeIntentInterpreter
+from app.intent.parser import IntentParser
+from app.llm.factory import LangChainModelFactory
 from app.recommendation.service import RecommendationService
 from app.schemas import (
+    ConversationIntent,
+    ConversationTurnContext,
     ExerciseItem,
     ExerciseOption,
     GeneratedExerciseSet,
+    KnowledgeChunk,
     LearnerProfile,
     PracticePlan,
     PracticeRequest,
     SessionResult,
+)
+from app.tutor.service import (
+    GeneralTutorService,
+    TutorCapabilityResult,
+    TutorExplainService,
+    TutorResponseLLM,
 )
 
 
@@ -35,6 +51,14 @@ def parse_args() -> argparse.Namespace:
         default="./evals/reports/summary_report.json",
         help="Where to write the summary report.",
     )
+    parser.add_argument(
+        "--tutor-live-backends",
+        default="",
+        help=(
+            "Optional comma-separated tutor response backends to compare, "
+            "for example 'ollama,openai'. Default runs offline checks only."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -44,6 +68,8 @@ def main() -> None:
         "generation": evaluate_generation_schema(),
         "diagnosis": evaluate_diagnosis(),
         "recommendation": evaluate_recommendation(),
+        "tutor_response": evaluate_tutor_response_quality(),
+        "explanation_grounding": evaluate_explanation_grounding(),
         "retrieval": (
             {
                 "status": "skipped",
@@ -53,6 +79,12 @@ def main() -> None:
             else evaluate_retrieval_subprocess()
         ),
     }
+    live_tutor_backends = parse_backend_list(args.tutor_live_backends)
+    if live_tutor_backends:
+        report["tutor_response_live"] = {
+            backend: evaluate_live_tutor_backend(backend)
+            for backend in live_tutor_backends
+        }
     report["summary"] = {
         group: summary_value(group_report)
         for group, group_report in report.items()
@@ -93,6 +125,17 @@ def evaluate_generation_schema() -> dict[str, Any]:
 def summary_value(group_report: dict[str, Any]) -> float | str:
     if group_report.get("status") == "skipped":
         return "skipped"
+    if "score" in group_report:
+        return float(group_report.get("score", 0.0))
+    nested_scores = [
+        float(item["score"])
+        for item in group_report.values()
+        if isinstance(item, dict)
+        and isinstance(item.get("score"), (int, float))
+        and item.get("status") != "skipped"
+    ]
+    if nested_scores:
+        return sum(nested_scores) / len(nested_scores)
     return float(group_report.get("score", 0.0))
 
 
@@ -141,25 +184,377 @@ def evaluate_recommendation() -> dict[str, Any]:
             topic=case["result"]["topic"],
             exercises=case.get("exercises", []),
         )
-        recommendation = service.recommend(
-            result,
+        recommendation = service.build_next_activity_recommendation(
+            result=result,
             profile=profile,
             generated=generated,
             selected_answers=case.get("selected_answers", {}),
+            personalization_snapshot=case.get("personalization_snapshot"),
         )
-        is_pass = all(
-            expected in recommendation for expected in case["expected_contains"]
+        reason = recommendation.reason
+        evidence = recommendation.evidence
+        evidence_checks = recommendation_evidence_checks(
+            evidence,
+            case.get("expected_evidence", {}),
         )
+        is_pass = all(expected in reason for expected in case["expected_contains"])
+        is_pass = is_pass and all(check["passed"] for check in evidence_checks)
         passed += int(is_pass)
         rows.append(
             {
                 "case_id": case["case_id"],
-                "recommendation": recommendation,
+                "recommendation": reason,
+                "skill": recommendation.skill,
+                "evidence": evidence,
                 "expected_contains": case["expected_contains"],
+                "evidence_checks": evidence_checks,
                 "passed": is_pass,
             }
         )
     return metric_report("recommendation_policy_match", passed, len(cases), rows)
+
+
+def recommendation_evidence_checks(
+    evidence: dict[str, Any],
+    expected: dict[str, Any],
+) -> list[dict[str, Any]]:
+    checks: list[dict[str, Any]] = []
+    if not expected:
+        return checks
+    selected = evidence.get("selected_candidate")
+    selected = selected if isinstance(selected, dict) else {}
+    if expected.get("selected_skill"):
+        checks.append(
+            check_result(
+                "selected_skill",
+                selected.get("skill_id") == expected["selected_skill"],
+                {
+                    "expected": expected["selected_skill"],
+                    "actual": selected.get("skill_id"),
+                },
+            ),
+        )
+    for signal in expected.get("signals", []):
+        checks.append(
+            check_result(
+                f"signal:{signal}",
+                signal in selected.get("signals", []),
+                {"actual": selected.get("signals", [])},
+            ),
+        )
+    if "min_recent_misses" in expected:
+        checks.append(
+            check_result(
+                "min_recent_misses",
+                int(selected.get("recent_misses") or 0)
+                >= int(expected["min_recent_misses"]),
+                {"actual": selected.get("recent_misses")},
+            ),
+        )
+    if expected.get("requires_evidence"):
+        checks.append(
+            check_result(
+                "candidate_scores",
+                bool(evidence.get("candidate_scores")),
+            ),
+        )
+    return checks
+
+
+def evaluate_tutor_response_quality(
+    response_llm: TutorResponseLLM | None = None,
+    *,
+    label: str = "offline",
+    require_expected_source: bool = True,
+) -> dict[str, Any]:
+    cases = load_json("./evals/datasets/tutor_response_cases.json")
+    config = AppConfig(llm_backend="none", tutor_response_llm_enabled=False)
+    parser = IntentParser(config)
+    router = ConversationRouter(config, PracticeIntentInterpreter(config, parser))
+    general_service = GeneralTutorService(config=config, response_llm=response_llm)
+    explain_service = TutorExplainService(config=config, response_llm=response_llm)
+
+    passed = 0
+    rows = []
+    response_sources: dict[str, int] = {}
+    for case in cases:
+        context = tutor_context_from_case(case)
+        route = router.route(message=str(case["message"]), context=context)
+        if route.intent == ConversationIntent.EXPLAIN:
+            result = explain_service.explain(route=route, context=context)
+        elif route.intent in {ConversationIntent.READING, ConversationIntent.WRITING}:
+            result = TutorCapabilityResult(
+                assistant_reply=route.assistant_reply,
+                ui_action=f"{route.intent.value.lower()}.start",
+                metadata={
+                    "response_source": "activity-route",
+                    "learning_focus": route.slots.get("learning_focus"),
+                },
+            )
+        elif route.intent == ConversationIntent.GENERAL:
+            result = general_service.respond(route=route, context=context)
+        else:
+            result = None
+
+        assistant_reply = result.assistant_reply if result is not None else ""
+        metadata = result.metadata if result is not None else {}
+        response_source = str(metadata.get("response_source") or "unsupported")
+        response_sources[response_source] = response_sources.get(response_source, 0) + 1
+        case_checks = tutor_case_checks(
+            case=case,
+            route_intent=route.intent.value,
+            assistant_reply=assistant_reply,
+            metadata=metadata,
+            require_expected_source=require_expected_source,
+        )
+        is_pass = all(check["passed"] for check in case_checks)
+        passed += int(is_pass)
+        rows.append(
+            {
+                "case_id": case["case_id"],
+                "label": label,
+                "intent": route.intent.value,
+                "response_source": response_source,
+                "learning_focus": metadata.get("learning_focus"),
+                "assistant_reply": assistant_reply[:700],
+                "checks": case_checks,
+                "passed": is_pass,
+            }
+        )
+
+    report = metric_report("tutor_response_quality", passed, len(cases), rows)
+    report["label"] = label
+    report["response_sources"] = response_sources
+    return report
+
+
+def evaluate_explanation_grounding() -> dict[str, Any]:
+    cases = load_json("./evals/datasets/explanation_grounding_cases.json")
+    config = AppConfig(llm_backend="none", tutor_response_llm_enabled=False)
+    passed = 0
+    rows = []
+    for case in cases:
+        retrieval = StaticExplanationRetrieval([KnowledgeChunk(**case["chunk"])])
+        service = TutorExplainService(config=config, retrieval=retrieval)
+        route = ConversationRoute(
+            intent=ConversationIntent.EXPLAIN,
+            confidence=1.0,
+            source="eval",
+            reason="grounding eval",
+            slots={"concept": case["concept"]},
+        )
+        context = ConversationTurnContext(
+            conversation_id="eval_conversation",
+            learner_id="eval_learner",
+            profile=LearnerProfile(user_id="eval_learner", level="beginner"),
+            recent_messages=[{"role": "user", "content": case["message"]}],
+        )
+        result = service.explain(route=route, context=context)
+        expected = case["expected"]
+        normalized_reply = normalize_eval_text(result.assistant_reply)
+        sources = result.metadata.get("sources", [])
+        source_ids = [
+            str(source.get("chunk_id"))
+            for source in sources
+            if isinstance(source, dict)
+        ]
+        source_names = [
+            str(source.get("source"))
+            for source in sources
+            if isinstance(source, dict)
+        ]
+        checks = [
+            check_result(
+                "response_source",
+                result.metadata.get("response_source") == expected["response_source"],
+            ),
+            check_result("source_chunk", expected["chunk_id"] in source_ids),
+            check_result("source_name", expected["source"] in source_names),
+            check_result(
+                "grounded_reply",
+                any(
+                    normalize_eval_text(term) in normalized_reply
+                    for term in expected.get("must_contain_any", [])
+                ),
+                {"expected_any": expected.get("must_contain_any", [])},
+            ),
+        ]
+        is_pass = all(check["passed"] for check in checks)
+        passed += int(is_pass)
+        rows.append(
+            {
+                "case_id": case["case_id"],
+                "assistant_reply": result.assistant_reply[:700],
+                "sources": sources,
+                "checks": checks,
+                "passed": is_pass,
+            }
+        )
+    return metric_report("explanation_source_grounding", passed, len(cases), rows)
+
+
+class StaticExplanationRetrieval:
+    def __init__(self, chunks: list[KnowledgeChunk]) -> None:
+        self.chunks = chunks
+
+    def retrieve(self, plan: PracticePlan, learner_level: str) -> list[KnowledgeChunk]:
+        _ = plan, learner_level
+        return self.chunks
+
+
+def evaluate_live_tutor_backend(backend: str) -> dict[str, Any]:
+    backend = backend.strip().lower()
+    if backend not in {"ollama", "openai"}:
+        return {
+            "status": "skipped",
+            "score": 0.0,
+            "reason": f"unsupported tutor backend: {backend}",
+        }
+    if backend == "openai" and not os.getenv("OPENAI_API_KEY"):
+        return {
+            "status": "skipped",
+            "score": "skipped",
+            "reason": "OPENAI_API_KEY is not configured.",
+        }
+
+    config = AppConfig(llm_backend=backend, tutor_response_llm_enabled=True)
+    try:
+        factory = LangChainModelFactory(config)
+        runnable = factory.build_tutor_response_runnable()
+    except RuntimeError as exc:
+        return {"status": "skipped", "score": "skipped", "reason": str(exc)}
+
+    llm = TutorResponseLLM(
+        config=config,
+        runnable=runnable,
+        backend_name=factory.get_tutor_response_backend_name(),
+    )
+    report = evaluate_tutor_response_quality(
+        llm,
+        label=backend,
+        require_expected_source=False,
+    )
+    report["status"] = "ok"
+    return report
+
+
+def tutor_case_checks(
+    *,
+    case: dict[str, Any],
+    route_intent: str,
+    assistant_reply: str,
+    metadata: dict[str, Any],
+    require_expected_source: bool,
+) -> list[dict[str, Any]]:
+    expected = case.get("expected", {})
+    normalized_reply = normalize_eval_text(assistant_reply)
+    checks = [
+        check_result(
+            "intent",
+            route_intent == expected.get("intent"),
+            {"expected": expected.get("intent"), "actual": route_intent},
+        ),
+        check_result("non_empty", bool(assistant_reply.strip())),
+        check_result(
+            "max_chars",
+            len(assistant_reply) <= int(expected.get("max_chars", 1600)),
+            {
+                "actual": len(assistant_reply),
+                "limit": int(expected.get("max_chars", 1600)),
+            },
+        ),
+        check_result(
+            "no_repeated_menu",
+            not has_repeated_menu(normalized_reply),
+        ),
+    ]
+
+    if require_expected_source and expected.get("response_source"):
+        checks.append(
+            check_result(
+                "response_source",
+                metadata.get("response_source") == expected["response_source"],
+                {
+                    "expected": expected["response_source"],
+                    "actual": metadata.get("response_source"),
+                },
+            ),
+        )
+
+    if expected.get("learning_focus"):
+        checks.append(
+            check_result(
+                "learning_focus",
+                metadata.get("learning_focus") == expected["learning_focus"],
+                {
+                    "expected": expected["learning_focus"],
+                    "actual": metadata.get("learning_focus"),
+                },
+            ),
+        )
+
+    if expected.get("forbid_learning_focus"):
+        checks.append(
+            check_result(
+                "forbid_learning_focus",
+                "learning_focus" not in metadata,
+                {"actual": metadata.get("learning_focus")},
+            ),
+        )
+
+    must_contain_any = expected.get("must_contain_any") or []
+    if must_contain_any:
+        checks.append(
+            check_result(
+                "must_contain_any",
+                any(normalize_eval_text(term) in normalized_reply for term in must_contain_any),
+                {"expected_any": must_contain_any},
+            ),
+        )
+
+    must_not_contain = expected.get("must_not_contain") or []
+    for term in must_not_contain:
+        normalized_term = normalize_eval_text(term)
+        checks.append(
+            check_result(
+                f"must_not_contain:{term}",
+                normalized_term not in normalized_reply,
+            ),
+        )
+
+    if expected.get("require_vietnamese_tutor_text"):
+        checks.append(
+            check_result(
+                "vietnamese_tutor_text",
+                looks_like_vietnamese_tutor_text(normalized_reply),
+            ),
+        )
+
+    return checks
+
+
+def tutor_context_from_case(case: dict[str, Any]) -> ConversationTurnContext:
+    context = case.get("context") or {}
+    profile_payload = context.get("profile") or {}
+    active_intent = parse_conversation_intent(context.get("active_intent"))
+    return ConversationTurnContext(
+        conversation_id="eval_conversation",
+        learner_id="eval_learner",
+        profile=LearnerProfile(
+            user_id="eval_learner",
+            display_name=str(profile_payload.get("display_name") or ""),
+            level=str(profile_payload.get("level") or "beginner"),
+            preferred_difficulty=profile_payload.get("preferred_difficulty"),
+            preferred_num_questions=profile_payload.get("preferred_num_questions"),
+            weak_topics=dict(profile_payload.get("weak_topics") or {}),
+            skill_mastery=dict(profile_payload.get("skill_mastery") or {}),
+        ),
+        recent_messages=[
+            {"role": "user", "content": str(case.get("message") or "")},
+        ],
+        memory_summary=str(context.get("memory_summary") or ""),
+        active_intent=active_intent,
+    )
 
 
 def evaluate_retrieval_subprocess() -> dict[str, Any]:
@@ -188,9 +583,16 @@ def evaluate_retrieval_subprocess() -> dict[str, Any]:
         return {"status": "error", "score": 0.0, "stderr": "missing report"}
     report = load_json(report_path)
     metrics = report.get("metrics", {})
+    score_keys = [
+        "recall_at_k",
+        "metadata_recall_at_k",
+        "expected_chunk_recall_at_k",
+        "top_1_metadata_match",
+    ]
+    score = sum(float(metrics.get(key, 0.0)) for key in score_keys) / len(score_keys)
     return {
         "status": "ok",
-        "score": float(metrics.get("recall_at_k", 0.0)),
+        "score": score,
         "metrics": metrics,
         "report_path": str(report_path),
     }
@@ -267,6 +669,71 @@ def write_json(payload: dict[str, Any], path: str | Path) -> None:
         json.dumps(payload, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+
+
+def parse_backend_list(value: str) -> list[str]:
+    return [item.strip().lower() for item in value.split(",") if item.strip()]
+
+
+def parse_conversation_intent(value: object) -> ConversationIntent | None:
+    if not value:
+        return None
+    try:
+        return ConversationIntent(str(value))
+    except ValueError:
+        return None
+
+
+def normalize_eval_text(value: str) -> str:
+    normalized = value.lower()
+    normalized = normalized.replace("+", " ")
+    normalized = normalized.replace("/", " ")
+    normalized = "".join(
+        character if character.isalnum() else " "
+        for character in normalized
+    )
+    return " ".join(normalized.split())
+
+
+def has_repeated_menu(normalized_reply: str) -> bool:
+    menu_patterns = (
+        "ban muon tap noi nghe doc hay viet",
+        "ban muon hoc gi dau tien",
+        "noi nghe doc hay viet",
+        "tap noi nghe doc hay viet",
+        "speaking listening reading writing",
+    )
+    return any(pattern in normalized_reply for pattern in menu_patterns)
+
+
+def looks_like_vietnamese_tutor_text(normalized_reply: str) -> bool:
+    markers = (
+        "ban",
+        "minh",
+        "hoc",
+        "tieng anh",
+        "ngu phap",
+        "cau",
+        "giai thich",
+        "khong",
+        "doc",
+        "nghe",
+        "viet",
+        "noi",
+    )
+    return any(marker in normalized_reply for marker in markers)
+
+
+def check_result(
+    name: str,
+    passed: bool,
+    details: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    return {
+        "name": name,
+        "passed": bool(passed),
+        "details": details or {},
+    }
 
 
 if __name__ == "__main__":

@@ -1,36 +1,36 @@
-query,expected_topic,expected_level,notes
-present simple passive am is are past participle,passive_voice,beginner,present passive form
-was were past participle passive sentence,passive_voice,beginner,past passive form
-modal passive must be submitted,passive_voice,intermediate,modal passive
-passive by agent written by composer,passive_voice,intermediate,by agent
-active to passive transformation object becomes subject,passive_voice,intermediate,transformation
-who relative pronoun for people,relative_clause,beginner,who for people
-which relative pronoun for things,relative_clause,beginner,which for things
-whose possession relative clause,relative_clause,intermediate,whose possession
-non defining relative clause commas not that,relative_clause,intermediate,non-defining clauses
-object relative pronoun omitted movie I watched,relative_clause,intermediate,omitted object pronoun
-zero conditional facts present simple,conditional_sentence,beginner,zero conditional
-first conditional if present simple will,conditional_sentence,beginner,first conditional
-second conditional if I were you would,conditional_sentence,intermediate,second conditional
-third conditional would have past participle,conditional_sentence,advanced,third conditional
-unless means if not condition,conditional_sentence,intermediate,unless
-reported speech statement backshift was,reported_speech,intermediate,reported statements
-reported yes no question if whether statement order,reported_speech,intermediate,yes no questions
-reported command told me to close,reported_speech,intermediate,reported commands
-say versus tell reported speech object,reported_speech,beginner,say and tell
-reported speech tomorrow the next day,reported_speech,intermediate,time expression shift
-present simple habits third person s, tenses,beginner,present simple
-present continuous action happening now, tenses,beginner,present continuous
-past simple finished time yesterday, tenses,beginner,past simple
-present perfect since for experience, tenses,intermediate,present perfect
-past perfect before another past action, tenses,intermediate,past perfect
-prepositions of time at on in,prepositions,beginner,time prepositions
-prepositions of place in on at,prepositions,beginner,place prepositions
-interested in good at dependent prepositions,prepositions,intermediate,dependent prepositions
-during versus for flight two hours,prepositions,intermediate,during for
-by deadline until continuing time,prepositions,intermediate,by until
-airport boarding pass gate luggage passport,travel_vocabulary,beginner,airport words
-hotel reservation reception check in check out,travel_vocabulary,beginner,hotel words
-one way round trip ticket platform fare,travel_vocabulary,beginner,transport words
-flight delayed cancelled lost luggage,travel_vocabulary,intermediate,travel problems
-passport visa itinerary travel documents,travel_vocabulary,beginner,travel documents
+query,expected_topic,expected_level,expected_subtopic,expected_cefr,expected_source,expected_chunk_ids,notes
+present simple passive am is are past participle,passive_voice,beginner,present_simple_passive,A1,teacher_authored_mvp_notes,grammar_passive_002,present passive form
+was were past participle passive sentence,passive_voice,beginner,past_simple_passive,A1,teacher_authored_mvp_notes,grammar_passive_003,past passive form
+modal passive must be submitted,passive_voice,intermediate,modal_passive,B1,teacher_authored_mvp_notes,grammar_passive_009,modal passive
+passive by agent written by composer,passive_voice,intermediate,passive_with_by_agent,B1,teacher_authored_mvp_notes,grammar_passive_005,by agent
+active to passive transformation object becomes subject,passive_voice,intermediate,active_to_passive_transformation,B1,teacher_authored_mvp_notes,grammar_passive_011,transformation
+who relative pronoun for people,relative_clause,beginner,who_for_people,A1,teacher_authored_mvp_notes,grammar_relative_002,who for people
+which relative pronoun for things,relative_clause,beginner,which_for_things,A1,teacher_authored_mvp_notes,grammar_relative_003,which for things
+whose possession relative clause,relative_clause,intermediate,whose_for_possession,B1,teacher_authored_mvp_notes,grammar_relative_007,whose possession
+non defining relative clause commas not that,relative_clause,intermediate,non_defining_relative_clause,B1,teacher_authored_mvp_notes,grammar_relative_009,non-defining clauses
+object relative pronoun omitted movie I watched,relative_clause,intermediate,omitted_relative_pronoun,B1,teacher_authored_mvp_notes,grammar_relative_011,omitted object pronoun
+zero conditional facts present simple,conditional_sentence,beginner,zero_conditional,A1,teacher_authored_mvp_notes,grammar_conditional_001,zero conditional
+first conditional if present simple will,conditional_sentence,beginner,first_conditional,A1,teacher_authored_mvp_notes,grammar_conditional_002,first conditional
+second conditional if I were you would,conditional_sentence,intermediate,second_conditional_be,B1,teacher_authored_mvp_notes,grammar_conditional_007,second conditional be
+third conditional would have past participle,conditional_sentence,advanced,third_conditional,B2,teacher_authored_mvp_notes,grammar_conditional_004,third conditional
+unless means if not condition,conditional_sentence,intermediate,unless,B1,teacher_authored_mvp_notes,grammar_conditional_006,unless
+reported speech statement backshift was,reported_speech,intermediate,reported_statements,B1,teacher_authored_mvp_notes,grammar_reported_002,reported statements
+reported yes no question if whether statement order,reported_speech,intermediate,reported_yes_no_questions,B1,teacher_authored_mvp_notes,grammar_reported_012,yes no questions
+reported command told me to close,reported_speech,intermediate,reported_commands,B1,teacher_authored_mvp_notes,grammar_reported_006,reported commands
+say versus tell reported speech object,reported_speech,beginner,say_vs_tell,A1,teacher_authored_mvp_notes,grammar_reported_008,say and tell
+reported speech tomorrow the next day,reported_speech,intermediate,time_expression_change,B1,teacher_authored_mvp_notes,grammar_reported_005,time expression shift
+present simple habits third person s,tenses,beginner,present_simple,A1,teacher_authored_mvp_notes,grammar_tenses_001,present simple
+present continuous action happening now,tenses,beginner,present_continuous,A1,teacher_authored_mvp_notes,grammar_tenses_002,present continuous
+past simple finished time yesterday,tenses,beginner,past_simple,A1,teacher_authored_mvp_notes,grammar_tenses_003,past simple
+present perfect since for experience,tenses,intermediate,present_perfect,B1,teacher_authored_mvp_notes,grammar_tenses_004,present perfect
+past perfect before another past action,tenses,intermediate,past_perfect,B1,teacher_authored_mvp_notes,grammar_tenses_010,past perfect
+prepositions of time at on in,prepositions,beginner,prepositions_of_time,A1,teacher_authored_mvp_notes,grammar_prep_001,time prepositions
+prepositions of place in on at,prepositions,beginner,prepositions_of_place,A1,teacher_authored_mvp_notes,grammar_prep_002,place prepositions
+interested in good at dependent prepositions,prepositions,intermediate,dependent_prepositions,B1,teacher_authored_mvp_notes,grammar_prep_003,dependent prepositions
+during versus for flight two hours,prepositions,intermediate,during_vs_for,B1,teacher_authored_mvp_notes,grammar_prep_005,during for
+by deadline until continuing time,prepositions,intermediate,by_vs_until,B1,teacher_authored_mvp_notes,grammar_prep_007,by until
+airport boarding pass gate luggage passport,travel_vocabulary,beginner,airport_gate_boarding,A1,teacher_authored_expansion_notes,vocab_travel_013,airport words
+hotel reservation reception check in check out,travel_vocabulary,beginner,hotel_vocabulary,A1,teacher_authored_mvp_notes,vocab_travel_002,hotel words
+one way round trip ticket platform fare,travel_vocabulary,beginner,transport_vocabulary,A1,teacher_authored_mvp_notes,vocab_travel_003,transport words
+flight delayed cancelled lost luggage,travel_vocabulary,intermediate,travel_problems,B1,teacher_authored_mvp_notes,vocab_travel_005,travel problems
+passport visa itinerary travel documents,travel_vocabulary,beginner,travel_documents,A1,teacher_authored_mvp_notes,vocab_travel_004,travel documents

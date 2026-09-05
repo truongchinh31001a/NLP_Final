@@ -53,6 +53,9 @@ class HeuristicReranker:
                         document.page_content,
                         str(metadata.get("topic", "")),
                         str(metadata.get("subtopic", "")),
+                        str(metadata.get("skill", "")),
+                        str(metadata.get("cefr", "")),
+                        str(metadata.get("source", "")),
                     ]
                 )
             )
@@ -60,13 +63,17 @@ class HeuristicReranker:
         overlap = len(query_tokens.intersection(document_tokens))
         score = float(overlap)
         if metadata.get("topic") == topic:
-            score += 8.0
+            score += 10.0
         if metadata.get("level") == level:
-            score += 2.0
+            score += 3.0
         else:
-            score -= self._level_distance(str(metadata.get("level", "")), level)
+            score -= 1.5 * self._level_distance(str(metadata.get("level", "")), level)
         if subtopic and self._subtopic_matches(metadata.get("subtopic"), subtopic):
-            score += 5.0
+            score += 8.0
+        elif subtopic:
+            subtopic_tokens = set(self._tokens(subtopic.replace("_", " ")))
+            if subtopic_tokens.intersection(document_tokens):
+                score += 2.0
         return score
 
     def _tokens(self, text: str) -> list[str]:
@@ -80,4 +87,3 @@ class HeuristicReranker:
         if not isinstance(actual, str):
             return False
         return actual == expected or actual.startswith(expected) or expected.startswith(actual)
-

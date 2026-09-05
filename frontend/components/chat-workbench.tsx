@@ -47,7 +47,7 @@ type ChatWorkbenchProps = {
   snapshot: DashboardSnapshot;
 };
 
-type Screen = "chat" | "generating" | "practice" | "result";
+type Screen = "chat" | "generating" | "practice" | "writing" | "result";
 type ConversationPhase = "idle" | "loading" | "sending" | "error";
 type ActivityPhase = "idle" | "ready" | "submitting" | "completed" | "error";
 
@@ -251,6 +251,11 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
   const [plan, setPlan] = useState<PracticePlanPreview>(snapshot.planPreview);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [scoreResult, setScoreResult] = useState<ScoreResult | null>(null);
+  const [activeActivityPreview, setActiveActivityPreview] =
+    useState<LearningActivityPreview | null>(null);
+  const [writingActivity, setWritingActivity] =
+    useState<LearningActivityPreview | null>(null);
+  const [writingText, setWritingText] = useState("");
   const [status, setStatus] = useState("Sẵn sàng tạo bài luyện tập.");
   const [isScoring, setIsScoring] = useState(false);
   const [conversationState, setConversationState] = useState<ConversationState>({
@@ -284,6 +289,9 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
     Boolean(activityState.activeActivityId) &&
     preview.length > 0 &&
     answeredCount === preview.length;
+  const canSubmitWriting =
+    Boolean(writingActivity?.activityId ?? activityState.activeActivityId) &&
+    writingText.trim().length >= 20;
   const showOnboardingShortcuts = true;
   const isComposerLocked = isOnboardingSaving || isCoachThinking;
 
@@ -345,6 +353,7 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
           phase: "idle",
         });
         setActivityState(activityStateFromActivity(chatResume.activeActivity));
+        setActiveActivityPreview(chatResume.activeActivity ?? null);
         const history = mapPersistedChatMessages(chatResume);
         const storedSessions = loadStoredChatSessions();
         setChatSessions(
@@ -418,6 +427,9 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
           phase: "error",
         });
         setActivityState(emptyActivityState());
+        setActiveActivityPreview(null);
+        setWritingActivity(null);
+        setWritingText("");
         setIsGuidedOnboarding(false);
         setOnboardingStepIndex(0);
         setOnboardingAnswers({});
@@ -533,6 +545,9 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
       phase: session.backendSessionId ? "idle" : "error",
     });
     setActivityState(emptyActivityState());
+    setActiveActivityPreview(null);
+    setWritingActivity(null);
+    setWritingText("");
     chatMessagesRef.current = session.messages;
     setActiveLocalSessionId(session.id);
     setChatMessages(session.messages);
@@ -556,6 +571,7 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
         phase: "idle",
       });
       setActivityState(activityStateFromActivity(chatResume.activeActivity));
+      setActiveActivityPreview(chatResume.activeActivity ?? null);
       activateChatSession(mapPersistedChatMessages(chatResume), {
         backendSessionId: chatResume.sessionId,
         localSessionId: session.id,
@@ -589,6 +605,9 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
     setSubmittedPrompt(null);
     setAnswers({});
     setScoreResult(null);
+    setActiveActivityPreview(null);
+    setWritingActivity(null);
+    setWritingText("");
     setIsCoachThinking(false);
     setIsGuidedOnboarding(false);
     setOnboardingStepIndex(0);
@@ -806,6 +825,21 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
         return;
       }
 
+      if (turn.uiAction === "writing.start" && turn.activity) {
+        setActiveActivityPreview(turn.activity);
+        setWritingActivity(turn.activity);
+        setWritingText("");
+        setAnswers({});
+        setPreview([]);
+        setScoreResult(turn.activity.result ?? null);
+        setActivityState(activityStateFromActivity(turn.activity));
+        setStatus(
+          String(turn.activity.recommendation || "Writing activity is ready."),
+        );
+        setScreen("writing");
+        return;
+      }
+
       if (turn.uiAction === "profile.update") {
         await refreshPersonalizationSummary();
       }
@@ -877,6 +911,9 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
     });
     setAnswers({});
     setScoreResult(activity.result ?? null);
+    setActiveActivityPreview(activity);
+    setWritingActivity(null);
+    setWritingText("");
     setSubmittedPrompt(sourcePrompt);
     setActivityState(activityStateFromActivity(activity));
     setStatus(
@@ -906,6 +943,9 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
     setAnswers({});
     setIsCoachThinking(true);
     setActivityState(emptyActivityState());
+    setActiveActivityPreview(null);
+    setWritingActivity(null);
+    setWritingText("");
     setStatus("Mình đang tạo bài luyện tiếp theo gợi ý vừa chấm...");
 
     try {
@@ -993,6 +1033,9 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
         }
       });
       setScoreResult(result);
+      setActiveActivityPreview(response.activity);
+      setWritingActivity(null);
+      setWritingText("");
       setActivityState({
         activeActivityId: response.activity.activityId,
         generationRunId:
@@ -1037,6 +1080,84 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
         false,
       );
       setScreen("practice");
+    } finally {
+      setIsScoring(false);
+    }
+  };
+
+  const handleSubmitWriting = async () => {
+    const activeActivityId = writingActivity?.activityId ?? activityState.activeActivityId;
+    if (!activeActivityId) {
+      setStatus("Writing activity is missing an activity_id.");
+      return;
+    }
+
+    setIsScoring(true);
+    setActivityState((current) => ({
+      ...current,
+      phase: "submitting",
+    }));
+    setStatus("Scoring writing with the rubric...");
+
+    try {
+      const response = await submitActivity({
+        userId: USER_ID,
+        activityId: activeActivityId,
+        writingText,
+      });
+      const nextActivitySuggestion = response.nextActivitySuggestion ?? null;
+      const result = {
+        ...response.result,
+        nextActivitySuggestion,
+      };
+
+      setPreview([]);
+      setAnswers({});
+      setScoreResult(result);
+      setActiveActivityPreview(response.activity);
+      setWritingActivity(response.activity);
+      setActivityState({
+        activeActivityId: response.activity.activityId,
+        generationRunId: null,
+        nextActivitySuggestion,
+        phase: "completed",
+      });
+      setStatus("Writing feedback is ready.");
+      appendChatMessage(
+        "bot",
+        buildResultCoachMessage({
+          correctCount: response.result.correctCount,
+          recommendation:
+            response.result.practiceReview?.summary ?? response.result.recommendation,
+          score: response.result.score,
+          totalQuestions: response.result.totalQuestions,
+        }),
+        {
+          phase: "writing_result",
+          uiAction: response.uiAction,
+          activity: response.activity,
+          activityId: response.activity.activityId,
+          sessionCode: response.result.sessionCode,
+          topic: response.result.topic,
+          score: response.result.score,
+        },
+        false,
+      );
+      await refreshPersonalizationSummary();
+      setScreen("result");
+    } catch {
+      setActivityState((current) => ({
+        ...current,
+        phase: "error",
+      }));
+      setStatus("Writing submit failed. Your draft is still here.");
+      appendChatMessage(
+        "bot",
+        "I could not submit this writing activity yet. Keep the draft here and try again after checking the backend.",
+        { phase: "writing_result", uiAction: "writing.submit_failed" },
+        false,
+      );
+      setScreen("writing");
     } finally {
       setIsScoring(false);
     }
@@ -1239,6 +1360,10 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
             </div>
           </div>
 
+          {activeActivityPreview?.type === "READING" ? (
+            <ReadingActivityPanel activity={activeActivityPreview} />
+          ) : null}
+
           <div className="question-list">
             {preview.map((exercise, index) => (
               <QuestionCard
@@ -1280,6 +1405,49 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
         </section>
       ) : null}
 
+      {screen === "writing" && writingActivity ? (
+        <section className="test-screen">
+          <div className="test-header">
+            <div>
+              <p className="eyebrow">Writing activity</p>
+              <h2>Short response</h2>
+              <p className="muted">{status}</p>
+            </div>
+            <div className="progress-pill">
+              {writingText.trim().split(/\s+/).filter(Boolean).length} words
+            </div>
+          </div>
+
+          <WritingActivityPanel
+            activity={writingActivity}
+            value={writingText}
+            onChange={setWritingText}
+          />
+
+          <div className="test-actions">
+            <button
+              className="button button--secondary"
+              type="button"
+              onClick={() => {
+                setPrompt(submittedPrompt ?? "");
+                setSubmittedPrompt(null);
+                setScreen("chat");
+              }}
+            >
+              Edit request
+            </button>
+            <button
+              className="button button--primary"
+              type="button"
+              onClick={handleSubmitWriting}
+              disabled={!canSubmitWriting || isScoring}
+            >
+              {isScoring ? "Scoring..." : "Submit writing"}
+            </button>
+          </div>
+        </section>
+      ) : null}
+
       {screen === "result" && scoreResult ? (
         <section className="result-screen">
           <div className="score-summary">
@@ -1290,6 +1458,10 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
             </span>
             <p>{scoreResult.recommendation}</p>
           </div>
+
+          {activeActivityPreview?.type === "WRITING" ? (
+            <WritingFeedbackSummary activity={activeActivityPreview} />
+          ) : null}
 
           {scoreResult.answerDiagnoses?.some((item) => !item.isCorrect) ? (
             <section className="coach-review-card">
@@ -1404,7 +1576,9 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
             <button
               className="button button--secondary"
               type="button"
-              onClick={() => setScreen("practice")}
+              onClick={() =>
+                setScreen(activeActivityPreview?.type === "WRITING" ? "writing" : "practice")
+              }
             >
               Xem lại bài
             </button>
@@ -1415,6 +1589,9 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
                 setScreen("chat");
                 setScoreResult(null);
                 setAnswers({});
+                setActiveActivityPreview(null);
+                setWritingActivity(null);
+                setWritingText("");
                 setSubmittedPrompt(null);
                 setPrompt("");
                 appendChatMessage(
@@ -1498,6 +1675,128 @@ function ChatSessionSidebar({
   );
 }
 
+function ReadingActivityPanel({
+  activity,
+}: {
+  activity: LearningActivityPreview;
+}) {
+  const passage = getMetadataString(activity.metadata, "passage");
+  const vocabulary = getMetadataList(activity.metadata, "vocabulary_support");
+
+  if (!passage && vocabulary.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="literacy-panel">
+      {passage ? (
+        <div className="literacy-panel__block">
+          <strong>Passage</strong>
+          <p>{passage}</p>
+        </div>
+      ) : null}
+      {vocabulary.length > 0 ? (
+        <div className="literacy-vocab">
+          {vocabulary.map((item) => (
+            <span key={`${item.word}-${item.meaning}`}>
+              <strong>{item.word}</strong> {item.meaning}
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function WritingActivityPanel({
+  activity,
+  onChange,
+  value,
+}: {
+  activity: LearningActivityPreview;
+  onChange: (value: string) => void;
+  value: string;
+}) {
+  const prompt = getMetadataString(
+    activity.metadata,
+    "writing_prompt",
+    "Write a short English paragraph.",
+  );
+  const correctedVersion = getMetadataString(
+    activity.metadata,
+    "corrected_version",
+  );
+  const rubric = getMetadataStringArray(activity.metadata, "rubric");
+
+  return (
+    <section className="literacy-panel">
+      <div className="literacy-panel__block">
+        <strong>Prompt</strong>
+        <p>{prompt}</p>
+      </div>
+      {rubric.length > 0 ? (
+        <div className="writing-rubric">
+          {rubric.map((item) => (
+            <span key={item}>{item}</span>
+          ))}
+        </div>
+      ) : null}
+      <textarea
+        className="writing-response"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder="Write your answer here..."
+        rows={10}
+      />
+      {correctedVersion ? (
+        <div className="literacy-panel__block literacy-panel__block--feedback">
+          <strong>Corrected version</strong>
+          <p>{correctedVersion}</p>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function WritingFeedbackSummary({
+  activity,
+}: {
+  activity: LearningActivityPreview;
+}) {
+  const correctedVersion = getMetadataString(
+    activity.metadata,
+    "corrected_version",
+  );
+  const targetSkill = getMetadataString(
+    activity.metadata,
+    "target_skill_diagnosis",
+  );
+  const rubricScores = getMetadataRecord(activity.metadata, "rubric_scores");
+
+  return (
+    <section className="coach-review-card">
+      <div className="coach-review-card__top">
+        <div>
+          <p className="eyebrow">Writing feedback</p>
+          <h3>Rubric result</h3>
+        </div>
+        {targetSkill ? <span>{formatDiagnosisLabel(targetSkill)}</span> : null}
+      </div>
+      {correctedVersion ? <p>{correctedVersion}</p> : null}
+      {Object.keys(rubricScores).length > 0 ? (
+        <div className="writing-score-grid">
+          {Object.entries(rubricScores).map(([key, value]) => (
+            <span key={key}>
+              <strong>{formatDiagnosisLabel(key)}</strong>
+              {` ${Math.round(Number(value) * 100)}%`}
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 function ChatMessageBubble({ message }: { message: ChatMessage }) {
   const isBot = message.role === "bot";
   const displayTime = formatMessageTime(message.createdAt);
@@ -1519,7 +1818,7 @@ function ChatMessageBubble({ message }: { message: ChatMessage }) {
         <div className="message-content">
           {renderMessageContent(message.content)}
         </div>
-        {message.activity?.exercises.length ? (
+        {message.activity ? (
           <PracticeActivityMiniCard activity={message.activity} />
         ) : null}
       </div>
@@ -1532,9 +1831,16 @@ function PracticeActivityMiniCard({
 }: {
   activity: LearningActivityPreview;
 }) {
-  const topic = activity.plan?.topic ?? activity.request?.topic ?? "practice";
+  const topic =
+    activity.type === "WRITING"
+      ? "writing"
+      : activity.plan?.topic ?? activity.request?.topic ?? "practice";
   const difficulty = activity.plan?.difficulty ?? activity.difficulty ?? "";
   const exerciseCount = activity.exercises.length;
+  const note =
+    getMetadataString(activity.metadata, "writing_prompt") ||
+    getMetadataString(activity.metadata, "passage") ||
+    formatActivityType(activity.type);
 
   return (
     <div className="message-activity">
@@ -1549,8 +1855,11 @@ function PracticeActivityMiniCard({
         </p>
       ) : (
         <p>
-          {exerciseCount} câu
-          {difficulty ? ` - mức ${formatDifficulty(String(difficulty))}` : ""}
+          {exerciseCount > 0
+            ? `${exerciseCount} cau${
+                difficulty ? ` - muc ${formatDifficulty(String(difficulty))}` : ""
+              }`
+            : note}
         </p>
       )}
       <small>Activity: {activity.activityId}</small>
@@ -2057,6 +2366,42 @@ function isLearningActivityPreview(
     typeof value.conversationId === "string" &&
     Array.isArray(value.exercises)
   );
+}
+
+function getMetadataString(
+  metadata: Record<string, unknown>,
+  key: string,
+  fallback = "",
+) {
+  const value = metadata[key];
+  return typeof value === "string" && value.trim() ? value : fallback;
+}
+
+function getMetadataStringArray(
+  metadata: Record<string, unknown>,
+  key: string,
+) {
+  const value = metadata[key];
+  return Array.isArray(value) ? value.map(String).filter(Boolean) : [];
+}
+
+function getMetadataList(metadata: Record<string, unknown>, key: string) {
+  const value = metadata[key];
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .filter(isRecord)
+    .map((item) => ({
+      word: typeof item.word === "string" ? item.word : "",
+      meaning: typeof item.meaning === "string" ? item.meaning : "",
+    }))
+    .filter((item) => item.word && item.meaning);
+}
+
+function getMetadataRecord(metadata: Record<string, unknown>, key: string) {
+  const value = metadata[key];
+  return isRecord(value) ? value : {};
 }
 
 function normalizePersistedChatContent(content: string) {
@@ -2860,6 +3205,15 @@ function formatTopic(topic: string) {
 
 function formatDiagnosisLabel(value: string) {
   return value.replaceAll(".", " ").replaceAll("_", " ");
+}
+
+function formatActivityType(value: string) {
+  const labels: Record<string, string> = {
+    PRACTICE: "Practice activity",
+    READING: "Reading activity",
+    WRITING: "Writing activity",
+  };
+  return labels[value] ?? value.replaceAll("_", " ");
 }
 
 function formatDifficulty(difficulty: string) {

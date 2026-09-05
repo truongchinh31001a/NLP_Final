@@ -144,15 +144,34 @@ class ConversationRouterTests(unittest.TestCase):
 
         self.assertEqual(route.intent, ConversationIntent.GENERAL)
 
-    def test_short_learning_focus_selection_routes_to_general_slot(self) -> None:
+    def test_short_reading_focus_selection_routes_to_reading_activity(self) -> None:
         route = self.router.route(
             message="\u0111\u1ecdc tr\u01b0\u1edbc \u0111i",
             context=self._context(active_intent=ConversationIntent.GENERAL),
         )
 
-        self.assertEqual(route.intent, ConversationIntent.GENERAL)
+        self.assertEqual(route.intent, ConversationIntent.READING)
         self.assertEqual(route.slots["learning_focus"], "reading")
         self.assertEqual(route.slots["selection_kind"], "learning_focus")
+
+    def test_short_writing_focus_selection_routes_to_writing_activity(self) -> None:
+        route = self.router.route(
+            message="viet truoc nhe",
+            context=self._context(active_intent=ConversationIntent.GENERAL),
+        )
+
+        self.assertEqual(route.intent, ConversationIntent.WRITING)
+        self.assertEqual(route.slots["learning_focus"], "writing")
+        self.assertEqual(route.slots["selection_kind"], "learning_focus")
+
+    def test_audio_focus_selection_stays_planned_until_audio_stack_exists(self) -> None:
+        route = self.router.route(
+            message="noi truoc di",
+            context=self._context(active_intent=ConversationIntent.GENERAL),
+        )
+
+        self.assertEqual(route.intent, ConversationIntent.GENERAL)
+        self.assertEqual(route.slots["planned_activity"], "speaking")
 
     def test_learning_focus_selection_does_not_overmatch_complaint(self) -> None:
         route = self.router.route(

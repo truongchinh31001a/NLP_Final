@@ -83,11 +83,13 @@ class SparseKeywordRetriever:
         metadata = document.metadata
         score = 0.0
         if topic and metadata.get("topic") == topic:
-            score += 3.0
+            score += 4.0
         if level and metadata.get("level") == level:
-            score += 1.0
+            score += 1.5
+        elif level:
+            score -= 0.25
         if subtopic and self._subtopic_matches(metadata.get("subtopic"), subtopic):
-            score += 2.0
+            score += 4.0
         return score
 
     def _document_frequencies(
@@ -109,6 +111,8 @@ class SparseKeywordRetriever:
                 str(metadata.get("subtopic", "")),
                 str(metadata.get("skill", "")),
                 str(metadata.get("level", "")),
+                str(metadata.get("cefr", "")),
+                str(metadata.get("source", "")),
             ]
         )
 
@@ -120,4 +124,3 @@ class SparseKeywordRetriever:
         if not isinstance(actual, str):
             return False
         return actual == expected or actual.startswith(expected) or expected.startswith(actual)
-

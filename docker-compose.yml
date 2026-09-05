@@ -42,6 +42,16 @@ services:
     command: ["pull", "${OLLAMA_MODEL:-llama3.1:8b}"]
     restart: "no"
 
+  ollama-embedding-models:
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    command: ["pull", "${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}"]
+    restart: "no"
+
   backend:
     build:
       context: .
@@ -54,6 +64,8 @@ services:
         condition: service_healthy
       ollama-models:
         condition: service_completed_successfully
+      ollama-embedding-models:
+        condition: service_completed_successfully
     environment:
       CORS_ORIGINS: http://localhost:3000
       LEARNING_REPOSITORY_BACKEND: ${LEARNING_REPOSITORY_BACKEND:-sqlite}
@@ -62,7 +74,7 @@ services:
       VECTOR_STORE_BACKEND: ${VECTOR_STORE_BACKEND:-chroma}
       RETRIEVAL_MODE: ${RETRIEVAL_MODE:-hybrid}
       RERANKER_ENABLED: ${RERANKER_ENABLED:-true}
-      EMBEDDING_BACKEND: ${EMBEDDING_BACKEND:-keyword_hash}
+      EMBEDDING_BACKEND: ${EMBEDDING_BACKEND:-ollama}
       PGVECTOR_DATABASE_URL: ${PGVECTOR_DATABASE_URL:-postgresql://english_tutor:english_tutor@postgres:5432/english_tutor}
       PGVECTOR_TABLE_NAME: ${PGVECTOR_TABLE_NAME:-rag_documents}
       PGVECTOR_EMBEDDING_DIMENSION: ${PGVECTOR_EMBEDDING_DIMENSION:-0}

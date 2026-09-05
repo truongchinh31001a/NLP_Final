@@ -5,7 +5,7 @@ import unicodedata
 import uuid
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator
+from typing import Any, Iterator
 
 from app.config import AppConfig
 from app.learner.knowledge_tracing import BayesianKnowledgeTracer
@@ -855,6 +855,45 @@ class SQLiteLearningRepository:
                 status,
             )
             updated = self._get_activity_row_by_db_id(connection, db_user_id, int(row["id"]))
+
+        return self._activity_from_row(updated)
+
+    def update_learning_activity_metadata(
+        self,
+        user_id: str,
+        activity_id: str,
+        metadata: dict[str, Any],
+    ) -> LearningActivity:
+        with self._connect() as connection:
+            db_user_id = self._ensure_user(connection, user_id)
+            row = self._get_activity_row_by_code(connection, db_user_id, activity_id)
+            if row is None:
+                raise LookupError(f"Learning activity not found: {activity_id}")
+            current_metadata = self._json_object(row["metadata_json"])
+            current_metadata.update(metadata)
+            connection.execute(
+                """
+                UPDATE learning_activities
+                SET metadata_json = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (
+                    json.dumps(current_metadata, ensure_ascii=False),
+                    int(row["id"]),
+                ),
+            )
+            self._record_activity_event(
+                connection,
+                int(row["id"]),
+                "METADATA_UPDATED",
+                self._status_from_value(row["status"]),
+                {"metadata_keys": sorted(metadata.keys())},
+            )
+            updated = self._get_activity_row_by_db_id(
+                connection,
+                db_user_id,
+                int(row["id"]),
+            )
 
         return self._activity_from_row(updated)
 
@@ -2880,10 +2919,6 @@ class SQLiteLearningRepository:
             if existing is not None
             else self.knowledge_tracer.parameters.initial_mastery
         )
-        posterior_mastery = self.knowledge_tracer.update(
-            prior_mastery,
-            is_correct,
-        )
         attempts_count = 1
         correct_count = int(is_correct)
         incorrect_count = 0 if is_correct else 1
@@ -2906,6 +2941,13 @@ class SQLiteLearningRepository:
         if error_tag and not is_correct:
             error_frequency[error_tag] = int(error_frequency.get(error_tag, 0)) + 1
 
+        repeated_error_count = max(error_frequency.values(), default=0)
+        posterior_mastery = self.knowledge_tracer.update(
+            prior_mastery,
+            is_correct,
+            attempts_count=max(attempts_count - 1, 0),
+            repeated_error_count=repeated_error_count,
+        )
         confidence = min(attempts_count / 8, 1.0)
         connection.execute(
             """

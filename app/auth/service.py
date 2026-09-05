@@ -28,6 +28,12 @@ class AuthService:
         self.mode = config.auth_mode.strip().lower()
         self.secret = config.auth_token_secret
         self.ttl_seconds = config.auth_token_ttl_seconds
+        self.deployment_environment = config.deployment_environment.strip().lower()
+        self._validate_runtime_security()
+
+    @property
+    def requires_authentication(self) -> bool:
+        return self.mode not in {"", "disabled", "off", "none"}
 
     def issue_token(self, user_id: str) -> str:
         expires_at = int(time.time()) + self.ttl_seconds
@@ -45,7 +51,7 @@ class AuthService:
         user_id: str,
         authorization_header: str | None,
     ) -> AuthContext:
-        if self.mode in {"", "disabled", "off", "none"}:
+        if not self.requires_authentication:
             return AuthContext(user_id=user_id, authenticated=False)
 
         token = self._bearer_token(authorization_header)
@@ -111,3 +117,21 @@ class AuthService:
 
     def _b64encode_bytes(self, value: bytes) -> str:
         return base64.urlsafe_b64encode(value).decode("ascii").rstrip("=")
+
+    def _validate_runtime_security(self) -> None:
+        production_like = self.deployment_environment in {"prod", "production"}
+        strict_mode = self.mode in {"prod", "production", "strict"}
+        if not production_like and not strict_mode:
+            return
+        if not self.requires_authentication:
+            raise RuntimeError(
+                "AUTH_MODE must require bearer tokens in production-like deployments.",
+            )
+        if self.secret in {"", "dev-secret-change-me", "change-me-before-enabling-auth"}:
+            raise RuntimeError(
+                "AUTH_TOKEN_SECRET must be replaced before production-like deployments.",
+            )
+        if len(self.secret) < 32:
+            raise RuntimeError(
+                "AUTH_TOKEN_SECRET must be at least 32 characters for production-like deployments.",
+            )

@@ -42,6 +42,36 @@ class AuthServiceTests(unittest.TestCase):
         with self.assertRaises(PermissionError):
             service.authorize("other-user", f"Bearer {token}")
 
+    def test_production_like_deployment_rejects_disabled_auth(self) -> None:
+        with self.assertRaises(RuntimeError):
+            AuthService(
+                AppConfig(
+                    deployment_environment="production",
+                    auth_mode="disabled",
+                )
+            )
+
+    def test_production_like_deployment_requires_strong_secret(self) -> None:
+        with self.assertRaises(RuntimeError):
+            AuthService(
+                AppConfig(
+                    deployment_environment="production",
+                    auth_mode="demo_token",
+                    auth_token_secret="short-secret",
+                )
+            )
+
+    def test_production_like_deployment_accepts_strong_token_auth(self) -> None:
+        service = AuthService(
+            AppConfig(
+                deployment_environment="production",
+                auth_mode="demo_token",
+                auth_token_secret="a-very-long-test-secret-for-production",
+            )
+        )
+
+        self.assertTrue(service.requires_authentication)
+
 
 if __name__ == "__main__":
     unittest.main()
