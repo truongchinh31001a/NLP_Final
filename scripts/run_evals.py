@@ -70,6 +70,7 @@ def main() -> None:
         "recommendation": evaluate_recommendation(),
         "tutor_response": evaluate_tutor_response_quality(),
         "explanation_grounding": evaluate_explanation_grounding(),
+        "audio_activity_contract": evaluate_audio_activity_contract(),
         "retrieval": (
             {
                 "status": "skipped",
@@ -391,6 +392,123 @@ def evaluate_explanation_grounding() -> dict[str, Any]:
             }
         )
     return metric_report("explanation_source_grounding", passed, len(cases), rows)
+
+
+def evaluate_audio_activity_contract() -> dict[str, Any]:
+    cases = load_json("./evals/datasets/audio_activity_cases.json")
+    passed = 0
+    rows = []
+    for case in cases:
+        activity_type = str(case.get("activity_type", ""))
+        metadata = case.get("metadata") if isinstance(case.get("metadata"), dict) else {}
+        submission = (
+            case.get("submission") if isinstance(case.get("submission"), dict) else {}
+        )
+        expected = case.get("expected") if isinstance(case.get("expected"), dict) else {}
+        privacy = metadata.get("privacy")
+        privacy = privacy if isinstance(privacy, dict) else {}
+        checks = [
+            check_result("case_id", bool(str(case.get("case_id", "")).strip())),
+            check_result("activity_type", activity_type in {"LISTENING", "SPEAKING"}),
+            check_result("metadata", bool(metadata)),
+            check_result("submission", bool(submission)),
+            check_result("expected", bool(expected)),
+            check_result(
+                "default_no_raw_audio",
+                privacy.get("store_raw_audio_by_default") is False
+                and "audio" not in submission
+                and "audio_blob" not in submission
+                and "audio_base64" not in submission,
+            ),
+        ]
+        if activity_type == "LISTENING":
+            checks.extend(audio_listening_checks(metadata, submission, expected))
+        elif activity_type == "SPEAKING":
+            checks.extend(audio_speaking_checks(metadata, submission, expected))
+
+        is_pass = all(check["passed"] for check in checks)
+        passed += int(is_pass)
+        rows.append(
+            {
+                "case_id": case.get("case_id"),
+                "activity_type": activity_type,
+                "checks": checks,
+                "passed": is_pass,
+            }
+        )
+    return metric_report("audio_activity_contract", passed, len(cases), rows)
+
+
+def audio_listening_checks(
+    metadata: dict[str, Any],
+    submission: dict[str, Any],
+    expected: dict[str, Any],
+) -> list[dict[str, Any]]:
+    audio_source = metadata.get("audio_source")
+    audio_source = audio_source if isinstance(audio_source, dict) else {}
+    prompts = metadata.get("comprehension_prompts")
+    prompts = prompts if isinstance(prompts, list) else []
+    replay_policy = metadata.get("replay_policy")
+    replay_policy = replay_policy if isinstance(replay_policy, dict) else {}
+    answers = submission.get("answers")
+    answers = answers if isinstance(answers, dict) else {}
+    return [
+        check_result("mode", metadata.get("mode") == "listening"),
+        check_result("audio_source_kind", audio_source.get("kind") == "browser_tts"),
+        check_result("transcript", bool(str(metadata.get("transcript", "")).strip())),
+        check_result("target_skills", bool(metadata.get("target_skills"))),
+        check_result("comprehension_prompts", bool(prompts)),
+        check_result(
+            "prompt_answers",
+            all(
+                isinstance(prompt, dict) and prompt.get("correct_answer")
+                for prompt in prompts
+            ),
+        ),
+        check_result(
+            "replay_policy",
+            isinstance(replay_policy.get("max_replays"), int)
+            and replay_policy.get("max_replays", 0) >= 0,
+        ),
+        check_result("submission_answers", bool(answers)),
+        check_result("ui_action", expected.get("ui_action") == "listening.result"),
+    ]
+
+
+def audio_speaking_checks(
+    metadata: dict[str, Any],
+    submission: dict[str, Any],
+    expected: dict[str, Any],
+) -> list[dict[str, Any]]:
+    rubric = metadata.get("rubric")
+    rubric = rubric if isinstance(rubric, dict) else {}
+    retry_policy = metadata.get("retry_policy")
+    retry_policy = retry_policy if isinstance(retry_policy, dict) else {}
+    stt = metadata.get("stt")
+    stt = stt if isinstance(stt, dict) else {}
+    return [
+        check_result("mode", metadata.get("mode") == "speaking"),
+        check_result("prompt", bool(str(metadata.get("prompt", "")).strip())),
+        check_result("expected_patterns", bool(metadata.get("expected_patterns"))),
+        check_result(
+            "rubric",
+            {"pronunciation", "fluency", "grammar", "task_completion"}.issubset(
+                set(rubric)
+            ),
+        ),
+        check_result(
+            "retry_policy",
+            isinstance(retry_policy.get("max_attempts"), int)
+            and retry_policy.get("max_attempts", 0) > 0,
+        ),
+        check_result("browser_stt", stt.get("preferred") == "browser_web_speech"),
+        check_result("manual_transcript", stt.get("allow_manual_transcript") is True),
+        check_result(
+            "submission_transcript",
+            bool(str(submission.get("transcript", "")).strip()),
+        ),
+        check_result("ui_action", expected.get("ui_action") == "speaking.result"),
+    ]
 
 
 class StaticExplanationRetrieval:

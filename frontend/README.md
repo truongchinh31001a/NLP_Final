@@ -26,17 +26,24 @@ Current API endpoints used or planned:
 - `GET /api/conversations`
 - `GET /api/conversations/{conversation_id}`
 - `POST /api/conversations/{conversation_id}/messages`
+- `GET /api/activities/{activity_id}`
+- `GET /api/activities/{activity_id}/review`
 - `POST /api/activities/{activity_id}/submit`
-- `GET /api/recommendations`
+- `GET /api/learners/{learner_id}/profile`
+- `PATCH /api/learners/{learner_id}/profile`
+- `GET /api/learners/{learner_id}/mastery`
+- `GET /api/learners/{learner_id}/progress`
+- `GET /api/learners/{learner_id}/recommendations`
 - `POST /api/recommendations/{recommendation_id}/accept`
 - `GET /api/users/{user_id}/personalization`
-- `PATCH /api/users/{user_id}/profile`
 - `GET /api/health`
 
 Compatibility endpoints kept for older clients:
 
 - `POST /api/practice/generate`
 - `POST /api/practice/score`
+- `PATCH /api/users/{user_id}/profile`
+- `GET /api/recommendations?user_id={user_id}`
 
 ## Run locally
 

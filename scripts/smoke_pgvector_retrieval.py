@@ -66,6 +66,14 @@ def main() -> None:
             subtopic=args.subtopic,
         )
         chunk_ids = [chunk.chunk_id for chunk in chunks]
+        expected_chunk = next(
+            (
+                chunk
+                for chunk in chunks
+                if chunk.chunk_id == args.expected_chunk_id
+            ),
+            None,
+        )
         checks = [
             check("pgvector_search_non_empty", bool(chunks), {"chunk_ids": chunk_ids}),
             check(
@@ -74,12 +82,15 @@ def main() -> None:
                 {"expected": args.expected_chunk_id, "chunk_ids": chunk_ids},
             ),
             check(
-                "metadata_matches",
-                bool(chunks)
-                and chunks[0].topic == args.topic
-                and chunks[0].level == args.level
-                and chunks[0].metadata.get("subtopic") == args.subtopic,
-                {"top_chunk": chunk_ids[0] if chunk_ids else None},
+                "expected_chunk_metadata_matches",
+                expected_chunk is not None
+                and expected_chunk.topic == args.topic
+                and expected_chunk.level == args.level
+                and expected_chunk.metadata.get("subtopic") == args.subtopic,
+                {
+                    "expected": args.expected_chunk_id,
+                    "top_chunk": chunk_ids[0] if chunk_ids else None,
+                },
             ),
         ]
     except Exception as exc:

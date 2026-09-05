@@ -52,6 +52,17 @@ def main() -> None:
     activity_id = str(activity.get("activity_id") or "")
     answers = answers_with_one_mistake(activity.get("exercises") or [])
 
+    run_check(
+        checks,
+        "get_activity_detail",
+        lambda: client.get(f"/api/activities/{activity_id}?user_id={args.user_id}"),
+        require=lambda payload: (
+            payload.get("activity_id") == activity_id
+            and payload.get("ui_action") == "practice.open"
+            and bool(payload.get("exercises"))
+        ),
+    )
+
     submission = run_check(
         checks,
         "submit_activity",
@@ -66,9 +77,30 @@ def main() -> None:
         ),
     )
 
+    unsubmitted_turn = run_check(
+        checks,
+        "create_unsubmitted_context_activity",
+        lambda: client.post(
+            f"/api/conversations/{conversation_id}/messages",
+            {
+                "user_id": args.user_id,
+                "message": "Cho toi 1 cau vocabulary.",
+            },
+        ),
+        require=lambda payload: (
+            payload.get("intent") == "PRACTICE"
+            and payload.get("ui_action") == "practice.start"
+            and bool(payload.get("activity", {}).get("activity_id"))
+            and payload.get("activity", {}).get("activity_id") != activity_id
+        ),
+    )
+    unsubmitted_activity_id = str(
+        (unsubmitted_turn.get("activity") or {}).get("activity_id") or "",
+    )
+
     run_check(
         checks,
-        "review_latest_activity",
+        "review_latest_submitted_activity",
         lambda: client.post(
             f"/api/conversations/{conversation_id}/messages",
             {"user_id": args.user_id, "message": "Tai sao cau 1 sai?"},
@@ -77,6 +109,19 @@ def main() -> None:
             payload.get("intent") == "REVIEW"
             and payload.get("ui_action") == "review.open"
             and payload.get("activity", {}).get("activity_id") == activity_id
+        ),
+    )
+
+    run_check(
+        checks,
+        "get_activity_review",
+        lambda: client.get(
+            f"/api/activities/{activity_id}/review?user_id={args.user_id}&question_number=1",
+        ),
+        require=lambda payload: (
+            payload.get("activity_id") == activity_id
+            and payload.get("ui_action") == "review.open"
+            and payload.get("metadata", {}).get("question_number") == 1
         ),
     )
 
@@ -111,11 +156,43 @@ def main() -> None:
             {"user_id": args.user_id, "message": "doc truoc di"},
         ),
         require=lambda payload: (
-            payload.get("intent") == "GENERAL"
-            and payload.get("ui_action") == "conversation.reply"
+            payload.get("intent") == "READING"
+            and payload.get("ui_action") == "reading.start"
+            and payload.get("activity", {}).get("type") == "READING"
             and payload.get("route", {}).get("slots", {}).get("learning_focus")
             == "reading"
         ),
+    )
+
+    run_check(
+        checks,
+        "canonical_learner_progress",
+        lambda: client.get(
+            f"/api/learners/{args.user_id}/progress?conversation_id={conversation_id}",
+        ),
+        require=lambda payload: (
+            payload.get("learner_id") == args.user_id
+            and payload.get("ui_action") == "progress.open"
+            and bool(payload.get("summary"))
+        ),
+    )
+
+    run_check(
+        checks,
+        "canonical_learner_mastery",
+        lambda: client.get(f"/api/learners/{args.user_id}/mastery"),
+        require=lambda payload: (
+            payload.get("learner_id") == args.user_id
+            and payload.get("ui_action") == "mastery.open"
+            and bool(payload.get("skill_mastery"))
+        ),
+    )
+
+    run_check(
+        checks,
+        "canonical_learner_recommendations",
+        lambda: client.get(f"/api/learners/{args.user_id}/recommendations"),
+        require=lambda payload: bool(payload.get("recommendations")),
     )
 
     profile_snapshot = run_check(
@@ -132,6 +209,7 @@ def main() -> None:
         "conversation_id": conversation_id,
         "second_conversation_id": second_conversation.get("conversation_id"),
         "activity_id": activity_id,
+        "unsubmitted_activity_id": unsubmitted_activity_id,
         "generation_run_id": activity.get("generation_run_id"),
         "session_code": submission.get("result", {}).get("session_code"),
         "skill_mastery_count": len(profile_snapshot.get("skill_mastery") or []),

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -220,6 +222,17 @@ class LearningActivityResponseModel(BaseModel):
     result: ScorePracticeResponseModel | None = None
     recommendation: str = ""
     next_activity_suggestion: ActivityRecommendationResponseModel | None = None
+    ui_action: str = "activity.open"
+
+
+class ActivityReviewResponseModel(BaseModel):
+    learner_id: str
+    activity_id: str
+    conversation_id: str
+    assistant_reply: str
+    activity: LearningActivityResponseModel | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    ui_action: str = "review.open"
 
 
 class ActivitySubmitResponseModel(BaseModel):
@@ -235,6 +248,29 @@ class RecommendationListResponseModel(BaseModel):
     recommendations: list[ActivityRecommendationResponseModel] = Field(
         default_factory=list,
     )
+
+
+class LearnerMasteryResponseModel(BaseModel):
+    learner_id: str
+    skill_mastery: list[PersonalizationSkillMasteryModel] = Field(
+        default_factory=list,
+    )
+    weak_skills: list[PersonalizationSkillMasteryModel] = Field(default_factory=list)
+    topic_stats: list[PersonalizationTopicStatModel] = Field(default_factory=list)
+    subtopic_stats: list[PersonalizationSubtopicStatModel] = Field(default_factory=list)
+    error_stats: list[PersonalizationErrorStatModel] = Field(default_factory=list)
+    ui_action: str = "mastery.open"
+
+
+class LearnerProgressResponseModel(BaseModel):
+    learner_id: str
+    conversation_id: str | None = None
+    metric: str
+    summary: str
+    weak_areas: list[dict[str, Any]] = Field(default_factory=list)
+    lowest_skill: dict[str, Any] | None = None
+    snapshot: PersonalizationSnapshotResponseModel
+    ui_action: str = "progress.open"
 
 
 class AcceptRecommendationRequestModel(BaseModel):
@@ -298,6 +334,7 @@ class ConversationDetailResponseModel(BaseModel):
     extracted_facts: dict[str, Any] = Field(default_factory=dict)
     suggested_next_question: str = ""
     messages: list[ChatMessageResponseModel] = Field(default_factory=list)
+    pending_clarification: PendingClarificationResponseModel | None = None
     active_activity: LearningActivityResponseModel | None = None
 
 
@@ -307,6 +344,8 @@ class ConversationRouteResponseModel(BaseModel):
     source: str
     reason: str
     slots: dict[str, Any] = Field(default_factory=dict)
+    missing_slots: list[str] = Field(default_factory=list)
+    referenced_activity_id: str | None = None
     needs_clarification: bool = False
     clarification_question: str | None = None
 
@@ -338,6 +377,7 @@ class ChatMemoryResponseModel(BaseModel):
     extracted_facts: dict[str, Any] = Field(default_factory=dict)
     suggested_next_question: str
     messages: list[ChatMessageResponseModel] = Field(default_factory=list)
+    pending_clarification: PendingClarificationResponseModel | None = None
 
 
 class SaveChatMessageResponseModel(BaseModel):

@@ -13,6 +13,7 @@ from app.learner.knowledge_tracing import BayesianKnowledgeTracer
 from app.learner.skill_graph import DEFAULT_SKILL_GRAPH
 from app.schemas import (
     AnswerDiagnosis,
+    ConversationIntent,
     ExerciseItem,
     ExerciseOption,
     GeneratedExerciseSet,
@@ -21,6 +22,7 @@ from app.schemas import (
     LearningActivity,
     LearningActivityStatus,
     LearningActivityType,
+    PendingClarification,
     PracticePlan,
     PracticeRequest,
     PracticeReview,
@@ -321,6 +323,53 @@ class PostgreSQLLearningRepository:
         if row is None:
             return None
         return self._activity_from_payload(row["activity_json"])
+
+    def get_pending_clarification(
+        self,
+        user_id: str,
+        conversation_id: str,
+    ) -> PendingClarification | None:
+        with self._connect() as connection:
+            self._ensure_user(connection, user_id)
+            row = connection.execute(
+                """
+                SELECT pending_clarification_json
+                FROM tutor_chat_sessions
+                WHERE user_code = %s AND session_id = %s
+                """,
+                (user_id, conversation_id),
+            ).fetchone()
+        if row is None:
+            raise LookupError("Chat session not found.")
+        return self._clarification_from_payload(
+            self._dict(row.get("pending_clarification_json")),
+        )
+
+    def save_pending_clarification(
+        self,
+        user_id: str,
+        conversation_id: str,
+        clarification: PendingClarification | None,
+    ) -> None:
+        with self._connect() as connection:
+            self._ensure_user(connection, user_id)
+            row = connection.execute(
+                """
+                UPDATE tutor_chat_sessions
+                SET pending_clarification_json = %s, updated_at = now()
+                WHERE user_code = %s AND session_id = %s
+                RETURNING session_id
+                """,
+                (
+                    Jsonb(self._clarification_payload(clarification))
+                    if clarification is not None
+                    else None,
+                    user_id,
+                    conversation_id,
+                ),
+            ).fetchone()
+            if row is None:
+                raise LookupError("Chat session not found.")
 
     def get_generated_exercise_set(
         self,
@@ -626,6 +675,14 @@ class PostgreSQLLearningRepository:
                 """,
                 (active_session_id, limit),
             ).fetchall()
+            session_row = connection.execute(
+                """
+                SELECT pending_clarification_json
+                FROM tutor_chat_sessions
+                WHERE user_code = %s AND session_id = %s
+                """,
+                (user_id, active_session_id),
+            ).fetchone()
         ordered_messages = [
             {
                 "message_id": row["message_id"],
@@ -643,6 +700,15 @@ class PostgreSQLLearningRepository:
             "extracted_facts": memory,
             "suggested_next_question": self._suggest_next_question(memory),
             "messages": ordered_messages,
+            "pending_clarification": self._clarification_payload(
+                self._clarification_from_payload(
+                    self._dict(
+                        session_row.get("pending_clarification_json")
+                        if session_row
+                        else None
+                    )
+                )
+            ),
         }
 
     def list_chat_sessions(self, user_id: str, limit: int = 20) -> dict[str, Any]:
@@ -690,6 +756,7 @@ class PostgreSQLLearningRepository:
             "extracted_facts": memory,
             "suggested_next_question": self._suggest_next_question(memory),
             "messages": [],
+            "pending_clarification": None,
         }
 
     def save_chat_message(
@@ -896,6 +963,7 @@ class PostgreSQLLearningRepository:
                     user_code TEXT NOT NULL REFERENCES tutor_users(user_code)
                         ON DELETE CASCADE,
                     active_activity_id TEXT,
+                    pending_clarification_json JSONB,
                     title TEXT,
                     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
                     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -912,6 +980,12 @@ class PostgreSQLLearningRepository:
                 """
                 ALTER TABLE tutor_chat_sessions
                 ADD COLUMN IF NOT EXISTS active_activity_id TEXT
+                """
+            )
+            connection.execute(
+                """
+                ALTER TABLE tutor_chat_sessions
+                ADD COLUMN IF NOT EXISTS pending_clarification_json JSONB
                 """
             )
             connection.execute(
@@ -1582,6 +1656,55 @@ class PostgreSQLLearningRepository:
 
     def _dict(self, value: Any) -> dict[str, Any]:
         return value if isinstance(value, dict) else {}
+
+    def _clarification_payload(
+        self,
+        clarification: PendingClarification | None,
+    ) -> dict[str, Any] | None:
+        if clarification is None:
+            return None
+        return {
+            "pending_intent": clarification.pending_intent.value,
+            "missing_fields": list(clarification.missing_fields),
+            "collected_slots": self._json_safe_dict(clarification.collected_slots),
+            "question": clarification.question,
+        }
+
+    def _clarification_from_payload(
+        self,
+        payload: object,
+    ) -> PendingClarification | None:
+        if not isinstance(payload, dict):
+            return None
+        try:
+            pending_intent = ConversationIntent(str(payload.get("pending_intent")))
+        except ValueError:
+            return None
+        missing_fields = payload.get("missing_fields")
+        collected_slots = payload.get("collected_slots")
+        return PendingClarification(
+            pending_intent=pending_intent,
+            missing_fields=[
+                str(item)
+                for item in (missing_fields if isinstance(missing_fields, list) else [])
+            ],
+            collected_slots=(
+                dict(collected_slots) if isinstance(collected_slots, dict) else {}
+            ),
+            question=str(payload.get("question") or ""),
+        )
+
+    def _json_safe_dict(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return {str(key): self._json_safe_value(value) for key, value in payload.items()}
+
+    def _json_safe_value(self, value: Any) -> Any:
+        if hasattr(value, "value"):
+            return value.value
+        if isinstance(value, dict):
+            return self._json_safe_dict(value)
+        if isinstance(value, list):
+            return [self._json_safe_value(item) for item in value]
+        return value
 
     def _dataclass_payload(self, dataclass_type: type, payload: dict[str, Any]) -> dict[str, Any]:
         allowed = {field.name for field in fields(dataclass_type)}

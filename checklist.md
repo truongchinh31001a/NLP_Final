@@ -1,6 +1,6 @@
 ﻿# Checklist refactor chat flow
 
-Checklist này được lập từ `chat_flow_redesign_refactor_plan.md` sau khi đối chiếu với hiện trạng repo. Mục tiêu là refactor dần từ flow "chat để tạo bài tập" sang nền tảng hội thoại có nhiều learning activity, nhưng vẫn giữ các phần đang chạy ổn như RAG, generator, validator, scorer, diagnosis, recommendation và chat session.
+Checklist này được lập từ `chat_flow_redesign_refactor_plan.md` và được re-baseline theo `adaptive_english_platform_refactor_plan.md` sau khi đối chiếu với hiện trạng repo. Mục tiêu là refactor dần từ flow "chat để tạo bài tập" sang nền tảng học tiếng Anh thích ứng có nhiều learning capability/activity, nhưng vẫn giữ các phần đang chạy ổn như RAG, generator, validator, scorer, diagnosis, recommendation và chat session.
 
 ## Hiện Trạng Nhanh
 
@@ -10,17 +10,37 @@ Checklist này được lập từ `chat_flow_redesign_refactor_plan.md` sau khi
 - [x] `LearningAgent` đã có retry generation, validate, seed-bank fallback backend, diagnosis, mastery update, recommendation và practice review.
 - [x] SQLite repository đã có bảng chat, generation run, practice session, answers, diagnoses, reviews, topic/subtopic/error/skill stats.
 - [x] PostgreSQL repository đang dùng JSONB tables cho profile, generated runs, practice sessions, chat sessions/messages/memory.
-- [x] Backend test đã xanh; sau Phase 13 `python -m unittest discover tests` chạy 65 tests pass.
+- [x] Backend test đã xanh; sau Phase 18 `python -m unittest discover tests` chạy 85 tests pass.
 - [x] Đã xử lý nhánh `GENERAL` và `EXPLAIN` để ưu tiên LLM-backed response khi có cấu hình, fallback theo context khi không có LLM.
 
 ## Nguyên Tắc Khi Làm
 
 - [x] Không rewrite toàn bộ. Giữ lại `PracticeIntentInterpreter`, `IntentParser`, `LearningAgent`, RAG, generator, validator, scorer, diagnosis, recommendation, review.
 - [x] Mỗi phase phải giữ demo hiện tại chạy được hoặc có compatibility endpoint rõ ràng.
-- [ ] `generation_run_id` chỉ còn là tracing/debug identity, không dùng làm business identity của practice/activity.
+- [x] `generation_run_id` chỉ còn là tracing/debug identity, không dùng làm business identity của practice/activity.
 - [x] Frontend không tự sinh bài/chấm bài fallback bằng local logic sau khi backend activity flow đã sẵn sàng.
 - [x] Router có thể rule-first để ổn định, nhưng nội dung trả lời cho `GENERAL`/chat tự do nên dùng LLM khi có cấu hình, và fallback phải context-aware thay vì một form cố định.
 - [x] Mọi thay đổi persistence phải cập nhật đủ `LearningRepository`, `InMemoryLearningRepository`, `SQLiteLearningRepository`, `PostgreSQLLearningRepository` và test tương ứng.
+
+## Re-Baseline Theo `adaptive_english_platform_refactor_plan.md`
+
+Plan mới là bản refactor nền tảng, không phải danh sách phải làm lại từ đầu. Sau khi đối chiếu code hiện tại:
+
+- [x] Priority 1 `ConversationRouter`: đã map vào Phase 3, có rule-first routing, LLM classifier fallback, route metadata và tests.
+- [x] Priority 2 `ConversationState`: đã map vào Phase 1, Phase 4 và Phase 8, có `ConversationTurnContext`, recent messages, memory summary, pending clarification, active activity và frontend state tách khỏi domain state.
+- [x] Priority 3 `LearningActivity`: đã map vào Phase 1, Phase 2 và Phase 5, dùng `activity_id` làm business identity và có lifecycle/persistence.
+- [x] Priority 4 Practice capability: đã map vào Phase 5, practice generation đi qua activity lifecycle.
+- [x] Priority 5 Backend fallback/grading: đã map vào Phase 5, Phase 8 và Phase 10, frontend không còn tự generate/chấm bài local.
+- [x] Priority 6 `REVIEW`: đã map vào Phase 6, review resolve latest/target activity và dùng answer/diagnosis context.
+- [x] Priority 7 `PROGRESS`: đã map vào Phase 6 và Phase 15, progress đọc personalization/mastery/error signals.
+- [x] Priority 8 `EXPLAIN`: đã map vào Phase 6, Phase 11 và Phase 14, explain dùng RAG/LLM khi có và fallback bounded.
+- [x] Priority 9 `PROFILE_UPDATE` và progressive profiling: đã map vào Phase 6 và Phase 7, không đưa user quay lại onboarding bắt buộc.
+- [x] Priority 10 Structured Recommendation: đã map vào Phase 9 và Phase 15, accept recommendation tạo activity trực tiếp.
+- [x] Frontend refactor: đã map vào Phase 8, Phase 10 và Phase 16, frontend chủ yếu render backend response/activity.
+- [x] API surface trong plan mới đã có canonical route cho `/api/learners/*`, `GET /api/activities/{id}` và `GET /api/activities/{id}/review`; legacy `/api/users/*` vẫn giữ để compatibility.
+- [x] API/Docker/pgvector live smoke đã chạy trên stack Docker; manual browser UI smoke còn bị giới hạn bởi môi trường không có browser control.
+
+Kế hoạch tiếp theo vì vậy không lặp lại Phase 1-17; chỉ đóng các gap còn lại của platform refactor.
 
 ## Phase 0 - Pre-Flight Và Guardrails
 
@@ -243,14 +263,14 @@ File dự kiến:
 ## Phase 12 - Manual Smoke And Contract Hardening
 
 - [x] Add reproducible manual browser smoke checklist and API smoke script.
-- [ ] Run manual browser smoke: create conversation, generate practice, submit by `activity_id`, ask review for a wrong answer, ask progress, create New Chat, confirm profile/mastery/preferences persist.
+- [ ] Run manual browser smoke: create conversation, generate practice, submit by `activity_id`, ask review for a wrong answer, ask progress, create New Chat, confirm profile/mastery/preferences persist; Codex chưa tick vì browser control/visible launch bị chặn.
 - [x] Audit all remaining `generation_run_id` usage and classify each use as trace/debug/observability or compatibility-only response field.
 - [x] Remove or refactor any remaining business logic that still treats `generation_run_id` as the primary practice/activity identity.
 - [x] Document canonical endpoints versus compatibility endpoints: `/api/conversations/*`, `/api/activities/*`, `/api/recommendations/*` versus legacy `/api/practice/*`.
 - [x] Add/verify Docker Compose smoke path for PostgreSQL repository backend.
 - [x] Add/verify Docker Compose smoke path for pgvector retrieval backend.
 - [x] Add a short smoke checklist in docs for Docker Ollama route: backend uses `http://ollama:11434`, host debug uses configured host port.
-- [ ] Run `python scripts/smoke_docker_stack.py` and `python scripts/smoke_conversation_flow.py` against a running Docker stack.
+- [x] Run `python scripts/smoke_docker_stack.py` and `python scripts/smoke_conversation_flow.py` against a running Docker stack.
 
 File du kien:
 
@@ -363,6 +383,125 @@ File du kien:
 - `README.md`
 - `docs/`
 
+## Phase 18 - Canonical Platform API Surface
+
+Mục tiêu: khép lại phần API direction trong `adaptive_english_platform_refactor_plan.md` để frontend và tài liệu có thể dùng một vocabulary thống nhất: conversation, activity, learner, recommendation.
+
+- [x] Thêm `GET /api/activities/{activity_id}` để đọc activity canonical theo `activity_id`.
+- [x] Thêm `GET /api/activities/{activity_id}/review` hoặc document rõ route review canonical nếu review vẫn đi qua conversation message.
+- [x] Thêm alias canonical `GET /api/learners/{learner_id}/profile` và `PATCH /api/learners/{learner_id}/profile`, giữ `/api/users/{user_id}/profile` làm compatibility endpoint.
+- [x] Thêm `GET /api/learners/{learner_id}/mastery` trả skill mastery, weak skills, confidence, attempts, `next_review_at`.
+- [x] Thêm `GET /api/learners/{learner_id}/progress` trả progress summary giống capability `PROGRESS` nhưng dạng API query.
+- [x] Thêm `GET /api/learners/{learner_id}/recommendations` làm canonical alias cho recommendation list hiện tại.
+- [x] Chuẩn hóa response schema để activity/review/progress có `learner_id`, `activity_id`, `conversation_id`, `ui_action` khi phù hợp.
+- [x] Auth/ownership của `/api/learners/*` và `/api/activities/*` phải giống các endpoint hiện có.
+- [x] Frontend API client dùng canonical endpoint mới ở chỗ phù hợp, nhưng legacy endpoint vẫn hoạt động.
+- [x] Cập nhật `docs/conversation_activity_contract.md`, `README.md`, `frontend/README.md`.
+- [x] Thêm API tests cho learner/profile/mastery/progress/recommendation aliases và activity read/review.
+
+File du kien:
+
+- `app/api/main.py`
+- `app/api/schemas.py`
+- `app/orchestrator/pipeline.py`
+- `app/persistence/repository.py`
+- `frontend/lib/api.ts`
+- `docs/conversation_activity_contract.md`
+- `README.md`
+- `frontend/README.md`
+- `tests/test_conversation_api.py`
+
+## Phase 19 - Pending Clarification And Activity Context Hardening
+
+Mục tiêu: làm chắc phần multi-turn conversation trong plan mới, nhất là case user trả lời ngắn sau câu hỏi clarification hoặc hỏi lại bài/câu vừa làm.
+
+- [x] Audit pending clarification hiện tại: trước đó chủ yếu suy ra từ assistant metadata, nay có session-level state.
+- [x] Persist pending clarification đủ bền để reload conversation vẫn tiếp tục được intent cũ.
+- [x] Merge slot cho flow: "Tôi muốn luyện ngữ pháp" -> assistant hỏi topic -> user trả lời "Past Simple" -> tạo đúng activity practice.
+- [x] Thêm `recent_activity_ids` và `latest_reviewable_activity` để review hiểu "bài vừa rồi", "câu đó", "câu 3".
+- [x] Review resolver ưu tiên active/latest completed activity nhưng vẫn chống đọc nhầm activity của user khác.
+- [x] Route metadata ghi rõ `confidence`, `source`, `reason`, `slots`, `missing_slots`, `referenced_activity_id` cho debug.
+- [x] Cập nhật test router/API cho ambiguous short replies, pending practice, pending review và context switching.
+- [x] Cập nhật frontend type/API mapping để nhận clarification/pending state tự nhiên nếu backend trả về.
+
+File du kien:
+
+- `app/conversation/router.py`
+- `app/conversation/service.py`
+- `app/conversation/schemas.py`
+- `app/review/service.py`
+- `app/persistence/repository.py`
+- `app/persistence/sqlite_repository.py`
+- `app/persistence/postgres_repository.py`
+- `frontend/components/chat-workbench.tsx`
+- `tests/test_conversation_router.py`
+- `tests/test_conversation_api.py`
+
+## Phase 20 - Manual, Live Docker, And Demo Smoke Evidence
+
+Mục tiêu: chuyển trạng thái "unit/build/eval xanh" thành bằng chứng chạy demo thật trên stack local/Docker.
+
+- [ ] Run manual browser smoke: create conversation, generate practice, submit by `activity_id`, ask review for a wrong answer, ask progress, create New Chat, confirm profile/mastery/preferences persist; browser control/visible launch bị chặn.
+- [x] Run `python scripts/smoke_conversation_flow.py` against backend đang chạy local.
+- [x] Run `python scripts/smoke_docker_stack.py` against Docker stack có backend, frontend, PostgreSQL/pgvector và Ollama.
+- [x] Run pgvector retrieval smoke khi container Postgres sẵn sàng.
+- [x] Verify Docker backend gọi Ollama bằng `http://ollama:11434`; host debug dùng port đã publish.
+- [x] Ghi kết quả smoke vào `docs/smoke_report.md` hoặc section trong `docs/manual_smoke_checklist.md`.
+- [x] Nếu smoke fail, thêm regression test trước khi sửa bug; live scripts đã pass, pgvector smoke criterion được chỉnh cho top-k retrieval và bug Phase 19 có regression test.
+- [x] User đã cho phép Codex start FE/BE/Docker; stack đã start bằng `docker compose up -d --build --force-recreate`.
+
+File du kien:
+
+- `scripts/smoke_conversation_flow.py`
+- `scripts/smoke_docker_stack.py`
+- `scripts/smoke_pgvector_retrieval.py`
+- `docs/manual_smoke_checklist.md`
+- `docs/docker_setup.md`
+- `docs/smoke_report.md`
+
+## Phase 21 - Listening And Speaking Activity Decision
+
+Mục tiêu: biến phần P3 "more activity types" thành kế hoạch kỹ thuật rõ ràng trước khi code audio.
+
+- [x] Chọn STT backend cho speaking/listening feedback: MVP dùng browser Web Speech API, fallback manual transcript; Whisper/OpenAI-compatible hoặc local Whisper để sau.
+- [x] Chọn TTS/audio delivery cho listening: MVP dùng browser SpeechSynthesis; generated audio files/external TTS để sau nếu cần voice ổn định.
+- [x] Thiết kế `ListeningActivity` metadata: audio source, transcript, target vocabulary/skill, comprehension prompts, replay limits nếu cần.
+- [x] Thiết kế `SpeakingActivity` metadata: prompt, expected patterns, transcript, pronunciation/fluency rubric, retry policy.
+- [x] Thiết kế persistence cho transcript/audio artifact mà không lưu file nhạy cảm mặc định.
+- [x] Thiết kế frontend controls: record/play/stop, permission state, transcript preview, submit, retry, rubric result.
+- [x] Thêm API contract trước: create/listen/speak activity vẫn dùng `LearningActivity` và `/api/activities/{id}/submit`.
+- [x] Thêm eval/test dataset nhỏ cho transcript scoring và listening comprehension.
+
+File du kien:
+
+- `app/activities/`
+- `app/api/schemas.py`
+- `app/api/main.py`
+- `frontend/components/chat-workbench.tsx`
+- `frontend/lib/api.ts`
+- `docs/audio_activity_design.md`
+- `tests/`
+- `evals/`
+
+## Phase 22 - Architecture Cleanup Without Rewrite
+
+Mục tiêu: dọn cấu trúc theo hướng plan mới nhưng không rename/rewrite ồ ạt.
+
+- [x] Tách dần `app/api/main.py` thành route modules nếu file tiếp tục phình to, bắt đầu từ conversations/activities/learners/recommendations.
+- [x] Ghi rõ ownership trong docs: conversation routing, activity services, learner model, retrieval, generation, diagnosis, recommendation, observability.
+- [x] Đảm bảo module mới dùng tên thống nhất `activities` thay vì tạo thêm package song song `activity`.
+- [x] Giữ `LearningWorkflowGraph` là orchestration/debug view, không ép toàn bộ conversation router phụ thuộc LangGraph.
+- [x] Không làm microservices/event sourcing/Kafka/full multi-agent rewrite trong giai đoạn này.
+- [x] Sau mỗi cleanup, chạy backend unit, eval thresholds, frontend lint/build.
+
+File du kien:
+
+- `app/api/`
+- `app/agent/workflow_graph.py`
+- `docs/architecture.md`
+- `README.md`
+- `tests/`
+
 ## Test Matrix Mỗi Phase
 
 - [x] Backend unit: `python -m unittest discover tests`.
@@ -372,13 +511,17 @@ File du kien:
 - [x] Tutor response: `GENERAL`/`EXPLAIN` có test cho LLM-enabled path và fallback context-aware path.
 - [x] Frontend static: `cd frontend && npm run lint`.
 - [x] Frontend build: `cd frontend && npm run build`.
-- [ ] Manual smoke: mở chat, tạo bài, nộp bài, hỏi "Tại sao câu 2 sai?", hỏi "Tôi đang yếu phần nào?", bấm "New Chat", kiểm tra learner state còn giữ.
+- [ ] Manual smoke: mở chat, tạo bài, nộp bài, hỏi "Tại sao câu 2 sai?", hỏi "Tôi đang yếu phần nào?", bấm "New Chat", kiểm tra learner state còn giữ; frontend HTTP smoke đã pass nhưng browser UI control bị chặn.
 - [x] Docker smoke path: backend, frontend, PostgreSQL/pgvector, Ollama container route.
 - [x] AI eval: tutor naturalness, repeated-menu avoidance, off-topic bridge, scope control, grounded explanation.
 - [x] Retrieval eval: Recall@K/MRR/NDCG plus metadata/source-grounding checks.
 - [x] Recommendation eval: accepted recommendation creates activity directly and reduces repeated weak-skill errors.
 - [x] Activity eval: reading/writing activity lifecycle, persistence, API payload, frontend rendering.
 - [x] Production hardening: auth, observability, CI eval thresholds, dependency/security checks.
+- [x] Canonical platform API: `/api/learners/*`, `/api/activities/{id}`, `/api/activities/{id}/review` aliases/routes tested.
+- [x] Pending clarification e2e: ambiguous practice request followed by short slot answer resumes the pending intent.
+- [x] Activity context e2e: review resolves latest/active activity and question number without generating a new activity.
+- [x] Live smoke evidence: local/Docker smoke commands recorded with date, env profile and result.
 
 ## Thứ Tự Làm Đề Xuất
 
@@ -397,11 +540,11 @@ File du kien:
 - [x] 10.1 Cleanup legacy và cập nhật docs.
 - [x] 11.1 LLM-backed natural response cho `GENERAL`.
 - [x] 11.2 Cải thiện `EXPLAIN` dùng LLM/RAG, giữ rule fallback.
-- [ ] 12.1 Manual smoke full conversation/activity flow.
+- [ ] 12.1 Manual smoke full conversation/activity flow; browser UI control bị chặn, API smoke tương đương đã pass.
 - [x] 12.2 Audit `generation_run_id` identity usage.
 - [x] 12.3 Contract docs for canonical API vs legacy compatibility API.
 - [x] 12.4 Docker smoke for PostgreSQL/pgvector/Ollama.
-- [ ] 12.5 Run Docker/API smoke against live stack.
+- [x] 12.5 Run Docker/API smoke against live stack.
 - [x] 13.1 Tutor response eval dataset.
 - [x] 13.2 Tutor response eval runner and metrics.
 - [x] 13.3 Compare Ollama/OpenAI tutor-response behavior.
@@ -411,12 +554,23 @@ File du kien:
 - [x] 15.1 Recommendation ranking upgrade.
 - [x] 15.2 BKT/spaced-review calibration.
 - [x] 15.3 Recommendation effectiveness eval.
-- [ ] 16.1 Reading activity service and UI.
-- [ ] 16.2 Writing correction activity service and UI.
-- [ ] 16.3 Listening/speaking activity design notes.
-- [ ] 17.1 Auth hardening.
-- [ ] 17.2 Observability dashboard path.
-- [ ] 17.3 CI security checks and AI eval thresholds.
+- [x] 16.1 Reading activity service and UI.
+- [x] 16.2 Writing correction activity service and UI.
+- [x] 16.3 Listening/speaking activity design notes.
+- [x] 17.1 Auth hardening.
+- [x] 17.2 Observability dashboard path.
+- [x] 17.3 CI security checks and AI eval thresholds.
+- [x] 18.1 Add canonical activity read/review endpoints.
+- [x] 18.2 Add canonical learner profile/mastery/progress/recommendation endpoints.
+- [x] 18.3 Migrate frontend API calls where useful while keeping legacy compatibility.
+- [x] 19.1 Persist and resume pending clarification.
+- [x] 19.2 Harden recent activity/question resolution for review.
+- [ ] 20.1 Run manual browser smoke; browser UI control/visible launch bị chặn trong môi trường hiện tại.
+- [x] 20.2 Run local API smoke and Docker smoke.
+- [x] 21.1 Choose audio/STT/TTS stack for listening/speaking.
+- [x] 21.2 Write listening/speaking API and UI design contract.
+- [x] 22.1 Split oversized API routes only when tests stay green.
+- [x] 22.2 Keep LangGraph as bounded workflow/debug layer, not a full rewrite.
 
 ## Definition Of Done
 

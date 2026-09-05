@@ -133,6 +133,7 @@ export type LearningActivityPreview = {
   result?: ScoreResult | null;
   recommendation?: string;
   nextActivitySuggestion?: NextActivitySuggestion | null;
+  uiAction?: string | null;
 };
 
 export type PersistedChatMessage = {
@@ -152,6 +153,7 @@ export type ChatMemoryResume = {
   extractedFacts: Record<string, unknown>;
   suggestedNextQuestion: string;
   messages: PersistedChatMessage[];
+  pendingClarification?: PendingClarification | null;
   activeActivity?: LearningActivityPreview | null;
 };
 
@@ -168,6 +170,8 @@ export type ConversationRoute = {
   source: string;
   reason: string;
   slots: Record<string, unknown>;
+  missingSlots: string[];
+  referencedActivityId?: string | null;
   needsClarification: boolean;
   clarificationQuestion?: string | null;
 };

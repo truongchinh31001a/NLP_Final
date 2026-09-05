@@ -315,6 +315,7 @@ CREATE TABLE IF NOT EXISTS chat_sessions (
     session_code TEXT NOT NULL UNIQUE,
     user_id INTEGER NOT NULL,
     active_activity_id INTEGER,
+    pending_clarification_json TEXT,
     title TEXT,
     status TEXT NOT NULL DEFAULT 'active',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,

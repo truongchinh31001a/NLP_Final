@@ -7,10 +7,12 @@ from app.learner.knowledge_tracing import BayesianKnowledgeTracer
 from app.learner.skill_graph import DEFAULT_SKILL_GRAPH
 from app.schemas import (
     AnswerDiagnosis,
+    ConversationIntent,
     GeneratedExerciseSet,
     LearnerProfile,
     LearningActivity,
     LearningActivityStatus,
+    PendingClarification,
     PracticeReview,
     SessionResult,
 )
@@ -71,6 +73,21 @@ class LearningRepository(Protocol):
         conversation_id: str,
         statuses: list[LearningActivityStatus] | None = None,
     ) -> LearningActivity | None:
+        ...
+
+    def get_pending_clarification(
+        self,
+        user_id: str,
+        conversation_id: str,
+    ) -> PendingClarification | None:
+        ...
+
+    def save_pending_clarification(
+        self,
+        user_id: str,
+        conversation_id: str,
+        clarification: PendingClarification | None,
+    ) -> None:
         ...
 
     def get_generated_exercise_set(
@@ -310,6 +327,28 @@ class InMemoryLearningRepository:
         )
         return activities[0] if activities else None
 
+    def get_pending_clarification(
+        self,
+        user_id: str,
+        conversation_id: str,
+    ) -> PendingClarification | None:
+        meta = self.chat_session_meta.get(conversation_id)
+        if meta is None or meta.get("user_id") != user_id:
+            raise LookupError("Chat session not found.")
+        return self._clarification_from_payload(meta.get("pending_clarification"))
+
+    def save_pending_clarification(
+        self,
+        user_id: str,
+        conversation_id: str,
+        clarification: PendingClarification | None,
+    ) -> None:
+        meta = self.chat_session_meta.get(conversation_id)
+        if meta is None or meta.get("user_id") != user_id:
+            raise LookupError("Chat session not found.")
+        meta["pending_clarification"] = self._clarification_payload(clarification)
+        meta["updated_at"] = self._now()
+
     def get_generated_exercise_set(
         self,
         user_id: str,
@@ -480,6 +519,10 @@ class InMemoryLearningRepository:
             "extracted_facts": facts,
             "suggested_next_question": self._suggest_next_question(facts),
             "messages": messages,
+            "pending_clarification": self.chat_session_meta.get(
+                active_session_id,
+                {},
+            ).get("pending_clarification"),
         }
 
     def list_chat_sessions(self, user_id: str, limit: int = 20) -> dict[str, Any]:
@@ -519,6 +562,7 @@ class InMemoryLearningRepository:
             "extracted_facts": facts,
             "suggested_next_question": self._suggest_next_question(facts),
             "messages": [],
+            "pending_clarification": None,
         }
 
     def save_chat_message(
@@ -654,6 +698,43 @@ class InMemoryLearningRepository:
                 "created_at": self._now(),
                 "metadata": metadata or {},
             }
+        )
+
+    def _clarification_payload(
+        self,
+        clarification: PendingClarification | None,
+    ) -> dict[str, Any] | None:
+        if clarification is None:
+            return None
+        return {
+            "pending_intent": clarification.pending_intent.value,
+            "missing_fields": list(clarification.missing_fields),
+            "collected_slots": dict(clarification.collected_slots),
+            "question": clarification.question,
+        }
+
+    def _clarification_from_payload(
+        self,
+        payload: object,
+    ) -> PendingClarification | None:
+        if not isinstance(payload, dict):
+            return None
+        try:
+            pending_intent = ConversationIntent(str(payload.get("pending_intent")))
+        except ValueError:
+            return None
+        missing_fields = payload.get("missing_fields")
+        collected_slots = payload.get("collected_slots")
+        return PendingClarification(
+            pending_intent=pending_intent,
+            missing_fields=[
+                str(item)
+                for item in (missing_fields if isinstance(missing_fields, list) else [])
+            ],
+            collected_slots=(
+                dict(collected_slots) if isinstance(collected_slots, dict) else {}
+            ),
+            question=str(payload.get("question") or ""),
         )
 
     def _activity_id_for_generation_run(

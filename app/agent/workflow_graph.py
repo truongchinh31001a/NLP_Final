@@ -25,7 +25,9 @@ class LearningWorkflowGraph:
 
     The runtime still calls existing services directly. This graph makes the
     orchestration contract explicit and can be compiled with LangGraph for
-    inspection or future node-by-node execution.
+    inspection or future node-by-node execution. Conversation routing should not
+    depend on LangGraph unless a future phase explicitly changes the runtime
+    orchestration model.
     """
 
     def __init__(self) -> None:

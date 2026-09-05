@@ -148,19 +148,94 @@ class ConversationApiTests(unittest.TestCase):
             conversation["conversation_id"],
             "Mình muốn luyện bài.",
         )
+        stored_pending = api_main.pipeline.repository.get_pending_clarification(
+            "learner",
+            conversation["conversation_id"],
+        )
+        resumed_response = self.client.get(
+            f"/api/conversations/{conversation['conversation_id']}",
+            params={"user_id": "learner"},
+        )
         second = self._send_message(
             conversation["conversation_id"],
             "5 câu passive voice.",
         )
 
+        cleared_pending = api_main.pipeline.repository.get_pending_clarification(
+            "learner",
+            conversation["conversation_id"],
+        )
+
         self.assertEqual(first["intent"], "PRACTICE")
         self.assertEqual(first["ui_action"], "clarification.ask")
         self.assertEqual(first["pending_clarification"]["pending_intent"], "PRACTICE")
+        self.assertTrue(first["route"]["missing_slots"])
+        self.assertIsNone(first["route"]["referenced_activity_id"])
+        self.assertEqual(resumed_response.status_code, 200)
+        self.assertEqual(
+            resumed_response.json()["pending_clarification"]["pending_intent"],
+            "PRACTICE",
+        )
+        self.assertIsNotNone(stored_pending)
+        self.assertEqual(stored_pending.pending_intent.value, "PRACTICE")
         self.assertEqual(second["intent"], "PRACTICE")
         self.assertEqual(second["ui_action"], "practice.start")
         self.assertEqual(second["activity"]["status"], "READY")
         self.assertEqual(second["route"]["slots"]["topic"], "passive_voice")
         self.assertEqual(second["route"]["slots"]["num_questions"], 5)
+        self.assertIsNone(cleared_pending)
+
+    def test_review_turn_prefers_completed_activity_over_new_unsubmitted_activity(
+        self,
+    ) -> None:
+        conversation = self._create_conversation("learner")
+        first_generated_response = self.client.post(
+            "/api/practice/generate",
+            json={
+                "user_id": "learner",
+                "conversation_id": conversation["conversation_id"],
+                "message": "Create 2 passive voice questions.",
+                "topic": "passive_voice",
+                "num_questions": 2,
+            },
+        )
+        self.assertEqual(first_generated_response.status_code, 200)
+        first_generated = first_generated_response.json()
+        first_activity_id = first_generated["activity_id"]
+        submit_response = self.client.post(
+            f"/api/activities/{first_activity_id}/submit",
+            json={
+                "user_id": "learner",
+                "answers": self._first_wrong_answers(first_generated),
+            },
+        )
+        self.assertEqual(submit_response.status_code, 200)
+
+        second_generated_response = self.client.post(
+            "/api/practice/generate",
+            json={
+                "user_id": "learner",
+                "conversation_id": conversation["conversation_id"],
+                "message": "Create 1 vocabulary question.",
+                "topic": "vocabulary",
+                "num_questions": 1,
+            },
+        )
+        self.assertEqual(second_generated_response.status_code, 200)
+        second_activity_id = second_generated_response.json()["activity_id"]
+
+        payload = self._send_message(
+            conversation["conversation_id"],
+            "Tai sao cau 1 sai?",
+        )
+
+        self.assertNotEqual(first_activity_id, second_activity_id)
+        self.assertEqual(payload["intent"], "REVIEW")
+        self.assertEqual(payload["ui_action"], "review.open")
+        self.assertEqual(payload["activity"]["activity_id"], first_activity_id)
+        self.assertEqual(payload["route"]["slots"]["activity_id"], first_activity_id)
+        self.assertEqual(payload["route"]["referenced_activity_id"], first_activity_id)
+        self.assertEqual(payload["route"]["slots"]["question_number"], 1)
 
     def test_generate_and_submit_activity_endpoint(self) -> None:
         conversation = self._create_conversation("learner")
@@ -216,6 +291,157 @@ class ConversationApiTests(unittest.TestCase):
             recommendations[0]["recommendation_id"],
             submitted["next_activity_suggestion"]["recommendation_id"],
         )
+
+    def test_canonical_activity_read_and_review_endpoints(self) -> None:
+        conversation = self._create_conversation("learner")
+        generated_response = self.client.post(
+            "/api/practice/generate",
+            json={
+                "user_id": "learner",
+                "conversation_id": conversation["conversation_id"],
+                "message": "Create 2 passive voice questions.",
+                "topic": "passive_voice",
+                "num_questions": 2,
+            },
+        )
+        self.assertEqual(generated_response.status_code, 200)
+        generated = generated_response.json()
+        submit_response = self.client.post(
+            f"/api/activities/{generated['activity_id']}/submit",
+            json={
+                "user_id": "learner",
+                "answers": self._first_wrong_answers(generated),
+            },
+        )
+        self.assertEqual(submit_response.status_code, 200)
+
+        activity_response = self.client.get(
+            f"/api/activities/{generated['activity_id']}",
+            params={"user_id": "learner"},
+        )
+        review_response = self.client.get(
+            f"/api/activities/{generated['activity_id']}/review",
+            params={"user_id": "learner", "question_number": 1},
+        )
+
+        self.assertEqual(activity_response.status_code, 200)
+        activity = activity_response.json()
+        self.assertEqual(activity["activity_id"], generated["activity_id"])
+        self.assertEqual(activity["learner_id"], "learner")
+        self.assertEqual(activity["conversation_id"], conversation["conversation_id"])
+        self.assertEqual(activity["ui_action"], "practice.open")
+        self.assertEqual(activity["status"], "COMPLETED")
+        self.assertEqual(len(activity["exercises"]), 2)
+        self.assertEqual(activity["result"]["activity_id"], generated["activity_id"])
+        self.assertTrue(activity["next_activity_suggestion"]["recommendation_id"])
+
+        self.assertEqual(review_response.status_code, 200)
+        review = review_response.json()
+        self.assertEqual(review["learner_id"], "learner")
+        self.assertEqual(review["activity_id"], generated["activity_id"])
+        self.assertEqual(review["conversation_id"], conversation["conversation_id"])
+        self.assertEqual(review["ui_action"], "review.open")
+        self.assertEqual(review["metadata"]["question_number"], 1)
+        self.assertEqual(review["activity"]["activity_id"], generated["activity_id"])
+        self.assertTrue(review["assistant_reply"])
+
+    def test_canonical_activity_read_rejects_other_user(self) -> None:
+        conversation = self._create_conversation("learner")
+        generated_response = self.client.post(
+            "/api/practice/generate",
+            json={
+                "user_id": "learner",
+                "conversation_id": conversation["conversation_id"],
+                "message": "Create 1 passive voice question.",
+                "topic": "passive_voice",
+                "num_questions": 1,
+            },
+        )
+        self.assertEqual(generated_response.status_code, 200)
+
+        response = self.client.get(
+            f"/api/activities/{generated_response.json()['activity_id']}",
+            params={"user_id": "other"},
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_canonical_learner_profile_mastery_progress_and_recommendations(self) -> None:
+        profile_response = self.client.patch(
+            "/api/learners/learner/profile",
+            json={
+                "display_name": "Linh",
+                "level": "intermediate",
+                "goals": ["ielts"],
+                "preferred_difficulty": "medium",
+                "preferred_num_questions": 2,
+                "weak_topics": ["passive voice"],
+                "onboarding_completed": True,
+            },
+        )
+        self.assertEqual(profile_response.status_code, 200)
+        self.assertEqual(profile_response.json()["display_name"], "Linh")
+
+        get_profile_response = self.client.get("/api/learners/learner/profile")
+        legacy_profile_response = self.client.get("/api/users/learner/profile")
+        self.assertEqual(get_profile_response.status_code, 200)
+        self.assertEqual(legacy_profile_response.status_code, 200)
+        self.assertEqual(get_profile_response.json()["level"], "intermediate")
+        self.assertEqual(legacy_profile_response.json()["display_name"], "Linh")
+
+        conversation = self._create_conversation("learner")
+        generated_response = self.client.post(
+            "/api/practice/generate",
+            json={
+                "user_id": "learner",
+                "conversation_id": conversation["conversation_id"],
+                "message": "Create 2 passive voice questions.",
+                "topic": "passive_voice",
+                "num_questions": 2,
+            },
+        )
+        self.assertEqual(generated_response.status_code, 200)
+        generated = generated_response.json()
+        submit_response = self.client.post(
+            f"/api/activities/{generated['activity_id']}/submit",
+            json={
+                "user_id": "learner",
+                "answers": self._correct_answers(generated),
+            },
+        )
+        self.assertEqual(submit_response.status_code, 200)
+        recommendation_id = submit_response.json()["next_activity_suggestion"][
+            "recommendation_id"
+        ]
+
+        mastery_response = self.client.get("/api/learners/learner/mastery")
+        progress_response = self.client.get(
+            "/api/learners/learner/progress",
+            params={"conversation_id": conversation["conversation_id"]},
+        )
+        recommendations_response = self.client.get(
+            "/api/learners/learner/recommendations",
+        )
+
+        self.assertEqual(mastery_response.status_code, 200)
+        mastery = mastery_response.json()
+        self.assertEqual(mastery["learner_id"], "learner")
+        self.assertEqual(mastery["ui_action"], "mastery.open")
+        self.assertTrue(mastery["skill_mastery"])
+        self.assertTrue(mastery["weak_skills"])
+        self.assertIn("next_review_at", mastery["skill_mastery"][0])
+
+        self.assertEqual(progress_response.status_code, 200)
+        progress = progress_response.json()
+        self.assertEqual(progress["learner_id"], "learner")
+        self.assertEqual(progress["conversation_id"], conversation["conversation_id"])
+        self.assertEqual(progress["ui_action"], "progress.open")
+        self.assertTrue(progress["summary"])
+        self.assertEqual(progress["snapshot"]["user_id"], "learner")
+
+        self.assertEqual(recommendations_response.status_code, 200)
+        recommendations = recommendations_response.json()["recommendations"]
+        self.assertEqual(recommendations[0]["recommendation_id"], recommendation_id)
 
     def test_accept_recommendation_creates_activity_without_parsing_prompt(self) -> None:
         conversation = self._create_conversation("learner")
@@ -415,6 +641,17 @@ class ConversationApiTests(unittest.TestCase):
             }
             for exercise in generated["exercises"]
         ]
+
+    def _first_wrong_answers(self, generated: dict) -> list[dict]:
+        answers = self._correct_answers(generated)
+        first_exercise = generated["exercises"][0]
+        wrong_option = next(
+            option
+            for option in first_exercise["options"]
+            if option["text"] != first_exercise["correct_answer"]
+        )
+        answers[0]["selected_answer"] = wrong_option["text"]
+        return answers
 
 
 if __name__ == "__main__":

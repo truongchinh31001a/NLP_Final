@@ -14,6 +14,7 @@ from app.learner.spaced_repetition import next_review_at
 from app.language.translation import BilingualTextNormalizer
 from app.schemas import (
     AnswerDiagnosis,
+    ConversationIntent,
     ExerciseItem,
     ExerciseOption,
     GeneratedExerciseSet,
@@ -21,6 +22,7 @@ from app.schemas import (
     LearningActivity,
     LearningActivityStatus,
     LearningActivityType,
+    PendingClarification,
     PracticePlan,
     PracticeReview,
     PracticeRequest,
@@ -391,6 +393,11 @@ class SQLiteLearningRepository:
                 messages,
             ),
             "messages": messages,
+            "pending_clarification": self._clarification_payload(
+                self._clarification_from_payload(
+                    self._json_object(session["pending_clarification_json"]),
+                ),
+            ),
         }
 
     def list_chat_sessions(self, user_id: str, limit: int = 20) -> dict[str, object]:
@@ -447,6 +454,7 @@ class SQLiteLearningRepository:
                 [],
             ),
             "messages": [],
+            "pending_clarification": None,
         }
 
     def save_chat_message(
@@ -1069,6 +1077,58 @@ class SQLiteLearningRepository:
             ).fetchall()
 
         return self._activity_from_row(rows[0]) if rows else None
+
+    def get_pending_clarification(
+        self,
+        user_id: str,
+        conversation_id: str,
+    ) -> PendingClarification | None:
+        with self._connect() as connection:
+            db_user_id = self._ensure_user(connection, user_id)
+            session = self._get_chat_session_by_code(
+                connection,
+                db_user_id,
+                conversation_id,
+            )
+            if session is None:
+                raise LookupError("Chat session not found.")
+            return self._clarification_from_payload(
+                self._json_object(session["pending_clarification_json"]),
+            )
+
+    def save_pending_clarification(
+        self,
+        user_id: str,
+        conversation_id: str,
+        clarification: PendingClarification | None,
+    ) -> None:
+        with self._connect() as connection:
+            db_user_id = self._ensure_user(connection, user_id)
+            session = self._get_chat_session_by_code(
+                connection,
+                db_user_id,
+                conversation_id,
+            )
+            if session is None:
+                raise LookupError("Chat session not found.")
+            connection.execute(
+                """
+                UPDATE chat_sessions
+                SET
+                    pending_clarification_json = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (
+                    json.dumps(
+                        self._clarification_payload(clarification),
+                        ensure_ascii=False,
+                    )
+                    if clarification is not None
+                    else None,
+                    int(session["id"]),
+                ),
+            )
 
     def get_generated_exercise_set(
         self,
@@ -1730,7 +1790,15 @@ class SQLiteLearningRepository:
     ) -> sqlite3.Row:
         row = connection.execute(
             """
-            SELECT id, session_code, title, status, created_at, updated_at
+            SELECT
+                id,
+                session_code,
+                active_activity_id,
+                pending_clarification_json,
+                title,
+                status,
+                created_at,
+                updated_at
             FROM chat_sessions
             WHERE user_id = ? AND status = 'active'
             ORDER BY updated_at DESC, id DESC
@@ -1751,7 +1819,15 @@ class SQLiteLearningRepository:
     ) -> sqlite3.Row | None:
         return connection.execute(
             """
-            SELECT id, session_code, title, status, created_at, updated_at
+            SELECT
+                id,
+                session_code,
+                active_activity_id,
+                pending_clarification_json,
+                title,
+                status,
+                created_at,
+                updated_at
             FROM chat_sessions
             WHERE user_id = ? AND session_code = ?
             """,
@@ -1773,7 +1849,15 @@ class SQLiteLearningRepository:
         )
         return connection.execute(
             """
-            SELECT id, session_code, title, status, created_at, updated_at
+            SELECT
+                id,
+                session_code,
+                active_activity_id,
+                pending_clarification_json,
+                title,
+                status,
+                created_at,
+                updated_at
             FROM chat_sessions
             WHERE id = ?
             """,
@@ -2307,6 +2391,12 @@ class SQLiteLearningRepository:
             )
             self._ensure_column(
                 connection,
+                table_name="chat_sessions",
+                column_name="pending_clarification_json",
+                column_definition="TEXT",
+            )
+            self._ensure_column(
+                connection,
                 table_name="session_exercises",
                 column_name="skill",
                 column_definition="TEXT NOT NULL DEFAULT 'grammar'",
@@ -2564,6 +2654,58 @@ class SQLiteLearningRepository:
     def _json_object(self, raw_value: str | None) -> dict[str, object]:
         value = self._json_value(raw_value, {})
         return value if isinstance(value, dict) else {}
+
+    def _clarification_payload(
+        self,
+        clarification: PendingClarification | None,
+    ) -> dict[str, object] | None:
+        if clarification is None:
+            return None
+        return {
+            "pending_intent": clarification.pending_intent.value,
+            "missing_fields": list(clarification.missing_fields),
+            "collected_slots": self._json_safe_dict(clarification.collected_slots),
+            "question": clarification.question,
+        }
+
+    def _clarification_from_payload(
+        self,
+        payload: object,
+    ) -> PendingClarification | None:
+        if not isinstance(payload, dict):
+            return None
+        try:
+            pending_intent = ConversationIntent(str(payload.get("pending_intent")))
+        except ValueError:
+            return None
+        missing_fields = payload.get("missing_fields")
+        collected_slots = payload.get("collected_slots")
+        return PendingClarification(
+            pending_intent=pending_intent,
+            missing_fields=[
+                str(item)
+                for item in (missing_fields if isinstance(missing_fields, list) else [])
+            ],
+            collected_slots=(
+                dict(collected_slots) if isinstance(collected_slots, dict) else {}
+            ),
+            question=str(payload.get("question") or ""),
+        )
+
+    def _json_safe_dict(self, payload: dict[str, object]) -> dict[str, object]:
+        return {
+            str(key): self._json_safe_value(value)
+            for key, value in payload.items()
+        }
+
+    def _json_safe_value(self, value: object) -> object:
+        if hasattr(value, "value"):
+            return str(value.value)
+        if isinstance(value, dict):
+            return self._json_safe_dict(value)
+        if isinstance(value, list):
+            return [self._json_safe_value(item) for item in value]
+        return value
 
     def _get_latest_generation_run(
         self,

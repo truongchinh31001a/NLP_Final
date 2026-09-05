@@ -283,6 +283,7 @@ export type ChatMemoryResumeResponse = {
   extracted_facts: Record<string, unknown>;
   suggested_next_question: string;
   messages: ChatMessageResponse[];
+  pending_clarification?: PendingClarificationResponse | null;
   active_activity?: LearningActivityResponse | null;
 };
 
@@ -319,6 +320,7 @@ export type ConversationDetailResponse = {
   extracted_facts: Record<string, unknown>;
   suggested_next_question: string;
   messages: ChatMessageResponse[];
+  pending_clarification?: PendingClarificationResponse | null;
   active_activity?: LearningActivityResponse | null;
 };
 
@@ -343,6 +345,8 @@ export type ConversationRouteResponse = {
   source: string;
   reason: string;
   slots: Record<string, unknown>;
+  missing_slots?: string[];
+  referenced_activity_id?: string | null;
   needs_clarification: boolean;
   clarification_question?: string | null;
 };
@@ -369,6 +373,17 @@ export type LearningActivityResponse = {
   result?: ScorePracticeResponse | null;
   recommendation?: string;
   next_activity_suggestion?: NextActivitySuggestionResponse | null;
+  ui_action?: string;
+};
+
+export type ActivityReviewResponse = {
+  learner_id: string;
+  activity_id: string;
+  conversation_id: string;
+  assistant_reply: string;
+  activity?: LearningActivityResponse | null;
+  metadata?: Record<string, unknown>;
+  ui_action: string;
 };
 
 export type ConversationMessageTurnResponse = {
@@ -414,6 +429,16 @@ export type ActivitySubmitResult = {
     selectedAnswer: string;
   }>;
   nextActivitySuggestion?: NextActivitySuggestion | null;
+  uiAction: string;
+};
+
+export type ActivityReviewResult = {
+  learnerId: string;
+  activityId: string;
+  conversationId: string;
+  assistantReply: string;
+  activity: LearningActivityPreview | null;
+  metadata: Record<string, unknown>;
   uiAction: string;
 };
 
@@ -638,6 +663,65 @@ export async function sendConversationMessage(payload: {
   return mapConversationTurn(data);
 }
 
+export async function getActivity(
+  userId: string,
+  activityId: string,
+): Promise<LearningActivityPreview> {
+  const params = new URLSearchParams({ user_id: userId });
+  const response = await fetch(
+    `${API_BASE_URL}/api/activities/${encodeURIComponent(activityId)}?${params}`,
+    {
+      headers: authHeaders(),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to load activity.");
+  }
+
+  const activity = mapLearningActivity(
+    (await response.json()) as LearningActivityResponse,
+  );
+  if (!activity) {
+    throw new Error("Backend returned an invalid activity.");
+  }
+  return activity;
+}
+
+export async function getActivityReview(payload: {
+  userId: string;
+  activityId: string;
+  questionNumber?: number | null;
+}): Promise<ActivityReviewResult> {
+  const params = new URLSearchParams({ user_id: payload.userId });
+  if (payload.questionNumber) {
+    params.set("question_number", String(payload.questionNumber));
+  }
+  const response = await fetch(
+    `${API_BASE_URL}/api/activities/${encodeURIComponent(
+      payload.activityId,
+    )}/review?${params}`,
+    {
+      headers: authHeaders(),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to load activity review.");
+  }
+
+  const data = (await response.json()) as ActivityReviewResponse;
+  return {
+    learnerId: data.learner_id,
+    activityId: data.activity_id,
+    conversationId: data.conversation_id,
+    assistantReply: data.assistant_reply,
+    activity: mapLearningActivity(data.activity),
+    metadata: data.metadata ?? {},
+    uiAction: data.ui_action,
+  };
+}
+
 export async function submitActivity(
   payload: SubmitActivityRequest,
 ): Promise<ActivitySubmitResult> {
@@ -697,12 +781,16 @@ export async function listRecommendations(
   limit = 5,
 ): Promise<NextActivitySuggestion[]> {
   const params = new URLSearchParams({
-    user_id: userId,
     limit: String(limit),
   });
-  const response = await fetch(`${API_BASE_URL}/api/recommendations?${params}`, {
-    headers: authHeaders(),
-  });
+  const response = await fetch(
+    `${API_BASE_URL}/api/learners/${encodeURIComponent(
+      userId,
+    )}/recommendations?${params}`,
+    {
+      headers: authHeaders(),
+    },
+  );
 
   if (!response.ok) {
     throw new Error("Failed to load recommendations.");
@@ -848,7 +936,7 @@ export async function updateUserProfile(
   payload: UpdateUserProfileRequest,
 ): Promise<UserProfileResponse> {
   const response = await fetch(
-    `${API_BASE_URL}/api/users/${encodeURIComponent(payload.userId)}/profile`,
+    `${API_BASE_URL}/api/learners/${encodeURIComponent(payload.userId)}/profile`,
     {
       method: "PATCH",
       headers: authHeaders({ "Content-Type": "application/json" }),
@@ -1090,6 +1178,7 @@ function mapChatResume(data: ChatMemoryResumeResponse): ChatMemoryResume {
     extractedFacts: data.extracted_facts,
     suggestedNextQuestion: data.suggested_next_question,
     messages: data.messages.map(mapChatMessage),
+    pendingClarification: mapPendingClarification(data.pending_clarification),
     activeActivity: mapLearningActivity(data.active_activity),
   };
 }
@@ -1102,6 +1191,7 @@ function mapConversationDetail(data: ConversationDetailResponse): ChatMemoryResu
     extractedFacts: data.extracted_facts,
     suggestedNextQuestion: data.suggested_next_question,
     messages: data.messages.map(mapChatMessage),
+    pendingClarification: mapPendingClarification(data.pending_clarification),
     activeActivity: mapLearningActivity(data.active_activity),
   };
 }
@@ -1191,6 +1281,8 @@ function mapConversationRoute(
     source: data.source,
     reason: data.reason,
     slots: data.slots,
+    missingSlots: data.missing_slots ?? [],
+    referencedActivityId: data.referenced_activity_id,
     needsClarification: data.needs_clarification,
     clarificationQuestion: data.clarification_question,
   };
@@ -1248,6 +1340,7 @@ function mapLearningActivity(
     result: rawResult ? mapScoreResult(rawResult, nextActivitySuggestion) : null,
     recommendation: getString(rawActivity.recommendation) ?? "",
     nextActivitySuggestion,
+    uiAction: getString(rawActivity.ui_action),
   };
 }
 

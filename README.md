@@ -53,6 +53,8 @@ Next.js UI
 
 Key backend modules:
 
+- `app/api/main.py`: FastAPI app bootstrap, middleware, debug/ops, and legacy routes.
+- `app/api/routes/`: canonical conversation, activity, learner, and recommendation routes.
 - `app/agent/`: bounded learning agent and LangGraph-compatible workflow graph.
 - `app/activities/`: learning activity lifecycle for practice generation and submit.
 - `app/auth/`: signed demo-token auth and user ownership checks.
@@ -66,6 +68,35 @@ Key backend modules:
 - `app/persistence/`: SQLite and PostgreSQL repositories.
 - `app/observability/`: metrics registry and optional OpenTelemetry setup.
 - `evals/`: offline datasets and evaluation report targets.
+
+See `docs/architecture.md` for the current ownership map and cleanup rules.
+
+## Canonical API Surface
+
+New application code should use the platform vocabulary directly:
+
+```text
+POST /api/conversations
+GET  /api/conversations?user_id={user_id}
+GET  /api/conversations/{conversation_id}?user_id={user_id}
+POST /api/conversations/{conversation_id}/messages
+
+GET  /api/activities/{activity_id}?user_id={user_id}
+GET  /api/activities/{activity_id}/review?user_id={user_id}
+POST /api/activities/{activity_id}/submit
+
+GET   /api/learners/{learner_id}/profile
+PATCH /api/learners/{learner_id}/profile
+GET   /api/learners/{learner_id}/mastery
+GET   /api/learners/{learner_id}/progress
+GET   /api/learners/{learner_id}/recommendations
+
+POST /api/recommendations/{recommendation_id}/accept
+```
+
+Compatibility endpoints such as `/api/practice/*`, `/api/users/*`, and
+`GET /api/recommendations?user_id=...` remain for older clients. See
+`docs/conversation_activity_contract.md` for the full contract.
 
 ## Run Locally
 

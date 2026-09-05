@@ -23,6 +23,8 @@ Evaluation groups:
   off-topic bridge checks, and learning-focus selections.
 - `explanation_grounding`: `EXPLAIN` responses preserve retrieved source
   metadata and include grounded context when available.
+- `audio_activity_contract`: design-time listening/speaking metadata, submit
+  payload, and privacy guardrails. These cases are not runtime audio scoring yet.
 - `retrieval`: Precision@K, Recall@K, MRR, NDCG@K, metadata precision, source
   precision, CEFR precision, and expected chunk recall.
 

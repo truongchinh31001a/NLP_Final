@@ -13,6 +13,7 @@ from app.schemas import (
     ConversationIntent,
     ConversationTurnContext,
     LearningActivity,
+    LearningActivityStatus,
     PendingClarification,
     PracticeRequest,
 )
@@ -297,6 +298,7 @@ class ConversationRouter:
         pending = context.pending_clarification
         if pending is None:
             raise ValueError("Pending clarification is required.")
+        normalized = self.text_normalizer.normalize_for_matching(message)
 
         if pending.pending_intent == ConversationIntent.PRACTICE:
             route = self._practice_route(
@@ -308,6 +310,43 @@ class ConversationRouter:
             )
             route.confidence = max(route.confidence, 0.92)
             return route
+
+        if pending.pending_intent == ConversationIntent.REVIEW:
+            activity = self._context_activity(context)
+            slots = {
+                **pending.collected_slots,
+                **self._activity_slots(activity),
+                **self._activity_id_slots(message, normalized),
+                **self._review_slots(normalized),
+                "clarification_answer": message.strip(),
+            }
+            if not slots.get("activity_id"):
+                question = pending.question or (
+                    "Minh can biet ban muon xem lai bai nao. "
+                    "Ban gui activity_id hoac noi ro cau so may nhe?"
+                )
+                return ConversationRoute(
+                    intent=ConversationIntent.REVIEW,
+                    confidence=0.82,
+                    source="pending-clarification",
+                    reason="Learner answered a pending review clarification without activity context.",
+                    slots=slots,
+                    needs_clarification=True,
+                    clarification_question=question,
+                    pending_clarification=PendingClarification(
+                        pending_intent=ConversationIntent.REVIEW,
+                        missing_fields=["activity_id"],
+                        collected_slots=slots,
+                        question=question,
+                    ),
+                )
+            return ConversationRoute(
+                intent=ConversationIntent.REVIEW,
+                confidence=0.92,
+                source="pending-clarification",
+                reason="Learner answered a pending review clarification.",
+                slots=slots,
+            )
 
         return ConversationRoute(
             intent=pending.pending_intent,
@@ -384,9 +423,10 @@ class ConversationRouter:
         activity = self._context_activity(context)
         slots: dict[str, Any] = {
             **self._activity_slots(activity),
+            **self._activity_id_slots(message, normalized),
             **self._review_slots(normalized),
         }
-        needs_clarification = activity is None
+        needs_clarification = not bool(slots.get("activity_id"))
         question = None
         pending = None
         if needs_clarification:
@@ -722,6 +762,24 @@ class ConversationRouter:
             slots["review_focus"] = "latest_question"
         return slots
 
+    def _activity_id_slots(
+        self,
+        message: str,
+        normalized: str,
+    ) -> dict[str, Any]:
+        patterns = (
+            r"\bactivity[_\-\s]*id\s*[:=#]?\s*([A-Za-z0-9][A-Za-z0-9_.:-]{2,})",
+            r"\bactivity\s+([A-Za-z0-9][A-Za-z0-9_.:-]{2,})",
+            r"\b((?:inmemory|pg)-activity-[A-Za-z0-9_.:-]+)\b",
+            r"\b((?:activity|act)[_-][A-Za-z0-9][A-Za-z0-9_.:-]*)\b",
+        )
+        for haystack in (message, normalized):
+            for pattern in patterns:
+                match = re.search(pattern, haystack, flags=re.IGNORECASE)
+                if match:
+                    return {"activity_id": match.group(1).strip(".,;")}
+        return {}
+
     def _progress_slots(self, normalized: str) -> dict[str, Any]:
         if self._has_any(normalized, ("thap nhat", "lowest")):
             return {"metric": "lowest_skill"}
@@ -761,12 +819,29 @@ class ConversationRouter:
         self,
         context: ConversationTurnContext,
     ) -> LearningActivity | None:
+        if self._is_reviewable_activity(context.active_activity):
+            return context.active_activity
+        latest_reviewable = context.recent_context.get("latest_reviewable_activity")
+        if isinstance(latest_reviewable, LearningActivity):
+            return latest_reviewable
         if context.active_activity is not None:
             return context.active_activity
         latest = context.recent_context.get("latest_activity")
         if isinstance(latest, LearningActivity):
             return latest
         return None
+
+    def _is_reviewable_activity(
+        self,
+        activity: LearningActivity | None,
+    ) -> bool:
+        if activity is None:
+            return False
+        return bool(activity.session_code) or activity.status in {
+            LearningActivityStatus.SUBMITTED,
+            LearningActivityStatus.GRADED,
+            LearningActivityStatus.COMPLETED,
+        }
 
     def _extract_known_concept(self, normalized: str) -> str | None:
         for concept in self.CONCEPT_SIGNALS:

@@ -11,7 +11,12 @@ from app.conversation.schemas import ConversationRoute
 from app.language.translation import BilingualTextNormalizer
 from app.persistence.repository import LearningRepository
 from app.schemas import AnswerDiagnosis, GeneratedExerciseSet, PracticeReview, SessionResult
-from app.schemas import ConversationTurnContext, LearningActivity, LearningActivityType
+from app.schemas import (
+    ConversationTurnContext,
+    LearningActivity,
+    LearningActivityStatus,
+    LearningActivityType,
+)
 from app.tutor.service import TutorCapabilityResult
 
 
@@ -320,9 +325,15 @@ class ConversationReviewService:
             )
 
         activity_payload = self._activity_payload(activity)
-        if activity.type != LearningActivityType.PRACTICE:
+        if activity.type not in {
+            LearningActivityType.PRACTICE,
+            LearningActivityType.READING,
+        }:
             return TutorCapabilityResult(
-                assistant_reply="Activity nay khong phai bai practice de review.",
+                assistant_reply=(
+                    "Activity nay khong phai bai practice/reading de review "
+                    "theo tung cau."
+                ),
                 ui_action="review.open",
                 activity=activity_payload,
                 metadata={"activity_id": activity.activity_id},
@@ -431,7 +442,27 @@ class ConversationReviewService:
             )
             if activity is not None:
                 return activity
+        if self._is_reviewable_activity(context.active_activity):
+            return context.active_activity
+        latest_reviewable = context.recent_context.get("latest_reviewable_activity")
+        if isinstance(latest_reviewable, LearningActivity):
+            return latest_reviewable
+        latest_activity = context.recent_context.get("latest_activity")
+        if isinstance(latest_activity, LearningActivity):
+            return latest_activity
         return context.active_activity
+
+    def _is_reviewable_activity(
+        self,
+        activity: LearningActivity | None,
+    ) -> bool:
+        if activity is None:
+            return False
+        return bool(activity.session_code) or activity.status in {
+            LearningActivityStatus.SUBMITTED,
+            LearningActivityStatus.GRADED,
+            LearningActivityStatus.COMPLETED,
+        }
 
     def _question_index(
         self,

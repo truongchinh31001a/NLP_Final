@@ -67,6 +67,37 @@ class ConversationRouterTests(unittest.TestCase):
         self.assertEqual(route.slots["activity_id"], "activity_1")
         self.assertFalse(route.needs_clarification)
 
+    def test_review_prefers_latest_reviewable_activity_over_ready_activity(self) -> None:
+        ready_activity = LearningActivity(
+            activity_id="activity_ready",
+            conversation_id="conversation_1",
+            learner_id="learner",
+            type=LearningActivityType.PRACTICE,
+            status=LearningActivityStatus.READY,
+            generation_run_id="gen_ready",
+        )
+        completed_activity = LearningActivity(
+            activity_id="activity_completed",
+            conversation_id="conversation_1",
+            learner_id="learner",
+            type=LearningActivityType.PRACTICE,
+            status=LearningActivityStatus.COMPLETED,
+            generation_run_id="gen_completed",
+            session_code="session_completed",
+        )
+
+        route = self.router.route(
+            message="Tai sao cau 1 sai?",
+            context=self._context(
+                active_activity=ready_activity,
+                recent_context={"latest_reviewable_activity": completed_activity},
+            ),
+        )
+
+        self.assertEqual(route.intent, ConversationIntent.REVIEW)
+        self.assertEqual(route.slots["activity_id"], "activity_completed")
+        self.assertEqual(route.slots["question_number"], 1)
+
     def test_review_without_activity_asks_for_clarification(self) -> None:
         route = self.router.route(
             message="Giải thích câu vừa rồi giúp tôi.",
@@ -80,6 +111,24 @@ class ConversationRouterTests(unittest.TestCase):
             ConversationIntent.REVIEW,
         )
         self.assertIn("activity_id", route.pending_clarification.missing_fields)
+
+    def test_pending_review_clarification_accepts_activity_id_and_question(self) -> None:
+        route = self.router.route(
+            message="activity_id=activity_api_1 cau 2",
+            context=self._context(
+                pending_clarification=PendingClarification(
+                    pending_intent=ConversationIntent.REVIEW,
+                    missing_fields=["activity_id"],
+                    collected_slots={"review_focus": "mistake"},
+                    question="Ban muon xem lai activity nao?",
+                ),
+            ),
+        )
+
+        self.assertEqual(route.intent, ConversationIntent.REVIEW)
+        self.assertEqual(route.slots["activity_id"], "activity_api_1")
+        self.assertEqual(route.slots["question_number"], 2)
+        self.assertFalse(route.needs_clarification)
 
     def test_progress_question_routes_to_progress(self) -> None:
         route = self.router.route(
@@ -207,6 +256,7 @@ class ConversationRouterTests(unittest.TestCase):
         active_intent: ConversationIntent | None = None,
         active_activity: LearningActivity | None = None,
         pending_clarification: PendingClarification | None = None,
+        recent_context: dict | None = None,
     ) -> ConversationTurnContext:
         return ConversationTurnContext(
             conversation_id="conversation_1",
@@ -215,6 +265,7 @@ class ConversationRouterTests(unittest.TestCase):
             active_intent=active_intent,
             active_activity=active_activity,
             pending_clarification=pending_clarification,
+            recent_context=recent_context or {},
         )
 
 

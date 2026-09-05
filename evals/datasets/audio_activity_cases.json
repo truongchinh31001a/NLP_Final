@@ -1,0 +1,182 @@
+[
+  {
+    "case_id": "listening_basic_detail",
+    "activity_type": "LISTENING",
+    "level": "A1",
+    "metadata": {
+      "mode": "listening",
+      "audio_source": {
+        "kind": "browser_tts",
+        "voice_hint": "en-US",
+        "rate": 0.95,
+        "transcript_ref": "metadata.transcript"
+      },
+      "transcript": "The museum opens at nine and closes at five.",
+      "target_skills": ["listening.detail"],
+      "target_vocabulary": ["museum", "opens", "closes"],
+      "comprehension_prompts": [
+        {
+          "exercise_id": "listen_basic_detail_q1",
+          "question_text": "What time does the museum open?",
+          "options": [
+            {"label": "A", "text": "At nine"},
+            {"label": "B", "text": "At five"},
+            {"label": "C", "text": "At ten"}
+          ],
+          "correct_answer": "A"
+        }
+      ],
+      "replay_policy": {
+        "max_replays": 3,
+        "allow_speed_control": true
+      },
+      "reveal_policy": {
+        "show_transcript_after_submit": true
+      },
+      "privacy": {
+        "store_raw_audio_by_default": false
+      }
+    },
+    "submission": {
+      "answers": {
+        "listen_basic_detail_q1": "A"
+      }
+    },
+    "expected": {
+      "ui_action": "listening.result",
+      "minimum_score": 1.0,
+      "forbid_raw_audio": true
+    }
+  },
+  {
+    "case_id": "listening_replay_policy",
+    "activity_type": "LISTENING",
+    "level": "A2",
+    "metadata": {
+      "mode": "listening",
+      "audio_source": {
+        "kind": "browser_tts",
+        "voice_hint": "en-US",
+        "rate": 0.9,
+        "transcript_ref": "metadata.transcript"
+      },
+      "transcript": "Lena missed the bus, so she walked to school.",
+      "target_skills": ["listening.sequence", "listening.cause_effect"],
+      "target_vocabulary": ["missed", "walked"],
+      "comprehension_prompts": [
+        {
+          "exercise_id": "listen_replay_policy_q1",
+          "question_text": "Why did Lena walk to school?",
+          "options": [
+            {"label": "A", "text": "She missed the bus"},
+            {"label": "B", "text": "She likes running"},
+            {"label": "C", "text": "The school was closed"}
+          ],
+          "correct_answer": "A"
+        }
+      ],
+      "replay_policy": {
+        "max_replays": 2,
+        "allow_speed_control": false
+      },
+      "reveal_policy": {
+        "show_transcript_after_submit": true
+      },
+      "privacy": {
+        "store_raw_audio_by_default": false
+      }
+    },
+    "submission": {
+      "answers": {
+        "listen_replay_policy_q1": "A"
+      },
+      "replay_count": 2
+    },
+    "expected": {
+      "ui_action": "listening.result",
+      "minimum_score": 1.0,
+      "max_replays_enforced": true,
+      "forbid_raw_audio": true
+    }
+  },
+  {
+    "case_id": "speaking_ordering_coffee",
+    "activity_type": "SPEAKING",
+    "level": "A1",
+    "metadata": {
+      "mode": "speaking",
+      "prompt": "Order a small coffee politely.",
+      "expected_patterns": ["could i have", "small coffee", "please"],
+      "target_skills": ["speaking.polite_requests"],
+      "rubric": {
+        "pronunciation": 0.3,
+        "fluency": 0.25,
+        "grammar": 0.25,
+        "task_completion": 0.2
+      },
+      "retry_policy": {
+        "max_attempts": 3,
+        "keep_best_score": true
+      },
+      "stt": {
+        "preferred": "browser_web_speech",
+        "allow_manual_transcript": true
+      },
+      "privacy": {
+        "store_raw_audio_by_default": false
+      }
+    },
+    "submission": {
+      "transcript": "Could I have a small coffee, please?",
+      "stt_confidence": 0.88,
+      "duration_ms": 4200,
+      "attempt_number": 1
+    },
+    "expected": {
+      "ui_action": "speaking.result",
+      "minimum_score": 0.85,
+      "matched_patterns": ["could i have", "small coffee", "please"],
+      "forbid_raw_audio": true
+    }
+  },
+  {
+    "case_id": "speaking_third_person_feedback",
+    "activity_type": "SPEAKING",
+    "level": "A2",
+    "metadata": {
+      "mode": "speaking",
+      "prompt": "Say one sentence about your friend's daily routine.",
+      "expected_patterns": ["he goes", "she goes", "every day"],
+      "target_skills": ["speaking.daily_routine", "grammar.present_simple_third_person"],
+      "rubric": {
+        "pronunciation": 0.25,
+        "fluency": 0.2,
+        "grammar": 0.35,
+        "task_completion": 0.2
+      },
+      "retry_policy": {
+        "max_attempts": 3,
+        "keep_best_score": true
+      },
+      "stt": {
+        "preferred": "browser_web_speech",
+        "allow_manual_transcript": true
+      },
+      "privacy": {
+        "store_raw_audio_by_default": false
+      }
+    },
+    "submission": {
+      "transcript": "He go to school every day.",
+      "stt_confidence": 0.81,
+      "duration_ms": 3300,
+      "attempt_number": 1
+    },
+    "expected": {
+      "ui_action": "speaking.result",
+      "minimum_score": 0.45,
+      "expected_feedback_tags": ["third_person_s"],
+      "forbid_raw_audio": true
+    }
+  }
+]

@@ -25,6 +25,7 @@ from app.schemas import (
     ConversationTurnContext,
     LearnerProfile,
     LearningActivity,
+    LearningActivityStatus,
     PendingClarification,
 )
 from app.tutor.service import (
@@ -95,7 +96,10 @@ class ConversationService:
             user_id,
             session_id=conversation_id,
         )
-        pending_clarification = self._latest_pending_clarification(
+        pending_clarification = self._stored_pending_clarification(
+            user_id,
+            conversation_id,
+        ) or self._latest_pending_clarification(
             before_resume.get("messages", []),
         )
         active_intent = self._latest_assistant_intent(
@@ -157,6 +161,11 @@ class ConversationService:
             ),
             update_memory=False,
         )
+        self._save_pending_clarification(
+            user_id,
+            str(user_saved["session_id"]),
+            route.pending_clarification,
+        )
 
         return ConversationTurnResult(
             conversation_id=str(user_saved["session_id"]),
@@ -184,6 +193,19 @@ class ConversationService:
             user_id,
             conversation_id,
         )
+        latest_reviewable_activity = self.repository.get_latest_learning_activity(
+            user_id,
+            conversation_id,
+            statuses=[
+                LearningActivityStatus.SUBMITTED,
+                LearningActivityStatus.GRADED,
+                LearningActivityStatus.COMPLETED,
+            ],
+        )
+        if pending_clarification is None:
+            pending_clarification = self._clarification_from_payload(
+                resume.get("pending_clarification"),
+            )
         messages = [
             {
                 "role": str(item.get("role") or ""),
@@ -209,6 +231,12 @@ class ConversationService:
                     extracted_facts if isinstance(extracted_facts, dict) else {}
                 ),
                 "latest_activity": latest_activity,
+                "latest_reviewable_activity": latest_reviewable_activity,
+                "recent_activity_ids": [
+                    activity.activity_id
+                    for activity in (latest_activity, latest_reviewable_activity)
+                    if activity is not None
+                ],
             },
         )
 
@@ -232,6 +260,9 @@ class ConversationService:
             user_id,
             conversation_id,
         )
+        pending = self._clarification_from_payload(
+            resume.get("pending_clarification"),
+        ) or self._latest_pending_clarification(resume.get("messages", []))
         return {
             "conversation_id": conversation_id,
             "has_history": bool(resume.get("has_history")),
@@ -239,6 +270,7 @@ class ConversationService:
             "extracted_facts": resume.get("extracted_facts") or {},
             "suggested_next_question": resume.get("suggested_next_question") or "",
             "messages": resume.get("messages") or [],
+            "pending_clarification": self._clarification_payload(pending),
             "active_activity": self._activity_payload(latest_activity),
         }
 
@@ -475,6 +507,16 @@ class ConversationService:
             "source": route.source,
             "reason": route.reason,
             "slots": self._json_safe(route.slots),
+            "missing_slots": (
+                route.pending_clarification.missing_fields
+                if route.pending_clarification is not None
+                else []
+            ),
+            "referenced_activity_id": (
+                str(route.slots["activity_id"])
+                if route.slots.get("activity_id")
+                else None
+            ),
             "needs_clarification": route.needs_clarification,
             "clarification_question": route.clarification_question,
         }
@@ -489,6 +531,31 @@ class ConversationService:
         return self._clarification_from_payload(
             latest_assistant.get("pending_clarification"),
         )
+
+    def _stored_pending_clarification(
+        self,
+        user_id: str,
+        conversation_id: str,
+    ) -> PendingClarification | None:
+        try:
+            return self.repository.get_pending_clarification(user_id, conversation_id)
+        except LookupError:
+            return None
+
+    def _save_pending_clarification(
+        self,
+        user_id: str,
+        conversation_id: str,
+        clarification: PendingClarification | None,
+    ) -> None:
+        try:
+            self.repository.save_pending_clarification(
+                user_id,
+                conversation_id,
+                clarification,
+            )
+        except LookupError:
+            return
 
     def _latest_assistant_intent(
         self,

@@ -23,19 +23,26 @@ Ollama container debug: http://localhost:11435/api/tags
 - [ ] Send: `Cho toi 2 cau passive voice.`
 - [ ] Confirm a practice activity card appears.
 - [ ] Confirm the activity has an `activity_id` in network/API payloads.
+- [ ] Open `GET /api/activities/{activity_id}?user_id=...` and confirm it
+  returns `ui_action=practice.open`.
 - [ ] Submit at least one wrong answer.
 - [ ] Confirm the result/review panel appears.
+- [ ] Open `GET /api/activities/{activity_id}/review?user_id=...&question_number=1`
+  and confirm it returns `ui_action=review.open`.
 - [ ] Send: `Tai sao cau 1 sai?`
 - [ ] Confirm the tutor reviews the latest submitted activity instead of
   generating a new exercise set.
 - [ ] Send: `Toi dang yeu phan nao?`
 - [ ] Confirm the tutor returns progress/weak-skill information.
+- [ ] Open `GET /api/learners/{user_id}/progress`,
+  `GET /api/learners/{user_id}/mastery`, and
+  `GET /api/learners/{user_id}/recommendations`.
 - [ ] Click New Chat.
 - [ ] Confirm the new conversation has a different `conversation_id`.
 - [ ] Confirm learner profile/mastery/preferences did not reset.
 - [ ] Send: `doc truoc di`
-- [ ] Confirm the tutor accepts reading focus and does not repeat the old
-  `noi/nghe/doc/viet` menu.
+- [ ] Confirm the tutor starts a `READING` activity with `ui_action=reading.start`
+  and does not repeat the old `noi/nghe/doc/viet` menu.
 
 ## API Smoke Alternative
 
