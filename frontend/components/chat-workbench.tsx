@@ -641,6 +641,7 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
     setChatMessages(nextMessages);
     syncActiveChatSession(nextMessages);
     void updateMemory;
+    return nextMessage;
   }
 
   async function handleGuidedOnboardingAnswer(message: string) {
@@ -789,6 +790,12 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
   const handleConversationMessage = async (message: string) => {
     setSubmittedPrompt(message);
     setPrompt("");
+    const optimisticUserMessage = appendChatMessage(
+      "user",
+      message,
+      { phase: "conversation_turn", uiAction: "conversation.local_user" },
+      false,
+    );
     setIsCoachThinking(true);
     setConversationState((current) => ({
       activeConversationId: current.activeConversationId ?? chatSessionIdRef.current,
@@ -813,7 +820,7 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
         phase: "idle",
       });
       attachBackendSessionIdToActiveSession(turn.conversationId);
-      appendConversationTurn(turn);
+      appendConversationTurn(turn, optimisticUserMessage.id);
 
       if (turn.activity?.exercises.length && turn.activity.plan) {
         setIsCoachThinking(false);
@@ -853,12 +860,6 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
         phase: "error",
       }));
       appendChatMessage(
-        "user",
-        message,
-        { phase: "conversation_failed", uiAction: "conversation.local_user" },
-        false,
-      );
-      appendChatMessage(
         "bot",
         "Mình chưa gửi được tin nhắn tới backend. Bạn kiểm tra server rồi gửi lại nhé.",
         { phase: "conversation_failed", uiAction: "conversation.error" },
@@ -871,7 +872,10 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
     }
   };
 
-  const appendConversationTurn = (turn: ConversationTurn) => {
+  const appendConversationTurn = (
+    turn: ConversationTurn,
+    optimisticUserMessageId?: string,
+  ) => {
     const userMessage = mapPersistedChatMessage(turn.message);
     const persistedAssistantMessage = turn.assistantMessage
       ? mapPersistedChatMessage(turn.assistantMessage)
@@ -886,11 +890,19 @@ export function ChatWorkbench({ snapshot }: ChatWorkbenchProps) {
           activity: turn.activity ?? null,
           uiAction: turn.uiAction,
         });
-    const nextMessages = [
-      ...chatMessagesRef.current,
-      userMessage,
-      assistantMessage,
-    ];
+    const currentMessages = chatMessagesRef.current;
+    const optimisticUserMessageIndex = optimisticUserMessageId
+      ? currentMessages.findIndex(
+          (message) => message.id === optimisticUserMessageId,
+        )
+      : -1;
+    const messagesWithPersistedUser =
+      optimisticUserMessageIndex >= 0
+        ? currentMessages.map((message, index) =>
+            index === optimisticUserMessageIndex ? userMessage : message,
+          )
+        : [...currentMessages, userMessage];
+    const nextMessages = [...messagesWithPersistedUser, assistantMessage];
     activateChatSession(nextMessages, {
       backendSessionId: turn.conversationId,
       localSessionId: activeLocalSessionIdRef.current ?? turn.conversationId,
