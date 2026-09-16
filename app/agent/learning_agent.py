@@ -53,6 +53,7 @@ class LearningAgent:
         recommendation: RecommendationService,
         review: PracticeReviewService,
         diagnosis: ErrorDiagnosisService,
+        activity_service: Any | None = None,
         max_generation_attempts: int = 2,
     ) -> None:
         self.config = config
@@ -65,6 +66,7 @@ class LearningAgent:
         self.recommendation = recommendation
         self.review = review
         self.diagnosis = diagnosis
+        self.activity_service = activity_service
         self.max_generation_attempts = max_generation_attempts
         self.text_normalizer = BilingualTextNormalizer()
         self.tracer = get_tracer(__name__)
@@ -283,13 +285,33 @@ class LearningAgent:
         if generated is None:
             raise LookupError(f"Generation run not found: {generation_run_id}")
         if generated.activity_id:
+            activity = self._run_tool(
+                trace,
+                "load_learning_activity",
+                lambda: self.repository.get_learning_activity(
+                    user_id,
+                    generated.activity_id or "",
+                ),
+                "Loaded the learning activity before submission state changes.",
+                {"activity_id": generated.activity_id},
+            )
+            if activity is not None and activity.status == LearningActivityStatus.READY:
+                self._run_tool(
+                    trace,
+                    "mark_activity_in_progress",
+                    lambda: self._start_activity(
+                        user_id,
+                        generated.activity_id or "",
+                    ),
+                    "Marked the learning activity as in progress before submission.",
+                    {"activity_id": generated.activity_id},
+                )
             self._run_tool(
                 trace,
                 "mark_activity_submitted",
-                lambda: self.repository.update_learning_activity_status(
+                lambda: self._submit_activity(
                     user_id,
                     generated.activity_id or "",
-                    status=LearningActivityStatus.SUBMITTED,
                 ),
                 "Marked the learning activity as submitted before grading.",
                 {"activity_id": generated.activity_id},
@@ -359,10 +381,9 @@ class LearningAgent:
             self._run_tool(
                 trace,
                 "mark_activity_graded",
-                lambda: self.repository.update_learning_activity_status(
+                lambda: self._grade_activity(
                     user_id,
                     generated.activity_id or "",
-                    status=LearningActivityStatus.GRADED,
                 ),
                 "Marked the learning activity as graded before final persistence.",
                 {"activity_id": generated.activity_id},
@@ -411,6 +432,42 @@ class LearningAgent:
         result.practice_review = practice_review
 
         return result
+
+    def _start_activity(self, user_id: str, activity_id: str) -> Any:
+        if self.activity_service is not None:
+            return self.activity_service.start_activity(
+                user_id=user_id,
+                activity_id=activity_id,
+            )
+        return self.repository.update_learning_activity_status(
+            user_id,
+            activity_id,
+            status=LearningActivityStatus.IN_PROGRESS,
+        )
+
+    def _submit_activity(self, user_id: str, activity_id: str) -> Any:
+        if self.activity_service is not None:
+            return self.activity_service.submit_activity(
+                user_id=user_id,
+                activity_id=activity_id,
+            )
+        return self.repository.update_learning_activity_status(
+            user_id,
+            activity_id,
+            status=LearningActivityStatus.SUBMITTED,
+        )
+
+    def _grade_activity(self, user_id: str, activity_id: str) -> Any:
+        if self.activity_service is not None:
+            return self.activity_service.grade_activity(
+                user_id=user_id,
+                activity_id=activity_id,
+            )
+        return self.repository.update_learning_activity_status(
+            user_id,
+            activity_id,
+            status=LearningActivityStatus.GRADED,
+        )
 
     def _run_tool(
         self,

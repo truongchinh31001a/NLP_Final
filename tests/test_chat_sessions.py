@@ -86,6 +86,7 @@ class ChatSessionRepositoryTests(unittest.TestCase):
             pending_intent=ConversationIntent.PRACTICE,
             missing_fields=["topic"],
             collected_slots={"num_questions": 5},
+            active_activity_id="activity_pending",
             question="Ban muon luyen chu de nao?",
         )
 
@@ -97,9 +98,14 @@ class ChatSessionRepositoryTests(unittest.TestCase):
         self.assertIsNotNone(stored)
         self.assertEqual(stored.pending_intent, ConversationIntent.PRACTICE)
         self.assertEqual(stored.collected_slots["num_questions"], 5)
+        self.assertEqual(stored.active_activity_id, "activity_pending")
         self.assertEqual(
             resumed["pending_clarification"]["pending_intent"],
             "PRACTICE",
+        )
+        self.assertEqual(
+            resumed["pending_clarification"]["active_activity_id"],
+            "activity_pending",
         )
         self.assertIsNone(repository.get_pending_clarification("learner", session_id))
 
@@ -114,6 +120,7 @@ class ChatSessionRepositoryTests(unittest.TestCase):
                 pending_intent=ConversationIntent.REVIEW,
                 missing_fields=["activity_id"],
                 collected_slots={"question_number": 2},
+                active_activity_id="activity_sqlite",
                 question="Ban muon xem lai activity nao?",
             )
 
@@ -125,9 +132,14 @@ class ChatSessionRepositoryTests(unittest.TestCase):
             self.assertIsNotNone(stored)
             self.assertEqual(stored.pending_intent, ConversationIntent.REVIEW)
             self.assertEqual(stored.collected_slots["question_number"], 2)
+            self.assertEqual(stored.active_activity_id, "activity_sqlite")
             self.assertEqual(
                 resumed["pending_clarification"]["pending_intent"],
                 "REVIEW",
+            )
+            self.assertEqual(
+                resumed["pending_clarification"]["active_activity_id"],
+                "activity_sqlite",
             )
             self.assertIsNone(repository.get_pending_clarification("learner", session_id))
 

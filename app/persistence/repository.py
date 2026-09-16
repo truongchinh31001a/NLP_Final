@@ -7,6 +7,7 @@ from app.learner.knowledge_tracing import BayesianKnowledgeTracer
 from app.learner.skill_graph import DEFAULT_SKILL_GRAPH
 from app.schemas import (
     AnswerDiagnosis,
+    ActivityStateEvent,
     ConversationIntent,
     GeneratedExerciseSet,
     LearnerProfile,
@@ -15,6 +16,7 @@ from app.schemas import (
     PendingClarification,
     PracticeReview,
     SessionResult,
+    validate_learning_activity_transition,
 )
 
 
@@ -73,6 +75,21 @@ class LearningRepository(Protocol):
         conversation_id: str,
         statuses: list[LearningActivityStatus] | None = None,
     ) -> LearningActivity | None:
+        ...
+
+    def list_user_activities(
+        self,
+        user_id: str,
+        statuses: list[LearningActivityStatus] | None = None,
+        limit: int = 50,
+    ) -> list[LearningActivity]:
+        ...
+
+    def list_activity_state_events(
+        self,
+        user_id: str,
+        activity_id: str,
+    ) -> list[ActivityStateEvent]:
         ...
 
     def get_pending_clarification(
@@ -222,6 +239,8 @@ class InMemoryLearningRepository:
         status: LearningActivityStatus,
     ) -> LearningActivity:
         activity = self._require_learning_activity(user_id, activity_id)
+        previous_status = activity.status
+        validate_learning_activity_transition(previous_status, status)
         now = self._now()
         activity.status = status
         activity.updated_at = now
@@ -232,7 +251,11 @@ class InMemoryLearningRepository:
         if self._is_terminal_activity_status(status) and activity.completed_at is None:
             activity.completed_at = now
         self._sync_active_activity(activity)
-        self._record_activity_event(activity, "STATUS_CHANGED")
+        self._record_activity_event(
+            activity,
+            "STATUS_CHANGED",
+            from_status=previous_status,
+        )
         return activity
 
     def update_learning_activity_metadata(
@@ -281,6 +304,11 @@ class InMemoryLearningRepository:
         session_code: str,
     ) -> LearningActivity:
         activity = self._require_learning_activity(user_id, activity_id)
+        previous_status = activity.status
+        validate_learning_activity_transition(
+            previous_status,
+            LearningActivityStatus.COMPLETED,
+        )
         session_result = next(
             (
                 result
@@ -303,6 +331,7 @@ class InMemoryLearningRepository:
             activity,
             "SESSION_RESULT_ATTACHED",
             {"session_code": session_code},
+            from_status=previous_status,
         )
         return activity
 
@@ -326,6 +355,37 @@ class InMemoryLearningRepository:
             reverse=True,
         )
         return activities[0] if activities else None
+
+    def list_user_activities(
+        self,
+        user_id: str,
+        statuses: list[LearningActivityStatus] | None = None,
+        limit: int = 50,
+    ) -> list[LearningActivity]:
+        status_values = {status.value for status in statuses or []}
+        activities = [
+            activity
+            for activity in self.learning_activities.values()
+            if activity.learner_id == user_id
+            and (not status_values or activity.status.value in status_values)
+        ]
+        activities.sort(
+            key=lambda activity: activity.updated_at or activity.created_at or "",
+            reverse=True,
+        )
+        return activities[: max(limit, 0)]
+
+    def list_activity_state_events(
+        self,
+        user_id: str,
+        activity_id: str,
+    ) -> list[ActivityStateEvent]:
+        if self.get_learning_activity(user_id, activity_id) is None:
+            return []
+        return [
+            self._activity_state_event_from_payload(event)
+            for event in self.activity_events.get(activity_id, [])
+        ]
 
     def get_pending_clarification(
         self,
@@ -690,14 +750,40 @@ class InMemoryLearningRepository:
         activity: LearningActivity,
         event_type: str,
         metadata: dict[str, Any] | None = None,
+        from_status: LearningActivityStatus | None = None,
+        reason: str | None = None,
     ) -> None:
         self.activity_events.setdefault(activity.activity_id, []).append(
             {
+                "event_id": f"evt_{uuid.uuid4().hex}",
+                "activity_id": activity.activity_id,
                 "event_type": event_type,
+                "from_status": from_status.value if from_status is not None else None,
+                "to_status": activity.status.value,
+                "reason": reason,
                 "status": activity.status.value,
                 "created_at": self._now(),
                 "metadata": metadata or {},
             }
+        )
+
+    def _activity_state_event_from_payload(
+        self,
+        payload: dict[str, Any],
+    ) -> ActivityStateEvent:
+        from_status = payload.get("from_status")
+        to_status = payload.get("to_status") or payload.get("status")
+        return ActivityStateEvent(
+            event_id=str(payload.get("event_id") or ""),
+            activity_id=str(payload.get("activity_id") or ""),
+            event_type=str(payload.get("event_type") or ""),
+            from_status=(
+                LearningActivityStatus(str(from_status)) if from_status else None
+            ),
+            to_status=LearningActivityStatus(str(to_status)),
+            reason=payload.get("reason"),
+            metadata=dict(payload.get("metadata") or {}),
+            created_at=payload.get("created_at"),
         )
 
     def _clarification_payload(
@@ -710,6 +796,7 @@ class InMemoryLearningRepository:
             "pending_intent": clarification.pending_intent.value,
             "missing_fields": list(clarification.missing_fields),
             "collected_slots": dict(clarification.collected_slots),
+            "active_activity_id": clarification.active_activity_id,
             "question": clarification.question,
         }
 
@@ -725,6 +812,7 @@ class InMemoryLearningRepository:
             return None
         missing_fields = payload.get("missing_fields")
         collected_slots = payload.get("collected_slots")
+        active_activity_id = payload.get("active_activity_id")
         return PendingClarification(
             pending_intent=pending_intent,
             missing_fields=[
@@ -733,6 +821,11 @@ class InMemoryLearningRepository:
             ],
             collected_slots=(
                 dict(collected_slots) if isinstance(collected_slots, dict) else {}
+            ),
+            active_activity_id=(
+                str(active_activity_id)
+                if active_activity_id not in (None, "")
+                else None
             ),
             question=str(payload.get("question") or ""),
         )

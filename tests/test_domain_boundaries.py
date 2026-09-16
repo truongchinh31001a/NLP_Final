@@ -50,8 +50,10 @@ class DomainBoundaryModelTests(unittest.TestCase):
         self.assertEqual(payload["pending_intent"], "PRACTICE")
         self.assertEqual(payload["missing_fields"], ["num_questions"])
         self.assertEqual(payload["collected_slots"]["topic"], "passive_voice")
+        self.assertIsNone(payload["active_activity_id"])
         self.assertEqual(other.missing_fields, [])
         self.assertEqual(other.collected_slots, {})
+        self.assertIsNone(other.active_activity_id)
 
     def test_learning_activity_defaults_are_serializable_and_isolated(self) -> None:
         activity = LearningActivity(
@@ -164,6 +166,7 @@ class DomainBoundaryModelTests(unittest.TestCase):
             payload["pending_clarification"]["pending_intent"],
             "PRACTICE",
         )
+        self.assertIsNone(payload["pending_clarification"]["active_activity_id"])
 
 
 if __name__ == "__main__":

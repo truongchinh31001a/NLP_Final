@@ -1,0 +1,82 @@
+{
+  "csv_annotation_fields": [
+    "text",
+    "original",
+    "corrected",
+    "POS"
+  ],
+  "csv_header": [
+    "",
+    "writingID",
+    "level",
+    "unit",
+    "learnerID",
+    "nationality",
+    "topicID",
+    "topic",
+    "grade",
+    "text",
+    "lvno",
+    "prof",
+    "original",
+    "corrected",
+    "POS"
+  ],
+  "xml_attribute_keys": {
+    "br": [],
+    "change": [],
+    "correct": [],
+    "date": [],
+    "grade": [],
+    "key": [],
+    "learner": [
+      "id",
+      "nationality"
+    ],
+    "meta": [],
+    "nationalities": [],
+    "selection": [
+      "id"
+    ],
+    "symbol": [],
+    "tag": [],
+    "text": [],
+    "title": [],
+    "topic": [
+      "id"
+    ],
+    "units": [],
+    "url": [],
+    "user": [],
+    "version": [],
+    "writing": [
+      "id",
+      "level",
+      "unit"
+    ],
+    "writings": []
+  },
+  "xml_tags": [
+    "selection",
+    "meta",
+    "title",
+    "version",
+    "url",
+    "key",
+    "user",
+    "date",
+    "nationalities",
+    "units",
+    "writings",
+    "writing",
+    "learner",
+    "topic",
+    "grade",
+    "text",
+    "change",
+    "tag",
+    "symbol",
+    "correct",
+    "br"
+  ]
+}

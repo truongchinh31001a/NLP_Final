@@ -3,11 +3,44 @@ import unittest
 from app.activities.practice_service import PracticeActivityService
 from app.config import AppConfig
 from app.persistence.repository import InMemoryLearningRepository
-from app.schemas import LearningActivityStatus, SubmittedAnswer
+from app.schemas import (
+    ExerciseItem,
+    ExerciseOption,
+    GeneratedExerciseSet,
+    LearningActivityStatus,
+    PracticePlan,
+    PracticeRequest,
+    SubmittedAnswer,
+)
 from practice_fixtures import build_offline_practice_pipeline
 
 
 class PracticeActivityServiceTests(unittest.TestCase):
+    def test_activity_exists_before_generation_runs(self) -> None:
+        repository = InMemoryLearningRepository()
+        conversation = repository.create_chat_session("learner")
+        agent = InspectingGenerationAgent(repository)
+        service = PracticeActivityService(
+            AppConfig(llm_backend="none"),
+            repository,
+            agent,
+        )
+
+        created = service.create_practice_activity(
+            user_id="learner",
+            raw_text="Cho toi 1 cau passive voice.",
+            conversation_id=str(conversation["session_id"]),
+        )
+
+        self.assertEqual(agent.seen_activity_id, created.activity.activity_id)
+        self.assertEqual(agent.seen_activity_status, LearningActivityStatus.GENERATING)
+        self.assertEqual(created.activity.status, LearningActivityStatus.READY)
+        self.assertEqual(created.generated.activity_id, created.activity.activity_id)
+        self.assertEqual(
+            created.activity.generation_run_id,
+            created.generated.generation_run_id,
+        )
+
     def test_create_and_submit_practice_activity_lifecycle(self) -> None:
         pipeline = build_offline_practice_pipeline()
         conversation = pipeline.create_conversation("learner")
@@ -104,6 +137,63 @@ class FailingAgent:
     def create_exercise_set(self, **kwargs):
         _ = kwargs
         raise RuntimeError("generation failed")
+
+
+class InspectingGenerationAgent:
+    def __init__(self, repository: InMemoryLearningRepository) -> None:
+        self.repository = repository
+        self.seen_activity_id: str | None = None
+        self.seen_activity_status: LearningActivityStatus | None = None
+
+    def create_exercise_set(self, **kwargs):
+        user_id = kwargs["user_id"]
+        activity_id = kwargs["activity_id"]
+        activity = self.repository.get_learning_activity(user_id, activity_id)
+        self.seen_activity_id = activity_id
+        self.seen_activity_status = activity.status if activity is not None else None
+
+        generated = GeneratedExerciseSet(
+            request=PracticeRequest(
+                user_id=user_id,
+                raw_text=kwargs["raw_text"],
+                topic="grammar",
+                difficulty="easy",
+                exercise_type="multiple_choice",
+                num_questions=1,
+            ),
+            plan=PracticePlan(
+                user_id=user_id,
+                topic="grammar",
+                difficulty="easy",
+                exercise_type="multiple_choice",
+                num_questions=1,
+                focus_reason="unit test",
+            ),
+            retrieved_chunks=[],
+            exercises=[
+                ExerciseItem(
+                    exercise_id="q1",
+                    exercise_type="multiple_choice",
+                    topic="grammar",
+                    difficulty="easy",
+                    skill="grammar",
+                    subtopic="passive_voice",
+                    error_tag="word_order",
+                    question_text="Choose the passive sentence.",
+                    options=[
+                        ExerciseOption("A", "The cake is made by Minh.", True),
+                        ExerciseOption("B", "Minh makes the cake."),
+                        ExerciseOption("C", "Minh is cake made."),
+                        ExerciseOption("D", "The cake Minh made."),
+                    ],
+                    correct_answer="A",
+                    explanation="'Is made' is passive voice.",
+                )
+            ],
+            activity_id=activity_id,
+        )
+        self.repository.save_generated_exercise_set(generated, "test-inspecting-agent")
+        return generated
 
 
 if __name__ == "__main__":

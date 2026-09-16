@@ -1,0 +1,35 @@
+{
+  "json_keys": [
+    "age",
+    "combined-score",
+    "edits",
+    "id",
+    "l1",
+    "new-scores",
+    "q",
+    "score",
+    "score-old-scale",
+    "session",
+    "text"
+  ],
+  "question_files": [
+    "data/raw/_fce-released-dataset-1.1/questions(oeistein.andersen@cambridge.org).json",
+    "data/raw/_fce-released-dataset-1.1/questions(oeistein.andersen@cambridge.org).xml"
+  ],
+  "xml_tags": [
+    "answer",
+    "c",
+    "dev",
+    "e",
+    "eval",
+    "i",
+    "learner",
+    "outliers",
+    "results",
+    "script",
+    "test",
+    "text",
+    "train",
+    "unknown"
+  ]
+}

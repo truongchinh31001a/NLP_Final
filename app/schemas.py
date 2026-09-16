@@ -36,6 +36,58 @@ class LearningActivityStatus(str, Enum):
     CANCELLED = "CANCELLED"
 
 
+VALID_LEARNING_ACTIVITY_TRANSITIONS: dict[
+    LearningActivityStatus,
+    set[LearningActivityStatus],
+] = {
+    LearningActivityStatus.CREATED: {
+        LearningActivityStatus.GENERATING,
+        LearningActivityStatus.FAILED,
+        LearningActivityStatus.CANCELLED,
+    },
+    LearningActivityStatus.GENERATING: {
+        LearningActivityStatus.READY,
+        LearningActivityStatus.FAILED,
+        LearningActivityStatus.CANCELLED,
+    },
+    LearningActivityStatus.READY: {
+        LearningActivityStatus.IN_PROGRESS,
+        LearningActivityStatus.FAILED,
+        LearningActivityStatus.CANCELLED,
+    },
+    LearningActivityStatus.IN_PROGRESS: {
+        LearningActivityStatus.SUBMITTED,
+        LearningActivityStatus.FAILED,
+        LearningActivityStatus.CANCELLED,
+    },
+    LearningActivityStatus.SUBMITTED: {
+        LearningActivityStatus.GRADED,
+        LearningActivityStatus.FAILED,
+    },
+    LearningActivityStatus.GRADED: {
+        LearningActivityStatus.COMPLETED,
+        LearningActivityStatus.FAILED,
+    },
+    LearningActivityStatus.COMPLETED: set(),
+    LearningActivityStatus.FAILED: set(),
+    LearningActivityStatus.CANCELLED: set(),
+}
+
+
+def validate_learning_activity_transition(
+    current: LearningActivityStatus,
+    target: LearningActivityStatus,
+) -> None:
+    if current == target:
+        return
+    allowed = VALID_LEARNING_ACTIVITY_TRANSITIONS.get(current, set())
+    if target not in allowed:
+        raise ValueError(
+            "Invalid learning activity transition: "
+            f"{current.value} -> {target.value}"
+        )
+
+
 @dataclass(slots=True)
 class PracticeRequest:
     user_id: str
@@ -89,6 +141,7 @@ class PendingClarification:
     pending_intent: ConversationIntent
     missing_fields: list[str] = field(default_factory=list)
     collected_slots: dict[str, Any] = field(default_factory=dict)
+    active_activity_id: str | None = None
     question: str = ""
 
 
@@ -98,9 +151,11 @@ class LearningActivity:
     conversation_id: str
     learner_id: str
     type: LearningActivityType
+    parent_activity_id: str | None = None
     status: LearningActivityStatus = LearningActivityStatus.CREATED
     target_skills: list[str] = field(default_factory=list)
     difficulty: str | None = None
+    config: dict[str, Any] = field(default_factory=dict)
     created_at: str | None = None
     started_at: str | None = None
     submitted_at: str | None = None
@@ -109,6 +164,18 @@ class LearningActivity:
     generation_run_id: str | None = None
     session_code: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class ActivityStateEvent:
+    event_id: str
+    activity_id: str
+    event_type: str
+    from_status: LearningActivityStatus | None
+    to_status: LearningActivityStatus
+    reason: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+    created_at: str | None = None
 
 
 @dataclass(slots=True)

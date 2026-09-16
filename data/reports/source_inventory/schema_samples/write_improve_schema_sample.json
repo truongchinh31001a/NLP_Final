@@ -1,0 +1,36 @@
+{
+  "corpus_tsv_header": [
+    "public_essay_id",
+    "created_epoch",
+    "created_timestamp",
+    "public_prompt_id",
+    "public_user_id",
+    "user_prompt",
+    "essay_version_num",
+    "is_first_version",
+    "is_final_version",
+    "language",
+    "text",
+    "wi_suspecttokens",
+    "automarker_cefr_level",
+    "humannotator_cefr_level",
+    "split"
+  ],
+  "m2_shape": {
+    "annotation_prefix": "A",
+    "sentence_prefix": "S",
+    "separator": "|||"
+  },
+  "prompts_tsv_header": [
+    "question_id",
+    "public_prompt_id",
+    "n.essay.sets",
+    "n.essays",
+    "topic",
+    "genre",
+    "min_words",
+    "max_words",
+    "prompt_level",
+    "prompt"
+  ]
+}

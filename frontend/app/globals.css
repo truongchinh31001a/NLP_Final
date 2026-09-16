@@ -1,20 +1,89 @@
+@import "tailwindcss";
+
 :root {
-  --bg: #f6f8fb;
-  --panel: #ffffff;
+  --color-bg-page: #f6f8fb;
+  --color-bg-surface: #ffffff;
+  --color-bg-sidebar: #0f172a;
+  --color-bg-nav-active: #e8efff;
+  --color-action-primary-fill: #2454a6;
+  --color-action-primary-soft: #e8efff;
+  --color-action-primary-dark: #162f63;
+  --color-action-primary-mid: #4d72bd;
+  --color-status-success: #147447;
+  --color-status-success-soft: #e7f6ee;
+  --color-status-warning-soft: #fff7e6;
+  --color-status-error-soft: #fff0ed;
+  --color-status-info-soft: #eef4ff;
+  --color-text-strong: #162033;
+  --color-text-muted: #667085;
+  --color-border-subtle: #d9e0ea;
+  --space-2xs: 4px;
+  --space-xs: 8px;
+  --space-compact: 10px;
+  --space-sm: 12px;
+  --space-card-inner: 14px;
+  --space-md: 16px;
+  --space-lg: 18px;
+  --space-section: 22px;
+  --space-xl: 24px;
+  --space-2xl: 32px;
+  --space-page: 34px;
+  --radius-control: 8px;
+  --radius-compact: 10px;
+  --radius-card: 12px;
+  --radius-hero: 20px;
+  --radius-pill: 999px;
+  --bg: var(--color-bg-page);
+  --panel: var(--color-bg-surface);
   --panel-soft: #f1f5f9;
-  --ink: #162033;
-  --muted: #667085;
-  --line: #d9e0ea;
-  --primary: #2454a6;
-  --primary-soft: #e8efff;
+  --ink: var(--color-text-strong);
+  --muted: var(--color-text-muted);
+  --line: var(--color-border-subtle);
+  --primary: var(--color-action-primary-fill);
+  --primary-soft: var(--color-action-primary-soft);
   --accent: #0f766e;
   --accent-soft: #e6f5f2;
-  --success: #147447;
-  --success-soft: #e7f6ee;
+  --success: var(--color-status-success);
+  --success-soft: var(--color-status-success-soft);
   --danger: #b42318;
-  --danger-soft: #fff0ed;
+  --danger-soft: var(--color-status-error-soft);
   --warning: #9a5b13;
   --shadow: 0 20px 52px rgba(30, 41, 59, 0.1);
+}
+
+@theme inline {
+  --color-ae-page: var(--color-bg-page);
+  --color-ae-surface: var(--color-bg-surface);
+  --color-ae-sidebar: var(--color-bg-sidebar);
+  --color-ae-nav-active: var(--color-bg-nav-active);
+  --color-ae-primary: var(--color-action-primary-fill);
+  --color-ae-primary-soft: var(--color-action-primary-soft);
+  --color-ae-primary-dark: var(--color-action-primary-dark);
+  --color-ae-primary-mid: var(--color-action-primary-mid);
+  --color-ae-success: var(--color-status-success);
+  --color-ae-success-soft: var(--color-status-success-soft);
+  --color-ae-warning-soft: var(--color-status-warning-soft);
+  --color-ae-error-soft: var(--color-status-error-soft);
+  --color-ae-info-soft: var(--color-status-info-soft);
+  --color-ae-ink: var(--color-text-strong);
+  --color-ae-muted: var(--color-text-muted);
+  --color-ae-line: var(--color-border-subtle);
+  --spacing-ae-2xs: var(--space-2xs);
+  --spacing-ae-xs: var(--space-xs);
+  --spacing-ae-compact: var(--space-compact);
+  --spacing-ae-sm: var(--space-sm);
+  --spacing-ae-card: var(--space-card-inner);
+  --spacing-ae-md: var(--space-md);
+  --spacing-ae-lg: var(--space-lg);
+  --spacing-ae-section: var(--space-section);
+  --spacing-ae-xl: var(--space-xl);
+  --spacing-ae-2xl: var(--space-2xl);
+  --spacing-ae-page: var(--space-page);
+  --radius-ae-control: var(--radius-control);
+  --radius-ae-compact: var(--radius-compact);
+  --radius-ae-card: var(--radius-card);
+  --radius-ae-hero: var(--radius-hero);
+  --radius-ae-pill: var(--radius-pill);
 }
 
 * {
@@ -30,7 +99,7 @@ body {
   min-height: 100vh;
   background: var(--bg);
   color: var(--ink);
-  font-family: var(--font-body), sans-serif;
+  font-family: var(--font-sans), sans-serif;
 }
 
 button,
@@ -50,10 +119,12 @@ p {
 }
 
 .flow-shell {
-  width: min(1040px, calc(100% - 28px));
-  min-height: 100vh;
-  margin: 0 auto;
-  padding: 24px 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: calc(100vh - 48px);
+  margin: 0;
+  padding: 0;
 }
 
 .flow-topbar {
@@ -79,16 +150,35 @@ p {
 
 h1 {
   margin-bottom: 0;
-  font-family: var(--font-heading), sans-serif;
+  font-family: var(--font-sans), sans-serif;
   font-size: 1.8rem;
   letter-spacing: 0;
 }
 
 h2 {
   margin-bottom: 8px;
-  font-family: var(--font-heading), sans-serif;
+  font-family: var(--font-sans), sans-serif;
   font-size: 1.35rem;
   letter-spacing: 0;
+}
+
+.lingoflow-onboarding-steps .ant-steps-item-title {
+  color: rgba(255, 255, 255, 0.92) !important;
+}
+
+.lingoflow-onboarding-steps .ant-steps-item-description,
+.lingoflow-onboarding-steps .ant-steps-item-subtitle {
+  color: rgba(255, 255, 255, 0.62) !important;
+}
+
+.lingoflow-onboarding-steps .ant-steps-item-icon {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.28) !important;
+}
+
+.lingoflow-onboarding-steps .ant-steps-item-process .ant-steps-icon,
+.lingoflow-onboarding-steps .ant-steps-item-finish .ant-steps-icon {
+  color: #ffffff !important;
 }
 
 .muted {
@@ -171,9 +261,11 @@ h2 {
 
 .chat-workspace {
   display: grid;
-  grid-template-columns: minmax(230px, 280px) minmax(0, 1fr);
+  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
   gap: 16px;
   align-items: stretch;
+  flex: 1;
+  min-height: 0;
 }
 
 .chat-screen,
@@ -189,8 +281,8 @@ h2 {
 .chat-screen {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  height: calc(100vh - 130px);
-  min-height: 560px;
+  height: calc(100vh - 138px);
+  min-height: 0;
   min-width: 0;
   overflow: hidden;
 }
@@ -199,8 +291,8 @@ h2 {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
   gap: 12px;
-  height: calc(100vh - 130px);
-  min-height: 560px;
+  height: calc(100vh - 138px);
+  min-height: 0;
   min-width: 0;
   padding: 14px;
   border: 1px solid var(--line);
@@ -659,7 +751,8 @@ h2 {
 .generation-screen {
   display: grid;
   place-items: center;
-  min-height: calc(100vh - 130px);
+  flex: 1;
+  min-height: calc(100vh - 138px);
   padding: 24px;
 }
 
@@ -710,7 +803,7 @@ h2 {
 
 .generation-steps--antd .ant-steps-item-title {
   color: var(--ink) !important;
-  font-family: var(--font-heading), sans-serif;
+  font-family: var(--font-sans), sans-serif;
   font-weight: 800;
 }
 
@@ -738,6 +831,8 @@ h2 {
 .result-screen {
   display: grid;
   gap: 16px;
+  flex: 1;
+  min-height: calc(100vh - 138px);
   padding: 18px;
 }
 
@@ -1209,8 +1304,8 @@ h2 {
 
 @media (max-width: 760px) {
   .flow-shell {
-    width: min(100% - 20px, 1040px);
-    padding: 14px 0;
+    min-height: calc(100vh - 88px);
+    padding: 0;
   }
 
   .flow-topbar,
@@ -1225,7 +1320,7 @@ h2 {
   }
 
   .chat-screen {
-    height: calc(100vh - 112px);
+    height: calc(100vh - 186px);
     min-height: 520px;
   }
 

@@ -1,0 +1,118 @@
+{
+  "generated_at": "2026-09-16T10:51:53.122316+00:00",
+  "source_level_details": {
+    "cefr_companion_volume_2020": [
+      "A1",
+      "A2",
+      "B1",
+      "B2",
+      "C1",
+      "C2",
+      "Pre-A1"
+    ],
+    "clc_fce": null,
+    "efcamdat": {
+      "1": 9370,
+      "10": 1964,
+      "11": 782,
+      "12": 501,
+      "13": 485,
+      "14": 185,
+      "15": 93,
+      "2": 6097,
+      "3": 4996,
+      "4": 8874,
+      "5": 5154,
+      "6": 3350,
+      "7": 4411,
+      "8": 2073,
+      "9": 1665
+    },
+    "english_grammar_profile": [
+      "A1",
+      "A2",
+      "B1",
+      "B2",
+      "C1",
+      "C2"
+    ],
+    "write_improve": {
+      "automarker_cefr_level": {
+        "A1": 20,
+        "A1+": 251,
+        "A2": 1560,
+        "A2+": 3191,
+        "B1": 3611,
+        "B1+": 3502,
+        "B2": 3414,
+        "B2+": 3018,
+        "C1": 2052,
+        "C1+": 1304,
+        "C2": 738,
+        "C2+": 554,
+        "pre-A1": 1
+      },
+      "humannotator_cefr_level": {
+        "A1": 1,
+        "A1+": 11,
+        "A2": 202,
+        "A2+": 846,
+        "B1": 959,
+        "B1+": 1073,
+        "B2": 919,
+        "B2+": 529,
+        "C1": 370,
+        "C1+": 102,
+        "C2": 38,
+        "NA": 18166
+      }
+    }
+  },
+  "sources": {
+    "cefr_companion_volume_2020": {
+      "explicit_cefr": true,
+      "granularity": "descriptor-level",
+      "inferred_cefr": false,
+      "level_mapping_available": "native CEFR descriptors",
+      "proprietary_level_system": false,
+      "reliability_caveats": "Only configured V1 scales are extracted.",
+      "score_grade_only": false
+    },
+    "clc_fce": {
+      "explicit_cefr": true,
+      "granularity": "dataset/exam-level plus answer/script scores",
+      "inferred_cefr": false,
+      "level_mapping_available": "FCE exam is documented as B2; answer/script scores also present",
+      "proprietary_level_system": false,
+      "reliability_caveats": "Individual score does not imply a per-script CEFR conversion here.",
+      "score_grade_only": true
+    },
+    "efcamdat": {
+      "explicit_cefr": false,
+      "granularity": "writing/course-unit metadata",
+      "inferred_cefr": false,
+      "level_mapping_available": "not established in this milestone",
+      "proprietary_level_system": true,
+      "reliability_caveats": "Course levels are not forced into CEFR.",
+      "score_grade_only": false
+    },
+    "english_grammar_profile": {
+      "explicit_cefr": true,
+      "granularity": "record-level",
+      "inferred_cefr": false,
+      "level_mapping_available": "native CEFR labels in processed records",
+      "proprietary_level_system": false,
+      "reliability_caveats": "EGP search/export category quirks are unrelated to CEFR labels.",
+      "score_grade_only": false
+    },
+    "write_improve": {
+      "explicit_cefr": true,
+      "granularity": "essay version row",
+      "inferred_cefr": false,
+      "level_mapping_available": "automarker and human annotator CEFR fields present",
+      "proprietary_level_system": false,
+      "reliability_caveats": "Automarker and human labels are distinct fields and may disagree.",
+      "score_grade_only": false
+    }
+  }
+}

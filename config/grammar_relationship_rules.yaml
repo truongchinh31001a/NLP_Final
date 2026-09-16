@@ -1,0 +1,193 @@
+inputs:
+  skill_evidence_profiles: "data/interim/knowledge_alignment/grammar_skill_evidence.jsonl"
+  cefr_egp_alignment: "data/interim/knowledge_alignment/cefr_egp_alignment.jsonl"
+
+outputs:
+  relationships_dir: "data/curated/relationships"
+  review_dir: "data/curated/review"
+  reports_dir: "data/reports/relationships"
+
+metadata:
+  created_by: deterministic_relationship_rules_v1
+  version: "relationships_v1"
+
+defaults:
+  structural_confidence: 1.0
+  prerequisite_confidence: 0.95
+  recommended_confidence: 0.88
+  supports_confidence: 0.8
+  semantic_confidence: 0.78
+  non_structural_status: candidate
+  non_structural_review_status: pending
+
+curated_relationships:
+  - source: grammar.present_simple.affirmative
+    target: grammar.present_simple.negative
+    relation_type: prerequisite_of
+    reason: Present simple affirmative form is normally controlled before present simple negation.
+  - source: grammar.present_simple.affirmative
+    target: grammar.present_simple.questions
+    relation_type: prerequisite_of
+    reason: Present simple question formation builds on control of the affirmative base form.
+  - source: grammar.present_simple.affirmative
+    target: grammar.present_simple.third_person_s
+    relation_type: prerequisite_of
+    reason: Third-person -s is a form refinement on the present simple affirmative pattern.
+
+  - source: grammar.present_continuous.form
+    target: grammar.present_continuous.current_action
+    relation_type: prerequisite_of
+    reason: Present continuous meaning for current action requires control of the be + -ing form.
+  - source: grammar.present_continuous.form
+    target: grammar.present_continuous.temporary_situation
+    relation_type: prerequisite_of
+    reason: Temporary-situation use requires control of the present continuous form.
+
+  - source: grammar.past_simple.regular_verbs
+    target: grammar.past_simple.finished_past
+    relation_type: supports
+    reason: Regular past forms support communication about finished past events.
+  - source: grammar.past_simple.irregular_verbs
+    target: grammar.past_simple.finished_past
+    relation_type: supports
+    reason: Irregular past forms support communication about finished past events.
+  - source: grammar.past_simple.finished_past
+    target: grammar.past_simple.negative
+    relation_type: recommended_before
+    reason: Finished-past meaning is pedagogically helpful before adding past simple negation.
+  - source: grammar.past_simple.finished_past
+    target: grammar.past_simple.questions
+    relation_type: recommended_before
+    reason: Finished-past meaning is pedagogically helpful before adding past simple questions.
+
+  - source: grammar.past_continuous.form
+    target: grammar.past_continuous.background_action
+    relation_type: prerequisite_of
+    reason: Past continuous background-action use requires control of the was/were + -ing form.
+  - source: grammar.past_continuous.form
+    target: grammar.past_continuous.interrupted_action
+    relation_type: prerequisite_of
+    reason: Interrupted-action use requires control of the past continuous form.
+  - source: grammar.past_simple.finished_past
+    target: grammar.past_continuous.interrupted_action
+    relation_type: recommended_before
+    reason: Past simple finished events are useful before contrasting them with interrupted past continuous actions.
+
+  - source: grammar.present_perfect.form
+    target: grammar.present_perfect.experience
+    relation_type: prerequisite_of
+    reason: Present perfect experience use requires control of the present perfect form.
+  - source: grammar.present_perfect.form
+    target: grammar.present_perfect.unfinished_time
+    relation_type: prerequisite_of
+    reason: Present perfect unfinished-time use requires control of the present perfect form.
+  - source: grammar.present_perfect.form
+    target: grammar.present_perfect.recent_result
+    relation_type: prerequisite_of
+    reason: Present perfect recent-result use requires control of the present perfect form.
+  - source: grammar.present_perfect.form
+    target: grammar.present_perfect.since_for
+    relation_type: prerequisite_of
+    reason: Present perfect since/for use requires control of the present perfect form.
+  - source: grammar.present_perfect.past_participle
+    target: grammar.present_perfect.form
+    relation_type: prerequisite_of
+    reason: Past participle knowledge is a form dependency for present perfect construction.
+
+  - source: grammar.future.will_prediction
+    target: grammar.future.will_spontaneous_decision
+    relation_type: related_to
+    reason: Will prediction and spontaneous-decision uses share the same auxiliary but differ in function.
+  - source: grammar.future.will_offer_promise
+    target: grammar.future.will_spontaneous_decision
+    relation_type: related_to
+    reason: Will offer/promise and spontaneous-decision uses are related future functions.
+
+  - source: grammar.modality.can_ability
+    target: grammar.modality.could_past_ability
+    relation_type: related_to
+    reason: Could past ability is semantically related to can ability.
+  - source: grammar.modality.can_ability
+    target: grammar.modality.can_permission
+    relation_type: related_to
+    reason: Both use the same modal form "can" but represent distinct communicative functions, ability versus permission.
+  - source: grammar.modality.must_obligation
+    target: grammar.modality.must_vs_have_to
+    relation_type: contrast_with
+    reason: Must obligation should be contrasted with have to / must distinctions.
+  - source: grammar.modality.should_advice
+    target: grammar.modality.must_obligation
+    relation_type: related_to
+    reason: Advice and obligation are related modality meanings with different force.
+
+  - source: grammar.articles.a_an
+    target: grammar.articles.the_specific_reference
+    relation_type: recommended_before
+    reason: Indefinite article control is helpful before definite specific-reference contrasts.
+  - source: grammar.articles.a_an
+    target: grammar.articles.first_vs_subsequent_mention
+    relation_type: recommended_before
+    reason: A/an supports first-mention work before contrasting subsequent reference.
+  - source: grammar.articles.the_specific_reference
+    target: grammar.articles.first_vs_subsequent_mention
+    relation_type: recommended_before
+    reason: Definite specific reference supports subsequent-mention article choices.
+  - source: grammar.articles.zero_article
+    target: grammar.articles.the_specific_reference
+    relation_type: contrast_with
+    reason: Zero article and definite article use are useful to compare directly.
+  - source: grammar.articles.generic_reference
+    target: grammar.articles.zero_article
+    relation_type: related_to
+    reason: Generic reference is often expressed through zero article choices.
+
+  - source: grammar.conditionals.zero
+    target: grammar.conditionals.first
+    relation_type: recommended_before
+    reason: Zero conditional form and meaning are useful before first conditional outcomes.
+  - source: grammar.conditionals.first
+    target: grammar.conditionals.second
+    relation_type: recommended_before
+    reason: First conditional is usually sequenced before second conditional hypothetical meaning.
+  - source: grammar.conditionals.first
+    target: grammar.conditionals.second
+    relation_type: contrast_with
+    reason: First and second conditionals are pedagogically useful to contrast directly.
+  - source: grammar.conditionals.first
+    target: grammar.conditionals.first_vs_second
+    relation_type: supports
+    reason: Understanding first conditional supports the explicit first-vs-second contrast skill.
+  - source: grammar.conditionals.second
+    target: grammar.conditionals.first_vs_second
+    relation_type: supports
+    reason: Understanding second conditional supports the explicit first-vs-second contrast skill.
+
+  - source: grammar.passive.be_past_participle
+    target: grammar.passive.present_simple
+    relation_type: prerequisite_of
+    reason: Passive present simple requires the be + past participle passive pattern.
+  - source: grammar.passive.be_past_participle
+    target: grammar.passive.past_simple
+    relation_type: prerequisite_of
+    reason: Passive past simple requires the be + past participle passive pattern.
+  - source: grammar.passive.be_past_participle
+    target: grammar.passive.agent_by
+    relation_type: prerequisite_of
+    reason: By-agent passive work requires the core be + past participle passive pattern.
+
+  - source: grammar.present_simple.affirmative
+    target: grammar.present_continuous.form
+    relation_type: recommended_before
+    reason: Present simple affirmative control is helpful before contrasting present continuous form.
+  - source: grammar.past_simple.finished_past
+    target: grammar.past_continuous.form
+    relation_type: recommended_before
+    reason: Past simple finished-past meaning is helpful before the past continuous form.
+  - source: grammar.past_simple.irregular_verbs
+    target: grammar.present_perfect.past_participle
+    relation_type: supports
+    reason: Irregular past-form knowledge supports later past participle form awareness.
+  - source: grammar.present_perfect.past_participle
+    target: grammar.passive.be_past_participle
+    relation_type: supports
+    reason: Past participle knowledge is shared morphological knowledge for the passive pattern, not a dependency on Present Perfect mastery.

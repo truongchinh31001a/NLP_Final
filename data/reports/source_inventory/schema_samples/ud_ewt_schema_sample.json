@@ -1,0 +1,20 @@
+{
+  "comment_keys": [
+    "newdoc id",
+    "newpar id",
+    "sent_id",
+    "text"
+  ],
+  "conllu_columns": [
+    "ID",
+    "FORM",
+    "LEMMA",
+    "UPOS",
+    "XPOS",
+    "FEATS",
+    "HEAD",
+    "DEPREL",
+    "DEPS",
+    "MISC"
+  ]
+}

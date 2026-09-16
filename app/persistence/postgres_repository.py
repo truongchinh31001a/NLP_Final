@@ -13,6 +13,7 @@ from app.learner.knowledge_tracing import BayesianKnowledgeTracer
 from app.learner.skill_graph import DEFAULT_SKILL_GRAPH
 from app.schemas import (
     AnswerDiagnosis,
+    ActivityStateEvent,
     ConversationIntent,
     ExerciseItem,
     ExerciseOption,
@@ -27,6 +28,7 @@ from app.schemas import (
     PracticeRequest,
     PracticeReview,
     SessionResult,
+    validate_learning_activity_transition,
 )
 
 
@@ -126,6 +128,8 @@ class PostgreSQLLearningRepository:
             if row is None:
                 raise LookupError(f"Learning activity not found: {activity_id}")
             activity = self._activity_from_payload(row["activity_json"])
+            previous_status = activity.status
+            validate_learning_activity_transition(previous_status, status)
             now = self._now_text(connection)
             activity.status = status
             activity.updated_at = now
@@ -141,6 +145,7 @@ class PostgreSQLLearningRepository:
                 activity.activity_id,
                 "STATUS_CHANGED",
                 status,
+                from_status=previous_status,
             )
             self._sync_active_activity(
                 connection,
@@ -250,6 +255,11 @@ class PostgreSQLLearningRepository:
             result_json = self._dict(session_row["result_json"])
             result_json["activity_id"] = activity.activity_id
             now = self._now_text(connection)
+            previous_status = activity.status
+            validate_learning_activity_transition(
+                previous_status,
+                LearningActivityStatus.COMPLETED,
+            )
             activity.session_code = session_code
             activity.status = LearningActivityStatus.COMPLETED
             activity.submitted_at = activity.submitted_at or now
@@ -275,6 +285,7 @@ class PostgreSQLLearningRepository:
                 "SESSION_RESULT_ATTACHED",
                 activity.status,
                 {"session_code": session_code},
+                from_status=previous_status,
             )
             self._sync_active_activity(
                 connection,
@@ -323,6 +334,72 @@ class PostgreSQLLearningRepository:
         if row is None:
             return None
         return self._activity_from_payload(row["activity_json"])
+
+    def list_user_activities(
+        self,
+        user_id: str,
+        statuses: list[LearningActivityStatus] | None = None,
+        limit: int = 50,
+    ) -> list[LearningActivity]:
+        with self._connect() as connection:
+            self._ensure_user(connection, user_id)
+            status_values = [status.value for status in statuses or []]
+            if status_values:
+                rows = connection.execute(
+                    """
+                    SELECT activity_json
+                    FROM tutor_learning_activities
+                    WHERE user_code = %s AND status = ANY(%s)
+                    ORDER BY updated_at DESC, created_at DESC
+                    LIMIT %s
+                    """,
+                    (user_id, status_values, max(limit, 0)),
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    """
+                    SELECT activity_json
+                    FROM tutor_learning_activities
+                    WHERE user_code = %s
+                    ORDER BY updated_at DESC, created_at DESC
+                    LIMIT %s
+                    """,
+                    (user_id, max(limit, 0)),
+                ).fetchall()
+
+        return [self._activity_from_payload(row["activity_json"]) for row in rows]
+
+    def list_activity_state_events(
+        self,
+        user_id: str,
+        activity_id: str,
+    ) -> list[ActivityStateEvent]:
+        with self._connect() as connection:
+            self._ensure_user(connection, user_id)
+            activity = self._get_activity_row(connection, user_id, activity_id)
+            if activity is None:
+                return []
+            rows = connection.execute(
+                """
+                SELECT
+                    event_id,
+                    event_type,
+                    from_status,
+                    to_status,
+                    reason,
+                    status,
+                    metadata_json,
+                    created_at::text AS created_at
+                FROM tutor_learning_activity_events
+                WHERE activity_id = %s
+                ORDER BY id
+                """,
+                (activity_id,),
+            ).fetchall()
+        return [
+            self._activity_state_event_from_row(row, activity_id)
+            for row in rows
+        ]
 
     def get_pending_clarification(
         self,
@@ -461,6 +538,11 @@ class PostgreSQLLearningRepository:
             )
             if activity_id:
                 now = self._now_text(connection)
+                previous_status = activity.status
+                validate_learning_activity_transition(
+                    previous_status,
+                    LearningActivityStatus.COMPLETED,
+                )
                 activity.session_code = session_code
                 activity.status = LearningActivityStatus.COMPLETED
                 activity.submitted_at = activity.submitted_at or now
@@ -473,6 +555,7 @@ class PostgreSQLLearningRepository:
                     "SESSION_RESULT_ATTACHED",
                     activity.status,
                     {"session_code": session_code},
+                    from_status=previous_status,
                 )
                 self._sync_active_activity(
                     connection,
@@ -1022,11 +1105,39 @@ class PostgreSQLLearningRepository:
                     id BIGSERIAL PRIMARY KEY,
                     activity_id TEXT NOT NULL REFERENCES tutor_learning_activities(activity_id)
                         ON DELETE CASCADE,
+                    event_id TEXT,
                     event_type TEXT NOT NULL,
+                    from_status TEXT,
+                    to_status TEXT,
+                    reason TEXT,
                     status TEXT NOT NULL,
                     metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb,
                     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
                 )
+                """
+            )
+            connection.execute(
+                """
+                ALTER TABLE tutor_learning_activity_events
+                ADD COLUMN IF NOT EXISTS event_id TEXT
+                """
+            )
+            connection.execute(
+                """
+                ALTER TABLE tutor_learning_activity_events
+                ADD COLUMN IF NOT EXISTS from_status TEXT
+                """
+            )
+            connection.execute(
+                """
+                ALTER TABLE tutor_learning_activity_events
+                ADD COLUMN IF NOT EXISTS to_status TEXT
+                """
+            )
+            connection.execute(
+                """
+                ALTER TABLE tutor_learning_activity_events
+                ADD COLUMN IF NOT EXISTS reason TEXT
                 """
             )
             connection.execute(
@@ -1246,23 +1357,53 @@ class PostgreSQLLearningRepository:
         event_type: str,
         status: LearningActivityStatus,
         metadata: dict[str, Any] | None = None,
+        from_status: LearningActivityStatus | None = None,
+        reason: str | None = None,
     ) -> None:
         connection.execute(
             """
             INSERT INTO tutor_learning_activity_events (
                 activity_id,
+                event_id,
                 event_type,
+                from_status,
+                to_status,
+                reason,
                 status,
                 metadata_json
             )
-            VALUES (%s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 activity_id,
+                f"evt_{uuid.uuid4().hex}",
                 event_type,
+                from_status.value if from_status is not None else None,
+                self._activity_status_value(status),
+                reason,
                 self._activity_status_value(status),
                 Jsonb(metadata or {}),
             ),
+        )
+
+    def _activity_state_event_from_row(
+        self,
+        row: dict[str, Any],
+        activity_id: str,
+    ) -> ActivityStateEvent:
+        from_status = row.get("from_status")
+        to_status = row.get("to_status") or row.get("status")
+        return ActivityStateEvent(
+            event_id=str(row.get("event_id") or ""),
+            activity_id=activity_id,
+            event_type=str(row.get("event_type") or ""),
+            from_status=(
+                LearningActivityStatus(str(from_status)) if from_status else None
+            ),
+            to_status=LearningActivityStatus(str(to_status)),
+            reason=row.get("reason"),
+            metadata=self._dict(row.get("metadata_json")),
+            created_at=row.get("created_at"),
         )
 
     def _sync_active_activity(
@@ -1667,6 +1808,7 @@ class PostgreSQLLearningRepository:
             "pending_intent": clarification.pending_intent.value,
             "missing_fields": list(clarification.missing_fields),
             "collected_slots": self._json_safe_dict(clarification.collected_slots),
+            "active_activity_id": clarification.active_activity_id,
             "question": clarification.question,
         }
 
@@ -1682,6 +1824,7 @@ class PostgreSQLLearningRepository:
             return None
         missing_fields = payload.get("missing_fields")
         collected_slots = payload.get("collected_slots")
+        active_activity_id = payload.get("active_activity_id")
         return PendingClarification(
             pending_intent=pending_intent,
             missing_fields=[
@@ -1690,6 +1833,11 @@ class PostgreSQLLearningRepository:
             ],
             collected_slots=(
                 dict(collected_slots) if isinstance(collected_slots, dict) else {}
+            ),
+            active_activity_id=(
+                str(active_activity_id)
+                if active_activity_id not in (None, "")
+                else None
             ),
             question=str(payload.get("question") or ""),
         )

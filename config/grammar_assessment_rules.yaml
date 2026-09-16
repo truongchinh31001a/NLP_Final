@@ -1,0 +1,40 @@
+inputs:
+  skill_evidence_profiles: "data/interim/knowledge_alignment/grammar_skill_evidence.jsonl"
+  cefr_egp_alignment: "data/interim/knowledge_alignment/cefr_egp_alignment.jsonl"
+  relationships: "data/curated/relationships/grammar_relationships.jsonl"
+  cefr_descriptors: "data/interim/cefr/cefr_descriptors.jsonl"
+  egp_records: "data/interim/english_profile/grammar/egp_records.jsonl"
+
+outputs:
+  assessment_dir: "data/curated/assessment"
+  review_dir: "data/curated/review"
+  reports_dir: "data/reports/assessment"
+
+metadata:
+  created_by: deterministic_assessment_rules_v1
+  version: "assessment_v1"
+
+defaults:
+  status: candidate
+  review_status: pending
+  threshold_source: curated_v1_default
+
+thresholds:
+  recognition:
+    recommended_threshold: 0.80
+    recommended_min_items: 5
+  form_accuracy:
+    recommended_threshold: 0.80
+    recommended_min_items: 6
+  meaning_use:
+    recommended_threshold: 0.75
+    recommended_min_items: 6
+  contrast_discrimination:
+    recommended_threshold: 0.75
+    recommended_min_items: 6
+  production:
+    recommended_threshold: 0.70
+    recommended_min_items: 4
+  error_correction:
+    recommended_threshold: 0.75
+    recommended_min_items: 5

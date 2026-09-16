@@ -337,6 +337,7 @@ class ConversationRouter:
                         pending_intent=ConversationIntent.REVIEW,
                         missing_fields=["activity_id"],
                         collected_slots=slots,
+                        active_activity_id=pending.active_activity_id,
                         question=question,
                     ),
                 )
@@ -394,6 +395,11 @@ class ConversationRouter:
                 pending_intent=ConversationIntent.PRACTICE,
                 missing_fields=missing_fields,
                 collected_slots=slots,
+                active_activity_id=(
+                    context.active_activity.activity_id
+                    if context.active_activity is not None
+                    else None
+                ),
                 question=clarification_question or "",
             )
 
@@ -438,6 +444,9 @@ class ConversationRouter:
                 pending_intent=ConversationIntent.REVIEW,
                 missing_fields=["activity_id"],
                 collected_slots=slots,
+                active_activity_id=(
+                    activity.activity_id if activity is not None else None
+                ),
                 question=question,
             )
 
@@ -481,7 +490,8 @@ class ConversationRouter:
         }
         prompt = (
             "Classify this English tutor chat turn. Return strict JSON only with "
-            "intent, confidence, reason, slots, needs_clarification. "
+            "intent, confidence, reason, slots, needs_clarification, "
+            "missing_slots, target_activity_id, clarification_question. "
             "Allowed intent values: PRACTICE, READING, WRITING, EXPLAIN, REVIEW, "
             "PROGRESS, PROFILE_UPDATE, GENERAL. Prefer non-PRACTICE unless the learner asks "
             "for an exercise, quiz, test, or continuing practice.\n"
@@ -528,6 +538,35 @@ class ConversationRouter:
         if confidence < 0.55:
             return None
         slots = parsed.get("slots")
+        route_slots = slots if isinstance(slots, dict) else {}
+        missing_slots = self._safe_string_list(parsed.get("missing_slots"))
+        target_activity_id = self._safe_optional_string(
+            parsed.get("target_activity_id"),
+        ) or (
+            str(route_slots["activity_id"])
+            if route_slots.get("activity_id") not in (None, "")
+            else None
+        )
+        needs_clarification = self._safe_bool(
+            parsed.get("needs_clarification"),
+        ) or bool(missing_slots)
+        clarification_question = self._safe_optional_string(
+            parsed.get("clarification_question"),
+        )
+        pending = None
+        if needs_clarification:
+            pending = PendingClarification(
+                pending_intent=intent,
+                missing_fields=missing_slots,
+                collected_slots=route_slots,
+                active_activity_id=target_activity_id
+                or (
+                    context.active_activity.activity_id
+                    if context.active_activity is not None
+                    else None
+                ),
+                question=clarification_question or "",
+            )
 
         if intent == ConversationIntent.PRACTICE:
             return self._practice_route(
@@ -536,7 +575,7 @@ class ConversationRouter:
                 reason=self._safe_string(parsed.get("reason"))
                 or "LLM classified this turn as practice.",
                 source="llm-ollama-practice-interpreter",
-                base_slots=slots if isinstance(slots, dict) else None,
+                base_slots=route_slots,
             )
 
         return ConversationRoute(
@@ -545,8 +584,12 @@ class ConversationRouter:
             source="llm-ollama",
             reason=self._safe_string(parsed.get("reason"))
             or "LLM classified ambiguous conversation turn.",
-            slots=slots if isinstance(slots, dict) else {},
-            needs_clarification=bool(parsed.get("needs_clarification")),
+            slots=route_slots,
+            missing_slots=missing_slots,
+            target_activity_id=target_activity_id,
+            needs_clarification=needs_clarification,
+            clarification_question=clarification_question,
+            pending_clarification=pending,
         )
 
     def _is_practice_request(self, normalized: str) -> bool:
@@ -904,6 +947,25 @@ class ConversationRouter:
             if match:
                 return max(1, min(int(match.group(0)), 20))
         return None
+
+    def _safe_string_list(self, value: object) -> list[str]:
+        if not isinstance(value, list):
+            return []
+        items = []
+        for item in value:
+            if not isinstance(item, str):
+                continue
+            parsed = item.strip()
+            if parsed:
+                items.append(parsed)
+        return items
+
+    def _safe_bool(self, value: object) -> bool:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.strip().lower() in {"1", "true", "yes", "on"}
+        return False
 
     def _clamp_float(self, value: object, minimum: float, maximum: float) -> float:
         try:

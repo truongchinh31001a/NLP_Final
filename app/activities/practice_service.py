@@ -1,8 +1,8 @@
-import uuid
 from dataclasses import asdict, dataclass
 from typing import Any
 
 from app.agent.learning_agent import LearningAgent
+from app.activities.service import ActivityService
 from app.config import AppConfig
 from app.persistence.repository import LearningRepository
 from app.schemas import (
@@ -38,10 +38,12 @@ class PracticeActivityService:
         config: AppConfig,
         repository: LearningRepository,
         agent: LearningAgent,
+        activity_service: ActivityService | None = None,
     ) -> None:
         self.config = config
         self.repository = repository
         self.agent = agent
+        self.activity_service = activity_service or ActivityService(repository)
 
     def create_practice_activity(
         self,
@@ -53,37 +55,25 @@ class PracticeActivityService:
         skip_request_parser: bool = False,
         metadata: dict[str, Any] | None = None,
     ) -> PracticeActivityGeneration:
-        resolved_conversation_id = self._ensure_conversation(
-            user_id,
-            conversation_id,
-        )
-        activity = self.repository.create_learning_activity(
-            LearningActivity(
-                activity_id=f"activity_{uuid.uuid4().hex}",
-                conversation_id=resolved_conversation_id,
-                learner_id=user_id,
-                type=LearningActivityType.PRACTICE,
-                target_skills=self._target_skills(request_overrides),
-                difficulty=(
-                    request_overrides.difficulty
-                    if request_overrides is not None
-                    else None
-                ),
-                metadata={
-                    "raw_text": raw_text,
-                    "request": (
-                        asdict(request_overrides)
-                        if request_overrides is not None
-                        else None
-                    ),
-                    **(metadata or {}),
-                },
+        activity = self.activity_service.create_activity(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            activity_type=LearningActivityType.PRACTICE,
+            target_skills=self._target_skills(request_overrides),
+            difficulty=(
+                request_overrides.difficulty if request_overrides is not None else None
             ),
+            metadata={
+                "raw_text": raw_text,
+                "request": (
+                    asdict(request_overrides) if request_overrides is not None else None
+                ),
+                **(metadata or {}),
+            },
         )
-        self.repository.update_learning_activity_status(
-            user_id,
-            activity.activity_id,
-            LearningActivityStatus.GENERATING,
+        activity = self.activity_service.start_generation(
+            user_id=user_id,
+            activity_id=activity.activity_id,
         )
 
         try:
@@ -95,17 +85,16 @@ class PracticeActivityService:
                 skip_request_parser=skip_request_parser,
             )
         except Exception:
-            self.repository.update_learning_activity_status(
-                user_id,
-                activity.activity_id,
-                LearningActivityStatus.FAILED,
+            self.activity_service.fail_activity(
+                user_id=user_id,
+                activity_id=activity.activity_id,
             )
             raise
 
-        activity = self.repository.update_learning_activity_status(
-            user_id,
-            activity.activity_id,
-            LearningActivityStatus.READY,
+        activity = self.activity_service.mark_ready(
+            user_id=user_id,
+            activity_id=activity.activity_id,
+            generation_run_id=generated.generation_run_id,
         )
         return PracticeActivityGeneration(
             activity=activity,
@@ -125,10 +114,9 @@ class PracticeActivityService:
             raise LookupError("Practice activity has no generated exercise set.")
 
         if activity.status == LearningActivityStatus.READY:
-            activity = self.repository.update_learning_activity_status(
-                user_id,
-                activity_id,
-                LearningActivityStatus.IN_PROGRESS,
+            activity = self.activity_service.start_activity(
+                user_id=user_id,
+                activity_id=activity_id,
             )
 
         result = self.agent.score_submission(
@@ -160,17 +148,6 @@ class PracticeActivityService:
                 {answer.exercise_id: answer.selected_answer for answer in answers},
             ),
         )
-
-    def _ensure_conversation(
-        self,
-        user_id: str,
-        conversation_id: str | None,
-    ) -> str:
-        resume = self.repository.get_chat_resume(
-            user_id,
-            session_id=conversation_id,
-        )
-        return str(resume["session_id"])
 
     def _require_practice_activity(
         self,

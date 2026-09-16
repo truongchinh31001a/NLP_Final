@@ -1,3 +1,4 @@
+from app.activities.service import ActivityService
 from app.activities.practice_service import (
     PracticeActivityGeneration,
     PracticeActivityService,
@@ -5,6 +6,7 @@ from app.activities.practice_service import (
 )
 
 __all__ = [
+    "ActivityService",
     "PracticeActivityGeneration",
     "PracticeActivityService",
     "PracticeActivitySubmission",

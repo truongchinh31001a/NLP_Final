@@ -1,0 +1,103 @@
+source:
+  name: english_grammar_profile
+  level: ALL
+  url: "https://englishprofile.org/?menu=egp-online"
+
+categories:
+  - id: present_simple
+    query: "present simple"
+    raw_path: "Tenses/Present Simple/present_simple.xlsx"
+    expected_super_category: "PRESENT"
+    expected_sub_category: "present simple"
+    canonical_parent_hint: "grammar.tenses.present_simple"
+
+  - id: present_continuous
+    query: "present continuous"
+    raw_path: "Tenses/Present Continuous/present_continuous.xlsx"
+    expected_super_category: "PRESENT"
+    expected_sub_category: "present continuous"
+    canonical_parent_hint: "grammar.tenses.present_continuous"
+
+  - id: past_simple
+    query: "past simple"
+    raw_path: "Tenses/Past Simple/past_simple.xlsx"
+    expected_super_category: "PAST"
+    expected_sub_category: "past simple"
+    canonical_parent_hint: "grammar.tenses.past_simple"
+
+  - id: past_continuous
+    query: "past continuous"
+    raw_path: "Tenses/Past Continuous/past_continuous.xlsx"
+    expected_super_category: "PAST"
+    expected_sub_category: "past continuous"
+    canonical_parent_hint: "grammar.tenses.past_continuous"
+
+  - id: present_perfect_simple
+    query: "present perfect simple"
+    raw_path: "Tenses/Present Perfect/present_perfect_simple.xlsx"
+    expected_super_category: "PAST"
+    expected_sub_category: "present perfect simple"
+    canonical_parent_hint: "grammar.tenses.present_perfect"
+
+  - id: future_will
+    query: "future simple"
+    raw_path: "Future/Will/future_will.xlsx"
+    expected_super_category: "FUTURE"
+    expected_sub_category: "future simple (with will and shall)"
+    canonical_parent_hint: "grammar.future.will"
+
+  - id: modality_can
+    query: "can"
+    raw_path: "Modality/can/modality_can.xlsx"
+    expected_super_category: "MODALITY"
+    expected_sub_category: "can"
+    canonical_parent_hint: "grammar.modality"
+
+  - id: modality_could
+    query: "could"
+    raw_path: "Modality/could/modality_could.xlsx"
+    expected_super_category: "MODALITY"
+    expected_sub_category: "could"
+    canonical_parent_hint: "grammar.modality"
+
+  - id: modality_must
+    query: "must"
+    raw_path: "Modality/must/modality_must.xlsx"
+    expected_super_category: "MODALITY"
+    expected_sub_category: "must"
+    canonical_parent_hint: "grammar.modality"
+
+  - id: modality_should
+    query: "should"
+    raw_path: "Modality/should/modality_should.xlsx"
+    expected_super_category: "MODALITY"
+    expected_sub_category: "should"
+    canonical_parent_hint: "grammar.modality"
+
+  - id: modality_have_got_to
+    query: "have got to"
+    raw_path: "Modality/have got to/modality_have_got_to.xlsx"
+    expected_super_category: "MODALITY"
+    expected_sub_category: "have (got) to"
+    canonical_parent_hint: "grammar.modality"
+
+  - id: articles
+    query: "articles"
+    raw_path: "Determiners/Articles/articles.xlsx"
+    expected_super_category: "DETERMINERS"
+    expected_sub_category: "articles"
+    canonical_parent_hint: "grammar.determiners.articles"
+
+  - id: conditional
+    query: "conditional"
+    raw_path: "Clauses/Conditionals/conditional.xlsx"
+    expected_super_category: "CLAUSES"
+    expected_sub_category: "conditional"
+    canonical_parent_hint: "grammar.clauses.conditionals"
+
+  - id: passives_form
+    query: "passives: form"
+    raw_path: "Passives/passives_form.xlsx"
+    expected_super_category: "PASSIVES"
+    expected_sub_category: "passives: form"
+    canonical_parent_hint: "grammar.passives"

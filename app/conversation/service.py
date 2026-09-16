@@ -231,7 +231,17 @@ class ConversationService:
                     extracted_facts if isinstance(extracted_facts, dict) else {}
                 ),
                 "latest_activity": latest_activity,
+                "active_activity_id": (
+                    latest_activity.activity_id
+                    if latest_activity is not None
+                    else None
+                ),
                 "latest_reviewable_activity": latest_reviewable_activity,
+                "latest_reviewable_activity_id": (
+                    latest_reviewable_activity.activity_id
+                    if latest_reviewable_activity is not None
+                    else None
+                ),
                 "recent_activity_ids": [
                     activity.activity_id
                     for activity in (latest_activity, latest_reviewable_activity)
@@ -408,19 +418,7 @@ class ConversationService:
         )
 
     def _ui_action(self, route: ConversationRoute) -> str:
-        if route.needs_clarification:
-            return "clarification.ask"
-        actions = {
-            ConversationIntent.PRACTICE: "practice.interpret",
-            ConversationIntent.READING: "reading.start",
-            ConversationIntent.WRITING: "writing.start",
-            ConversationIntent.EXPLAIN: "explain.respond",
-            ConversationIntent.REVIEW: "review.open",
-            ConversationIntent.PROGRESS: "progress.open",
-            ConversationIntent.PROFILE_UPDATE: "profile.update",
-            ConversationIntent.GENERAL: "conversation.reply",
-        }
-        return actions[route.intent]
+        return route.next_action
 
     def _activity_payload_for_route(
         self,
@@ -506,17 +504,12 @@ class ConversationService:
             "confidence": route.confidence,
             "source": route.source,
             "reason": route.reason,
+            "requires_context": route.requires_context,
             "slots": self._json_safe(route.slots),
-            "missing_slots": (
-                route.pending_clarification.missing_fields
-                if route.pending_clarification is not None
-                else []
-            ),
-            "referenced_activity_id": (
-                str(route.slots["activity_id"])
-                if route.slots.get("activity_id")
-                else None
-            ),
+            "missing_slots": route.missing_slots,
+            "target_activity_id": route.target_activity_id,
+            "referenced_activity_id": route.target_activity_id,
+            "next_action": route.next_action,
             "needs_clarification": route.needs_clarification,
             "clarification_question": route.clarification_question,
         }
@@ -594,6 +587,7 @@ class ConversationService:
             "pending_intent": clarification.pending_intent.value,
             "missing_fields": list(clarification.missing_fields),
             "collected_slots": self._json_safe(clarification.collected_slots),
+            "active_activity_id": clarification.active_activity_id,
             "question": clarification.question,
         }
 
@@ -609,6 +603,7 @@ class ConversationService:
             return None
         missing_fields = payload.get("missing_fields")
         collected_slots = payload.get("collected_slots")
+        active_activity_id = payload.get("active_activity_id")
         return PendingClarification(
             pending_intent=pending_intent,
             missing_fields=[
@@ -617,6 +612,11 @@ class ConversationService:
             ],
             collected_slots=(
                 dict(collected_slots) if isinstance(collected_slots, dict) else {}
+            ),
+            active_activity_id=(
+                str(active_activity_id)
+                if active_activity_id not in (None, "")
+                else None
             ),
             question=str(payload.get("question") or ""),
         )

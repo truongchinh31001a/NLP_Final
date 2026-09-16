@@ -64,6 +64,9 @@ class ConversationApiTests(unittest.TestCase):
         self.assertEqual(len(payload["activity"]["exercises"]), 10)
         self.assertEqual(payload["route"]["slots"]["topic"], "passive_voice")
         self.assertEqual(payload["route"]["slots"]["num_questions"], 10)
+        self.assertTrue(payload["route"]["requires_context"])
+        self.assertIsNone(payload["route"]["target_activity_id"])
+        self.assertEqual(payload["route"]["next_action"], "practice.interpret")
 
     def test_message_endpoint_routes_explain_turn(self) -> None:
         conversation = self._create_conversation("learner")
@@ -98,6 +101,8 @@ class ConversationApiTests(unittest.TestCase):
         self.assertEqual(payload["ui_action"], "review.open")
         self.assertEqual(payload["activity"]["activity_id"], "activity_api_1")
         self.assertEqual(payload["route"]["slots"]["question_number"], 2)
+        self.assertEqual(payload["route"]["target_activity_id"], "activity_api_1")
+        self.assertEqual(payload["route"]["next_action"], "review.open")
 
     def test_message_endpoint_routes_progress_turn(self) -> None:
         conversation = self._create_conversation("learner")
@@ -170,6 +175,8 @@ class ConversationApiTests(unittest.TestCase):
         self.assertEqual(first["ui_action"], "clarification.ask")
         self.assertEqual(first["pending_clarification"]["pending_intent"], "PRACTICE")
         self.assertTrue(first["route"]["missing_slots"])
+        self.assertEqual(first["route"]["next_action"], "clarification.ask")
+        self.assertIsNone(first["route"]["target_activity_id"])
         self.assertIsNone(first["route"]["referenced_activity_id"])
         self.assertEqual(resumed_response.status_code, 200)
         self.assertEqual(
@@ -234,6 +241,7 @@ class ConversationApiTests(unittest.TestCase):
         self.assertEqual(payload["ui_action"], "review.open")
         self.assertEqual(payload["activity"]["activity_id"], first_activity_id)
         self.assertEqual(payload["route"]["slots"]["activity_id"], first_activity_id)
+        self.assertEqual(payload["route"]["target_activity_id"], first_activity_id)
         self.assertEqual(payload["route"]["referenced_activity_id"], first_activity_id)
         self.assertEqual(payload["route"]["slots"]["question_number"], 1)
 
@@ -331,9 +339,21 @@ class ConversationApiTests(unittest.TestCase):
         self.assertEqual(activity["conversation_id"], conversation["conversation_id"])
         self.assertEqual(activity["ui_action"], "practice.open")
         self.assertEqual(activity["status"], "COMPLETED")
+        self.assertIsNone(activity["parent_activity_id"])
+        self.assertEqual(activity["config"], {})
         self.assertEqual(len(activity["exercises"]), 2)
         self.assertEqual(activity["result"]["activity_id"], generated["activity_id"])
         self.assertTrue(activity["next_activity_suggestion"]["recommendation_id"])
+        list_response = self.client.get(
+            "/api/users/learner/activities",
+            params={"status": "COMPLETED"},
+        )
+        self.assertEqual(list_response.status_code, 200)
+        listed_activities = list_response.json()["activities"]
+        self.assertIn(
+            generated["activity_id"],
+            [item["activity_id"] for item in listed_activities],
+        )
 
         self.assertEqual(review_response.status_code, 200)
         review = review_response.json()

@@ -1,0 +1,118 @@
+{
+  "classified_raw_datasets": [
+    {
+      "file_count": 695,
+      "files_by_extension": {
+        ".docx": 186,
+        ".jpg": 2,
+        ".json": 185,
+        ".png": 320,
+        ".xlsx": 2
+      },
+      "included_in_knowledge_core_inventory": false,
+      "inferred_role": "unrelated_project_dataset",
+      "markers": {
+        "root_name": "Dataset",
+        "sample_file_names": [
+          "MET_Eng_IE_2019.json",
+          "MET_Eng_IE_2020.json",
+          "MET_Eng_IE_2021.json",
+          "MET_Eng_IE_2022.json",
+          "MET_Eng_IE_2023.json",
+          "MET_Eng_IE_2019.docx",
+          "MET_Eng_IE_2020.docx",
+          "MET_Eng_IE_2021.docx",
+          "MET_Eng_IE_2022.docx",
+          "MET_Eng_IE_2023.docx",
+          "MET_Bio_IE_2019.json",
+          "MET_Bio_IE_2020.json",
+          "MET_Bio_IE_2021.json",
+          "MET_Bio_IE_2022.json",
+          "MET_Bio_IE_2023.json",
+          "image001.png",
+          "image001.png",
+          "image001.png",
+          "image002.png",
+          "image001.png"
+        ],
+        "sample_relative_paths": [
+          "VNHSGE-E/JSON format/eval/English/MET_Eng_IE_2019.json",
+          "VNHSGE-E/JSON format/eval/English/MET_Eng_IE_2020.json",
+          "VNHSGE-E/JSON format/eval/English/MET_Eng_IE_2021.json",
+          "VNHSGE-E/JSON format/eval/English/MET_Eng_IE_2022.json",
+          "VNHSGE-E/JSON format/eval/English/MET_Eng_IE_2023.json",
+          "VNHSGE-E/Word format/eval/English/MET_Eng_IE_2019.docx",
+          "VNHSGE-E/Word format/eval/English/MET_Eng_IE_2020.docx",
+          "VNHSGE-E/Word format/eval/English/MET_Eng_IE_2021.docx",
+          "VNHSGE-E/Word format/eval/English/MET_Eng_IE_2022.docx",
+          "VNHSGE-E/Word format/eval/English/MET_Eng_IE_2023.docx",
+          "VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2019.json",
+          "VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2020.json",
+          "VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2021.json",
+          "VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2022.json",
+          "VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2023.json",
+          "VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2019/image001.png",
+          "VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2020/image001.png",
+          "VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2021/image001.png",
+          "VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2021/image002.png",
+          "VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2022/image001.png"
+        ],
+        "top_level_dirs": [
+          "VNHSGE-E",
+          "VNHSGE-V"
+        ]
+      },
+      "path": "data/raw/Dataset",
+      "reason": "Directory contains VNHSGE/MET exam-style files with JSON/DOCX/image assets across school subjects; it is not one of the six Knowledge Core V1 sources.",
+      "representative_files": [
+        "data/raw/Dataset/VNHSGE-E/JSON format/eval/English/MET_Eng_IE_2019.json",
+        "data/raw/Dataset/VNHSGE-E/JSON format/eval/English/MET_Eng_IE_2020.json",
+        "data/raw/Dataset/VNHSGE-E/JSON format/eval/English/MET_Eng_IE_2021.json",
+        "data/raw/Dataset/VNHSGE-E/JSON format/eval/English/MET_Eng_IE_2022.json",
+        "data/raw/Dataset/VNHSGE-E/JSON format/eval/English/MET_Eng_IE_2023.json",
+        "data/raw/Dataset/VNHSGE-E/Word format/eval/English/MET_Eng_IE_2019.docx",
+        "data/raw/Dataset/VNHSGE-E/Word format/eval/English/MET_Eng_IE_2020.docx",
+        "data/raw/Dataset/VNHSGE-E/Word format/eval/English/MET_Eng_IE_2021.docx",
+        "data/raw/Dataset/VNHSGE-E/Word format/eval/English/MET_Eng_IE_2022.docx",
+        "data/raw/Dataset/VNHSGE-E/Word format/eval/English/MET_Eng_IE_2023.docx",
+        "data/raw/Dataset/VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2019.json",
+        "data/raw/Dataset/VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2020.json",
+        "data/raw/Dataset/VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2021.json",
+        "data/raw/Dataset/VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2022.json",
+        "data/raw/Dataset/VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2023.json",
+        "data/raw/Dataset/VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2019/image001.png",
+        "data/raw/Dataset/VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2020/image001.png",
+        "data/raw/Dataset/VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2021/image001.png",
+        "data/raw/Dataset/VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2021/image002.png",
+        "data/raw/Dataset/VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2022/image001.png"
+      ],
+      "source_key": "excluded_raw_dataset",
+      "status": "unrelated_to_knowledge_core_v1"
+    }
+  ],
+  "errors": [],
+  "excluded_raw_file_count": 695,
+  "generated_at": "2026-09-16T10:51:53.123317+00:00",
+  "unknown_raw_file_count": 0,
+  "unknown_raw_roots": [],
+  "validation": {
+    "checks": {
+      "all_expected_sources_accounted_for": true,
+      "all_raw_dataset_files_have_classification_context": true,
+      "all_raw_files_assigned_or_classified": true,
+      "canonical_taxonomy_unchanged": true,
+      "efcamdat_annotation_source_of_truth_documented": true,
+      "file_counts_internally_consistent": true,
+      "inspection_issues_reported": true,
+      "new_corpus_reports_generated": true,
+      "no_ingestion_artifacts_created": true,
+      "optional_sources_remain_inventoried": true,
+      "raw_data_unchanged": true,
+      "required_source_flags_correct": true
+    },
+    "error_count": 0,
+    "passed": true,
+    "warning_count": 0
+  },
+  "warnings": []
+}

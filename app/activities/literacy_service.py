@@ -386,6 +386,11 @@ class WritingActivityService:
                 },
             ),
         )
+        self.repository.update_learning_activity_status(
+            user_id,
+            activity.activity_id,
+            LearningActivityStatus.GENERATING,
+        )
         activity = self.repository.update_learning_activity_status(
             user_id,
             activity.activity_id,
@@ -408,17 +413,22 @@ class WritingActivityService:
         if len(text) < 20:
             raise ValueError("Writing submission is too short to assess.")
         if activity.status == LearningActivityStatus.READY:
-            self.repository.update_learning_activity_status(
+            activity = self.repository.update_learning_activity_status(
                 user_id,
                 activity_id,
                 LearningActivityStatus.IN_PROGRESS,
             )
-        self.repository.update_learning_activity_status(
+        activity = self.repository.update_learning_activity_status(
             user_id,
             activity_id,
             LearningActivityStatus.SUBMITTED,
         )
         assessment = self._assess(text, activity)
+        self.repository.update_learning_activity_status(
+            user_id,
+            activity_id,
+            LearningActivityStatus.GRADED,
+        )
         result = SessionResult(
             user_id=user_id,
             topic="writing",

@@ -1,0 +1,166 @@
+source:
+  name: cefr_companion_volume
+  document: "Common European Framework of Reference for Languages: Learning, teaching, assessment - Companion volume"
+  short_document: "CEFR Companion Volume 2020"
+  language: English
+  year: 2020
+  publisher: Council of Europe
+  source_file: "data/external/cefr/CEFR Companion Volume_eng.pdf"
+
+levels:
+  include:
+    - A1
+    - A2
+    - B1
+    - B2
+    - C1
+    - C2
+  preserve:
+    - Pre-A1
+    - A2+
+    - B1+
+    - B2+
+
+chapter2:
+  section: "2.6 CEFR Common Reference Levels"
+  page_start: 36
+  page_end: 44
+  primary_levels:
+    A1: Basic user
+    A2: Basic user
+    B1: Independent user
+    B2: Independent user
+    C1: Proficient user
+    C2: Proficient user
+  documentation_only:
+    - "2.8 CEFR Illustrative Descriptors"
+    - "2.9 Using the CEFR Illustrative Descriptors"
+
+sections:
+  reception:
+    enabled: true
+    chapter: "3"
+    section: "3.1.1 Reception activities"
+    descriptor_type: communicative_activity
+    page_start: 47
+    page_end: 60
+    scales:
+      - id: overall_oral_comprehension
+        name: "Overall oral comprehension"
+        subdomain: oral_comprehension
+      - id: overall_reading_comprehension
+        name: "Overall reading comprehension"
+        subdomain: reading
+      - id: reading_for_information_and_argument
+        name: "Reading for information and argument"
+        subdomain: reading
+      - id: reading_instructions
+        name: "Reading instructions"
+        subdomain: reading
+
+  production:
+    enabled: true
+    chapter: "3"
+    section: "3.1.2 Production activities"
+    descriptor_type: communicative_activity
+    page_start: 61
+    page_end: 68
+    scales:
+      - id: overall_oral_production
+        name: "Overall oral production"
+        subdomain: oral_production
+      - id: sustained_monologue_describing_experience
+        name: "Sustained monologue: describing experience"
+        subdomain: oral_production
+      - id: sustained_monologue_giving_information
+        name: "Sustained monologue: giving information"
+        subdomain: oral_production
+      - id: overall_written_production
+        name: "Overall written production"
+        subdomain: written_production
+      - id: creative_writing
+        name: "Creative writing"
+        subdomain: written_production
+      - id: reports_and_essays
+        name: "Reports and essays"
+        subdomain: written_production
+
+  interaction:
+    enabled: true
+    chapter: "3"
+    section: "3.1.3 Interaction activities"
+    descriptor_type: communicative_activity
+    page_start: 71
+    page_end: 84
+    scales:
+      - id: overall_oral_interaction
+        name: "Overall oral interaction"
+        subdomain: oral_interaction
+      - id: conversation
+        name: "Conversation"
+        subdomain: oral_interaction
+      - id: information_exchange
+        name: "Information exchange"
+        subdomain: oral_interaction
+      - id: overall_written_interaction
+        name: "Overall written interaction"
+        subdomain: written_interaction
+
+  linguistic_competence:
+    enabled: true
+    chapter: "5"
+    section: "5.1 Linguistic competence"
+    descriptor_type: linguistic_competence
+    page_start: 129
+    page_end: 136
+    scales:
+      - id: general_linguistic_range
+        name: "General linguistic range"
+        subdomain: general
+      - id: vocabulary_range
+        name: "Vocabulary range"
+        subdomain: vocabulary
+      - id: grammatical_accuracy
+        name: "Grammatical accuracy"
+        subdomain: grammar
+      - id: vocabulary_control
+        name: "Vocabulary control"
+        subdomain: vocabulary
+      - id: orthographic_control
+        name: "Orthographic control"
+        subdomain: orthography
+
+  mediation:
+    enabled: false
+    chapter: "3"
+    section: "3.4 Mediation"
+    descriptor_type: communicative_activity
+    page_start: 91
+    page_end: 124
+    scales: []
+
+appendices:
+  - id: appendix_1_salient_features
+    name: "Appendix 1: Salient features of the CEFR levels"
+    enabled: true
+    extraction: level_summary
+    page_start: 173
+    page_end: 175
+  - id: appendix_2_self_assessment_grid
+    name: "Appendix 2: Self-assessment grid"
+    enabled: false
+    extraction: skipped_rotated_grid_text_not_clean_for_v1
+    page_start: 179
+    page_end: 181
+  - id: appendix_3_qualitative_features
+    name: "Appendix 3: Qualitative features of spoken language"
+    enabled: false
+    extraction: skipped_rotated_grid_text_not_clean_for_v1
+    page_start: 183
+    page_end: 185
+  - id: appendix_4_written_assessment_grid
+    name: "Appendix 4: Written assessment grid"
+    enabled: false
+    extraction: skipped_rotated_grid_text_not_clean_for_v1
+    page_start: 187
+    page_end: 189

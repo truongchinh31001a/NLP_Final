@@ -1,0 +1,406 @@
+{
+  "annotation_source_of_truth": {
+    "fields": [
+      "text.<change>",
+      "text.<tag>",
+      "text.<symbol>",
+      "text.<correct>"
+    ],
+    "reason": "Local R scripts create the cleaned CSV from XML text and keep error-tagged scripts by detecting <change> in text. The CSV adds original/corrected/POS support columns but does not add a separate error_label field.",
+    "source": "xml_change_markup"
+  },
+  "approximate_record_count": 1425956,
+  "cefr_representation": "none_observed",
+  "cleaned_corpus_presence": true,
+  "corrected_text_available": true,
+  "correction_representation": "XML correct descendant; cleaned CSV corrected column is derived support.",
+  "count_type": "estimated",
+  "csv_embedded_error_labels": true,
+  "csv_embedded_label_field": "text",
+  "csv_embedded_label_fields_observed": [
+    "POS",
+    "corrected",
+    "original",
+    "text"
+  ],
+  "csv_error_label_semantics": {
+    "conclusion": "No standalone error-label column is present; source-native labels are embedded as <symbol> values inside XML-style change markup, primarily in the text field.",
+    "corrected_field_symbol_count": 348,
+    "field_change_counts": {
+      "POS": 348,
+      "corrected": 348,
+      "original": 348,
+      "text": 281727
+    },
+    "field_symbol_counts": {
+      "POS": 348,
+      "corrected": 348,
+      "original": 348,
+      "text": 281727
+    },
+    "fields_checked": [
+      "text",
+      "original",
+      "corrected",
+      "POS"
+    ],
+    "fields_with_symbol_markup": [
+      "POS",
+      "corrected",
+      "original",
+      "text"
+    ],
+    "has_standalone_error_label_column": false,
+    "original_field_symbol_count": 348,
+    "pos_field_symbol_count": 348,
+    "sample_symbols": [
+      "AG",
+      "AR",
+      "C",
+      "CO",
+      "D",
+      "EX",
+      "HL",
+      "IS",
+      "MW",
+      "NS",
+      "NSW",
+      "PH",
+      "PL",
+      "PO",
+      "PR",
+      "PS",
+      "PU",
+      "SI",
+      "SP",
+      "VT",
+      "WC",
+      "WO",
+      "Word Limit",
+      "XC"
+    ],
+    "sampled_rows": 50000,
+    "standalone_error_label_column": null,
+    "text_field_symbol_count": 281727,
+    "unique_symbol_count": 24
+  },
+  "csv_has_standalone_error_labels": false,
+  "detected_version": "unavailable",
+  "document_hierarchy": {
+    "record_unit": "writing",
+    "xml_attribute_keys": {
+      "br": [],
+      "change": [],
+      "correct": [],
+      "date": [],
+      "grade": [],
+      "key": [],
+      "learner": [
+        "id",
+        "nationality"
+      ],
+      "meta": [],
+      "nationalities": [],
+      "selection": [
+        "id"
+      ],
+      "symbol": [],
+      "tag": [],
+      "text": [],
+      "title": [],
+      "topic": [
+        "id"
+      ],
+      "units": [],
+      "url": [],
+      "user": [],
+      "version": [],
+      "writing": [
+        "id",
+        "level",
+        "unit"
+      ],
+      "writings": []
+    },
+    "xml_tags_sample": [
+      "selection",
+      "meta",
+      "title",
+      "version",
+      "url",
+      "key",
+      "user",
+      "date",
+      "nationalities",
+      "units",
+      "writings",
+      "writing",
+      "learner",
+      "topic",
+      "grade",
+      "text",
+      "change",
+      "tag",
+      "symbol",
+      "correct",
+      "br"
+    ]
+  },
+  "document_identifier_fields": [
+    "writing.id",
+    "writingID"
+  ],
+  "error_annotated_text_count": {
+    "count": null,
+    "count_type": "unavailable",
+    "reason": "full annotation coverage requires full corpus scan"
+  },
+  "error_annotation_structure": {
+    "csv": "cleaned error-coded CSV has no standalone error-label column; source-native XML-style change/tag/symbol/correct markup is embedded in the text field",
+    "sample_xml_change_child_tags": [
+      "br",
+      "correct",
+      "selection",
+      "symbol",
+      "tag"
+    ],
+    "xml": "inline change elements with selection, tag/symbol, and correct descendants"
+  },
+  "error_annotations_available": true,
+  "error_coded_corpus_presence": true,
+  "error_label_vocabulary": {
+    "count_type": "sampled",
+    "notes": "Sampled from XML-style symbol descendants; the same markup is preserved in the cleaned CSV text field.",
+    "sample_labels": [
+      "AG",
+      "AR",
+      "C",
+      "CO",
+      "D",
+      "EX",
+      "HL",
+      "IS",
+      "MW",
+      "NS",
+      "NSW",
+      "PH",
+      "PL",
+      "PO",
+      "PR",
+      "PS",
+      "PU",
+      "SI",
+      "SP",
+      "VT",
+      "WC",
+      "WO",
+      "Word Limit",
+      "XC"
+    ],
+    "unique_error_label_count": 24
+  },
+  "estimated_learner_count": {
+    "count": null,
+    "count_type": "unavailable",
+    "reason": "learner ids require full corpus scan"
+  },
+  "estimated_text_count": {
+    "count": 1425956,
+    "count_type": "estimated",
+    "method": "pattern count in first 67108864 bytes extrapolated by file size"
+  },
+  "formats": [
+    ".csv",
+    ".pdf",
+    ".r",
+    ".txt",
+    ".xml",
+    ".zip"
+  ],
+  "ingestion_readiness": "READY_WITH_KNOWN_QUIRKS",
+  "inspection_errors": [],
+  "inspection_warnings": [],
+  "known_quirks": [
+    "Very large XML and CSV files require streaming inspection.",
+    "Course-level proficiency is not automatically equivalent to CEFR.",
+    "CSV contains free-text, XML-style annotation markup primarily in text, derived original/corrected fields, and POS-tagged learner text.",
+    "Sampled rows show small residual annotation markup counts in derived support fields; text remains the primary embedded annotation field.",
+    "CSV does not expose a standalone error_label column; parsers must read symbol labels from change markup."
+  ],
+  "learner_identifier_fields": [
+    "learner.id",
+    "learnerID"
+  ],
+  "learner_metadata_fields": [
+    "learner.id",
+    "learner.nationality",
+    "learnerID",
+    "nationality"
+  ],
+  "licensing": {
+    "license_status": "needs_manual_review",
+    "licensing_files": [
+      "D:/code/NLP_Final/data/raw/EFCAMDAT/EFCamDat-User-Agreement-2023.pdf"
+    ],
+    "redistribution_notes": "User agreement or terms are present locally; exact permissions require manual review."
+  },
+  "local_documentation_files": [
+    "D:/code/NLP_Final/data/raw/EFCAMDAT/Cleaned_Subcorpus (Shatz, 2020)/Cleaned-Subcorpus-Readme explanation file.pdf",
+    "D:/code/NLP_Final/data/raw/EFCAMDAT/EFCamDat-User-Agreement-2023.pdf"
+  ],
+  "malformed_sample_count": 0,
+  "nested_annotation_behavior": "unknown; XML supports structured change elements but nested semantics require parser design.",
+  "original_corpus_presence": true,
+  "original_text_available": true,
+  "parser_requirements": [
+    "Stream XML with iterparse; EFCAMDAT_Database.xml is too large for DOM parsing.",
+    "Treat XML-style change/tag/symbol/correct markup as the source-native annotation source-of-truth.",
+    "Use cleaned CSV as derived text/POS/correction support; do not infer missing label semantics from CSV columns.",
+    "Process cleaned error-coded CSV in chunks; it is a large text/POS support table.",
+    "Do not emit learner free text in diagnostic logs."
+  ],
+  "pii_risk": "explicit_metadata_fields",
+  "primary_identifiers": [
+    "writing.id",
+    "learner.id",
+    "topic.id",
+    "writingID",
+    "learnerID",
+    "topicID"
+  ],
+  "proficiency_level_values": {
+    "1": 9370,
+    "10": 1964,
+    "11": 782,
+    "12": 501,
+    "13": 485,
+    "14": 185,
+    "15": 93,
+    "2": 6097,
+    "3": 4996,
+    "4": 8874,
+    "5": 5154,
+    "6": 3350,
+    "7": 4411,
+    "8": 2073,
+    "9": 1665
+  },
+  "proficiency_representation": "course level/unit fields in XML/CSV; CEFR mapping not assumed",
+  "publication_year": "unknown",
+  "record_count_details": {
+    "cleaned_error_csv_rows": {
+      "count": 518741,
+      "count_type": "estimated",
+      "method": "file size divided by average first 10000 line bytes"
+    },
+    "xml_writing_count": {
+      "count": 1425956,
+      "count_type": "estimated",
+      "method": "pattern count in first 67108864 bytes extrapolated by file size"
+    }
+  },
+  "report_path": "data/reports/source_inventory/efcamdat_inspection.json",
+  "root_path": "data/raw/EFCAMDAT",
+  "schema_sample": {
+    "csv_annotation_fields": [
+      "text",
+      "original",
+      "corrected",
+      "POS"
+    ],
+    "csv_header": [
+      "",
+      "writingID",
+      "level",
+      "unit",
+      "learnerID",
+      "nationality",
+      "topicID",
+      "topic",
+      "grade",
+      "text",
+      "lvno",
+      "prof",
+      "original",
+      "corrected",
+      "POS"
+    ],
+    "xml_attribute_keys": {
+      "br": [],
+      "change": [],
+      "correct": [],
+      "date": [],
+      "grade": [],
+      "key": [],
+      "learner": [
+        "id",
+        "nationality"
+      ],
+      "meta": [],
+      "nationalities": [],
+      "selection": [
+        "id"
+      ],
+      "symbol": [],
+      "tag": [],
+      "text": [],
+      "title": [],
+      "topic": [
+        "id"
+      ],
+      "units": [],
+      "url": [],
+      "user": [],
+      "version": [],
+      "writing": [
+        "id",
+        "level",
+        "unit"
+      ],
+      "writings": []
+    },
+    "xml_tags": [
+      "selection",
+      "meta",
+      "title",
+      "version",
+      "url",
+      "key",
+      "user",
+      "date",
+      "nationalities",
+      "units",
+      "writings",
+      "writing",
+      "learner",
+      "topic",
+      "grade",
+      "text",
+      "change",
+      "tag",
+      "symbol",
+      "correct",
+      "br"
+    ]
+  },
+  "source_key": "efcamdat",
+  "source_name": "EFCAMDAT",
+  "span_representation": "XML selection text in change markup, not normalized offsets; CSV original/corrected are derived text views.",
+  "task_count": {
+    "count": null,
+    "count_type": "unavailable",
+    "reason": "requires full topic id scan"
+  },
+  "task_identifier_fields": [
+    "topic.id",
+    "topicID"
+  ],
+  "task_prompt_metadata_presence": true,
+  "text_metadata_fields": [
+    "level",
+    "unit",
+    "topicID",
+    "topic",
+    "grade"
+  ]
+}

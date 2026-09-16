@@ -1,23 +1,18 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Sans, Space_Grotesk } from "next/font/google";
+import { Inter } from "next/font/google";
 
+import { Providers } from "@/components/providers";
 import "antd/dist/reset.css";
 import "./globals.css";
 
-const headingFont = Space_Grotesk({
+const inter = Inter({
   subsets: ["latin"],
-  variable: "--font-heading",
-});
-
-const bodyFont = IBM_Plex_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  variable: "--font-body",
+  variable: "--font-sans",
 });
 
 export const metadata: Metadata = {
-  title: "Personalized English Practice",
-  description: "Practice workflow for a personalized English exercise chatbot.",
+  title: "LingoFlow Adaptive English",
+  description: "Adaptive English learning workspace for tutoring and practice.",
 };
 
 export default function RootLayout({
@@ -27,8 +22,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="vi">
-      <body className={`${headingFont.variable} ${bodyFont.variable}`}>
-        {children}
+      <body className={`${inter.variable} bg-ae-page text-ae-ink antialiased`}>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

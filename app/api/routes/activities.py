@@ -11,13 +11,50 @@ from app.api.dependencies import (
 from app.api.schemas import (
     ActivityReviewResponseModel,
     ActivitySubmitResponseModel,
+    LearningActivityListResponseModel,
     LearningActivityResponseModel,
     SubmitActivityRequestModel,
 )
 from app.conversation.schemas import ConversationRoute
-from app.schemas import ConversationIntent, LearningActivityType, SubmittedAnswer
+from app.schemas import (
+    ConversationIntent,
+    LearningActivityStatus,
+    LearningActivityType,
+    SubmittedAnswer,
+)
 
 router = APIRouter()
+
+
+@router.get(
+    "/api/users/{user_id}/activities",
+    response_model=LearningActivityListResponseModel,
+)
+def list_user_activities(
+    user_id: str,
+    status: list[str] | None = Query(default=None),
+    limit: int = Query(default=50, ge=0, le=200),
+    authorization: str | None = Header(default=None),
+) -> LearningActivityListResponseModel:
+    authorize_user(user_id, authorization)
+    pipeline = get_pipeline()
+    try:
+        statuses = [
+            LearningActivityStatus(status_value)
+            for status_value in status or []
+        ]
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid activity status.") from exc
+    return LearningActivityListResponseModel(
+        activities=[
+            LearningActivityResponseModel(**learning_activity_payload(activity))
+            for activity in pipeline.repository.list_user_activities(
+                user_id,
+                statuses=statuses or None,
+                limit=limit,
+            )
+        ],
+    )
 
 
 @router.post(

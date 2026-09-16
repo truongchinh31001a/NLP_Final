@@ -1,4 +1,6 @@
+import json
 import unittest
+from unittest.mock import patch
 
 from app.config import AppConfig
 from app.conversation.router import ConversationRouter
@@ -15,6 +17,20 @@ from app.schemas import (
 )
 
 
+class _FakeHTTPResponse:
+    def __init__(self, payload: dict) -> None:
+        self.payload = payload
+
+    def __enter__(self) -> "_FakeHTTPResponse":
+        return self
+
+    def __exit__(self, *_args: object) -> None:
+        return None
+
+    def read(self) -> bytes:
+        return json.dumps(self.payload).encode("utf-8")
+
+
 class ConversationRouterTests(unittest.TestCase):
     def setUp(self) -> None:
         config = AppConfig(llm_backend="none")
@@ -23,6 +39,24 @@ class ConversationRouterTests(unittest.TestCase):
             config,
             PracticeIntentInterpreter(config, parser),
         )
+
+    def test_canonical_practice_request_routes_to_practice(self) -> None:
+        route = self.router.route(
+            message="Cho t\u00f4i 5 c\u00e2u Past Simple.",
+            context=self._context(),
+        )
+
+        self.assertEqual(route.intent, ConversationIntent.PRACTICE)
+        self.assertEqual(route.practice_request.topic, "tenses")
+        self.assertEqual(
+            route.practice_request.target_subtopic,
+            "past_simple_finished_time",
+        )
+        self.assertEqual(route.practice_request.num_questions, 5)
+        self.assertTrue(route.requires_context)
+        self.assertIsNone(route.target_activity_id)
+        self.assertEqual(route.missing_slots, [])
+        self.assertEqual(route.next_action, "practice.interpret")
 
     def test_practice_request_routes_to_practice_interpreter(self) -> None:
         route = self.router.route(
@@ -34,6 +68,18 @@ class ConversationRouterTests(unittest.TestCase):
         self.assertEqual(route.practice_request.topic, "passive_voice")
         self.assertEqual(route.practice_request.num_questions, 10)
         self.assertEqual(route.slots["topic"], "passive_voice")
+        self.assertFalse(route.needs_clarification)
+
+    def test_canonical_explain_request_routes_to_explain(self) -> None:
+        route = self.router.route(
+            message="Present Perfect d\u00f9ng khi n\u00e0o?",
+            context=self._context(),
+        )
+
+        self.assertEqual(route.intent, ConversationIntent.EXPLAIN)
+        self.assertEqual(route.slots["concept"], "present_perfect")
+        self.assertTrue(route.requires_context)
+        self.assertEqual(route.next_action, "explain.respond")
         self.assertFalse(route.needs_clarification)
 
     def test_explain_concept_is_not_forced_into_practice(self) -> None:
@@ -65,6 +111,8 @@ class ConversationRouterTests(unittest.TestCase):
         self.assertEqual(route.intent, ConversationIntent.REVIEW)
         self.assertEqual(route.slots["question_number"], 3)
         self.assertEqual(route.slots["activity_id"], "activity_1")
+        self.assertEqual(route.target_activity_id, "activity_1")
+        self.assertEqual(route.next_action, "review.open")
         self.assertFalse(route.needs_clarification)
 
     def test_review_prefers_latest_reviewable_activity_over_ready_activity(self) -> None:
@@ -106,6 +154,10 @@ class ConversationRouterTests(unittest.TestCase):
 
         self.assertEqual(route.intent, ConversationIntent.REVIEW)
         self.assertTrue(route.needs_clarification)
+        self.assertTrue(route.requires_context)
+        self.assertIsNone(route.target_activity_id)
+        self.assertEqual(route.missing_slots, ["activity_id"])
+        self.assertEqual(route.next_action, "clarification.ask")
         self.assertEqual(
             route.pending_clarification.pending_intent,
             ConversationIntent.REVIEW,
@@ -138,6 +190,8 @@ class ConversationRouterTests(unittest.TestCase):
 
         self.assertEqual(route.intent, ConversationIntent.PROGRESS)
         self.assertEqual(route.slots["metric"], "weak_areas")
+        self.assertTrue(route.requires_context)
+        self.assertEqual(route.next_action, "progress.open")
 
     def test_lowest_skill_question_routes_to_progress(self) -> None:
         route = self.router.route(
@@ -167,6 +221,18 @@ class ConversationRouterTests(unittest.TestCase):
         self.assertEqual(route.intent, ConversationIntent.PROFILE_UPDATE)
         self.assertEqual(route.slots["preferred_difficulty"], "hard")
         self.assertEqual(route.slots["preferred_num_questions"], 10)
+        self.assertEqual(route.next_action, "profile.update")
+
+    def test_canonical_future_count_preference_routes_to_profile_update(self) -> None:
+        route = self.router.route(
+            message="T\u1eeb gi\u1edd m\u1ed7i b\u00e0i 5 c\u00e2u th\u00f4i.",
+            context=self._context(),
+        )
+
+        self.assertEqual(route.intent, ConversationIntent.PROFILE_UPDATE)
+        self.assertEqual(route.slots["preferred_num_questions"], 5)
+        self.assertTrue(route.requires_context)
+        self.assertEqual(route.next_action, "profile.update")
 
     def test_continue_weakest_area_routes_to_practice(self) -> None:
         route = self.router.route(
@@ -192,6 +258,8 @@ class ConversationRouterTests(unittest.TestCase):
         )
 
         self.assertEqual(route.intent, ConversationIntent.GENERAL)
+        self.assertFalse(route.requires_context)
+        self.assertEqual(route.next_action, "conversation.reply")
 
     def test_short_reading_focus_selection_routes_to_reading_activity(self) -> None:
         route = self.router.route(
@@ -250,6 +318,93 @@ class ConversationRouterTests(unittest.TestCase):
         self.assertEqual(route.practice_request.topic, "passive_voice")
         self.assertFalse(route.needs_clarification)
 
+    def test_ambiguous_request_uses_llm_fallback_when_enabled(self) -> None:
+        router = self._llm_router()
+        llm_content = json.dumps(
+            {
+                "intent": "EXPLAIN",
+                "confidence": 0.73,
+                "reason": "The learner asks an underspecified English question.",
+                "slots": {"concept": "conditionals"},
+                "needs_clarification": False,
+                "missing_slots": [],
+            },
+        )
+
+        with patch(
+            "app.conversation.router.urllib.request.urlopen",
+            return_value=_FakeHTTPResponse({"message": {"content": llm_content}}),
+        ):
+            route = router.route(
+                message="Can you help me understand this bit?",
+                context=self._context(),
+            )
+
+        self.assertEqual(route.intent, ConversationIntent.EXPLAIN)
+        self.assertEqual(route.confidence, 0.73)
+        self.assertEqual(route.source, "llm-ollama")
+        self.assertTrue(route.requires_context)
+        self.assertEqual(route.next_action, "explain.respond")
+
+    def test_low_confidence_llm_route_falls_back_to_general(self) -> None:
+        router = self._llm_router()
+        llm_content = json.dumps(
+            {
+                "intent": "REVIEW",
+                "confidence": 0.42,
+                "reason": "Too uncertain.",
+                "slots": {},
+                "needs_clarification": False,
+                "missing_slots": [],
+            },
+        )
+
+        with patch(
+            "app.conversation.router.urllib.request.urlopen",
+            return_value=_FakeHTTPResponse({"message": {"content": llm_content}}),
+        ):
+            route = router.route(
+                message="Maybe that thing from earlier?",
+                context=self._context(),
+            )
+
+        self.assertEqual(route.intent, ConversationIntent.GENERAL)
+        self.assertEqual(route.source, "fallback")
+        self.assertEqual(route.confidence, 0.55)
+        self.assertFalse(route.requires_context)
+
+    def test_llm_clarification_populates_missing_slots_contract(self) -> None:
+        router = self._llm_router()
+        llm_content = json.dumps(
+            {
+                "intent": "REVIEW",
+                "confidence": 0.7,
+                "reason": "The learner refers to a previous answer without a target.",
+                "slots": {"review_focus": "mistake"},
+                "needs_clarification": True,
+                "missing_slots": ["activity_id"],
+                "clarification_question": "Ban muon xem lai bai nao?",
+            },
+        )
+
+        with patch(
+            "app.conversation.router.urllib.request.urlopen",
+            return_value=_FakeHTTPResponse({"message": {"content": llm_content}}),
+        ):
+            route = router.route(
+                message="Can we look at the earlier one?",
+                context=self._context(),
+            )
+
+        self.assertEqual(route.intent, ConversationIntent.REVIEW)
+        self.assertTrue(route.needs_clarification)
+        self.assertEqual(route.missing_slots, ["activity_id"])
+        self.assertEqual(route.next_action, "clarification.ask")
+        self.assertEqual(
+            route.pending_clarification.pending_intent,
+            ConversationIntent.REVIEW,
+        )
+
     def _context(
         self,
         *,
@@ -266,6 +421,17 @@ class ConversationRouterTests(unittest.TestCase):
             active_activity=active_activity,
             pending_clarification=pending_clarification,
             recent_context=recent_context or {},
+        )
+
+    def _llm_router(self) -> ConversationRouter:
+        config = AppConfig(
+            llm_backend="ollama",
+            conversation_router_llm_enabled=True,
+        )
+        parser = IntentParser(config)
+        return ConversationRouter(
+            config,
+            PracticeIntentInterpreter(config, parser),
         )
 
 

@@ -1,6 +1,7 @@
 from app.config import AppConfig
 from app.agent.learning_agent import LearningAgent
 from app.agent.workflow_graph import LearningWorkflowGraph
+from app.activities.service import ActivityService
 from app.activities.practice_service import (
     PracticeActivityGeneration,
     PracticeActivityService,
@@ -79,6 +80,7 @@ class PracticePipeline:
             config,
             practice_intent,
         )
+        self.activity_service = ActivityService(repository)
         self.conversation_service = ConversationService(
             config,
             repository,
@@ -96,11 +98,13 @@ class PracticePipeline:
             recommendation=recommendation,
             review=review,
             diagnosis=diagnosis,
+            activity_service=self.activity_service,
         )
         self.practice_activity_service = PracticeActivityService(
             config=config,
             repository=repository,
             agent=self.agent,
+            activity_service=self.activity_service,
         )
         self.reading_activity_service = ReadingActivityService(
             config=config,

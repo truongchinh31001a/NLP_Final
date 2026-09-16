@@ -1,0 +1,758 @@
+{
+  "classified_raw_datasets": [
+    {
+      "file_count": 695,
+      "files_by_extension": {
+        ".docx": 186,
+        ".jpg": 2,
+        ".json": 185,
+        ".png": 320,
+        ".xlsx": 2
+      },
+      "included_in_knowledge_core_inventory": false,
+      "inferred_role": "unrelated_project_dataset",
+      "markers": {
+        "root_name": "Dataset",
+        "sample_file_names": [
+          "MET_Eng_IE_2019.json",
+          "MET_Eng_IE_2020.json",
+          "MET_Eng_IE_2021.json",
+          "MET_Eng_IE_2022.json",
+          "MET_Eng_IE_2023.json",
+          "MET_Eng_IE_2019.docx",
+          "MET_Eng_IE_2020.docx",
+          "MET_Eng_IE_2021.docx",
+          "MET_Eng_IE_2022.docx",
+          "MET_Eng_IE_2023.docx",
+          "MET_Bio_IE_2019.json",
+          "MET_Bio_IE_2020.json",
+          "MET_Bio_IE_2021.json",
+          "MET_Bio_IE_2022.json",
+          "MET_Bio_IE_2023.json",
+          "image001.png",
+          "image001.png",
+          "image001.png",
+          "image002.png",
+          "image001.png"
+        ],
+        "sample_relative_paths": [
+          "VNHSGE-E/JSON format/eval/English/MET_Eng_IE_2019.json",
+          "VNHSGE-E/JSON format/eval/English/MET_Eng_IE_2020.json",
+          "VNHSGE-E/JSON format/eval/English/MET_Eng_IE_2021.json",
+          "VNHSGE-E/JSON format/eval/English/MET_Eng_IE_2022.json",
+          "VNHSGE-E/JSON format/eval/English/MET_Eng_IE_2023.json",
+          "VNHSGE-E/Word format/eval/English/MET_Eng_IE_2019.docx",
+          "VNHSGE-E/Word format/eval/English/MET_Eng_IE_2020.docx",
+          "VNHSGE-E/Word format/eval/English/MET_Eng_IE_2021.docx",
+          "VNHSGE-E/Word format/eval/English/MET_Eng_IE_2022.docx",
+          "VNHSGE-E/Word format/eval/English/MET_Eng_IE_2023.docx",
+          "VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2019.json",
+          "VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2020.json",
+          "VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2021.json",
+          "VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2022.json",
+          "VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2023.json",
+          "VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2019/image001.png",
+          "VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2020/image001.png",
+          "VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2021/image001.png",
+          "VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2021/image002.png",
+          "VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2022/image001.png"
+        ],
+        "top_level_dirs": [
+          "VNHSGE-E",
+          "VNHSGE-V"
+        ]
+      },
+      "path": "data/raw/Dataset",
+      "reason": "Directory contains VNHSGE/MET exam-style files with JSON/DOCX/image assets across school subjects; it is not one of the six Knowledge Core V1 sources.",
+      "representative_files": [
+        "data/raw/Dataset/VNHSGE-E/JSON format/eval/English/MET_Eng_IE_2019.json",
+        "data/raw/Dataset/VNHSGE-E/JSON format/eval/English/MET_Eng_IE_2020.json",
+        "data/raw/Dataset/VNHSGE-E/JSON format/eval/English/MET_Eng_IE_2021.json",
+        "data/raw/Dataset/VNHSGE-E/JSON format/eval/English/MET_Eng_IE_2022.json",
+        "data/raw/Dataset/VNHSGE-E/JSON format/eval/English/MET_Eng_IE_2023.json",
+        "data/raw/Dataset/VNHSGE-E/Word format/eval/English/MET_Eng_IE_2019.docx",
+        "data/raw/Dataset/VNHSGE-E/Word format/eval/English/MET_Eng_IE_2020.docx",
+        "data/raw/Dataset/VNHSGE-E/Word format/eval/English/MET_Eng_IE_2021.docx",
+        "data/raw/Dataset/VNHSGE-E/Word format/eval/English/MET_Eng_IE_2022.docx",
+        "data/raw/Dataset/VNHSGE-E/Word format/eval/English/MET_Eng_IE_2023.docx",
+        "data/raw/Dataset/VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2019.json",
+        "data/raw/Dataset/VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2020.json",
+        "data/raw/Dataset/VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2021.json",
+        "data/raw/Dataset/VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2022.json",
+        "data/raw/Dataset/VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2023.json",
+        "data/raw/Dataset/VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2019/image001.png",
+        "data/raw/Dataset/VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2020/image001.png",
+        "data/raw/Dataset/VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2021/image001.png",
+        "data/raw/Dataset/VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2021/image002.png",
+        "data/raw/Dataset/VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2022/image001.png"
+      ],
+      "source_key": "excluded_raw_dataset",
+      "status": "unrelated_to_knowledge_core_v1"
+    }
+  ],
+  "expected_sources": [
+    "efcamdat",
+    "clc_fce",
+    "write_improve",
+    "ud_english_ewt",
+    "english_grammar_profile",
+    "cefr_companion_volume_2020"
+  ],
+  "generated_at": "2026-09-16T10:51:53.123317+00:00",
+  "inspection_errors": [],
+  "inspection_warnings": [],
+  "sources": [
+    {
+      "approximate_record_count": 1425956,
+      "archive_files": [
+        "data/raw/EFCAMDAT/Cleaned_Error-coded_Subcorpus (Öksüz et al., 2025)/R scripts/1 - Processing EFCAMDAT/EFCAMDAT_tbc.xml.zip",
+        "data/raw/EFCAMDAT/Cleaned_Error-coded_Subcorpus (Öksüz et al., 2025)/R scripts/3 - Detecting non-English texts/ef2_tbc_rmvhtml.csv.zip",
+        "data/raw/EFCAMDAT/Cleaned_Error-coded_Subcorpus (Öksüz et al., 2025)/R scripts/4 - POS tagging/Corrected.txt.zip",
+        "data/raw/EFCAMDAT/Cleaned_Error-coded_Subcorpus (Öksüz et al., 2025)/R scripts/4 - POS tagging/efcamdat_error_labelled_including_corrected_original_wordcount_columns.csv.zip",
+        "data/raw/EFCAMDAT/Cleaned_Error-coded_Subcorpus (Öksüz et al., 2025)/R scripts/4 - POS tagging/original_POStagged.txt.zip"
+      ],
+      "cefr_representation": "none_observed",
+      "correction_representation": "XML correct descendant; cleaned CSV corrected column is derived support.",
+      "count_type": "estimated",
+      "detected_version": "unavailable",
+      "document_identifier_fields": [
+        "writing.id",
+        "writingID"
+      ],
+      "error_annotation_unit": "change element or cleaned CSV row",
+      "error_label_field": "XML-style symbol descendant in change markup; no standalone CSV error-label column",
+      "file_count": 14,
+      "file_formats": [
+        ".csv",
+        ".pdf",
+        ".r",
+        ".txt",
+        ".xml",
+        ".zip"
+      ],
+      "files_by_extension": {
+        ".csv": 1,
+        ".pdf": 4,
+        ".r": 1,
+        ".txt": 2,
+        ".xml": 1,
+        ".zip": 5
+      },
+      "has_corrected_text": true,
+      "has_error_annotations": true,
+      "has_original_text": true,
+      "has_revision_history": false,
+      "has_task_metadata": true,
+      "ingestion_readiness": "READY_WITH_KNOWN_QUIRKS",
+      "inspection_errors": [],
+      "inspection_warnings": [],
+      "known_quirks": [
+        "Very large XML and CSV files require streaming inspection.",
+        "Course-level proficiency is not automatically equivalent to CEFR.",
+        "CSV contains free-text, XML-style annotation markup primarily in text, derived original/corrected fields, and POS-tagged learner text.",
+        "Sampled rows show small residual annotation markup counts in derived support fields; text remains the primary embedded annotation field.",
+        "CSV does not expose a standalone error_label column; parsers must read symbol labels from change markup."
+      ],
+      "learner_identifier_fields": [
+        "learner.id",
+        "learnerID"
+      ],
+      "license_files": [
+        "data/raw/EFCAMDAT/EFCamDat-User-Agreement-2023.pdf"
+      ],
+      "license_status": "needs_manual_review",
+      "licensing_files": [
+        "D:/code/NLP_Final/data/raw/EFCAMDAT/EFCamDat-User-Agreement-2023.pdf"
+      ],
+      "nested_archive_files": [],
+      "optional_enrichment": false,
+      "parser_requirements": [
+        "Stream XML with iterparse; EFCAMDAT_Database.xml is too large for DOM parsing.",
+        "Treat XML-style change/tag/symbol/correct markup as the source-native annotation source-of-truth.",
+        "Use cleaned CSV as derived text/POS/correction support; do not infer missing label semantics from CSV columns.",
+        "Process cleaned error-coded CSV in chunks; it is a large text/POS support table.",
+        "Do not emit learner free text in diagnostic logs."
+      ],
+      "pii_risk": "explicit_metadata_fields",
+      "primary_identifiers": [
+        "writing.id",
+        "learner.id",
+        "topic.id",
+        "writingID",
+        "learnerID",
+        "topicID"
+      ],
+      "proficiency_representation": "course level/unit fields in XML/CSV; CEFR mapping not assumed",
+      "publication_year": "unknown",
+      "readme_files": [
+        "data/raw/EFCAMDAT/Cleaned_Subcorpus (Shatz, 2020)/Cleaned-Subcorpus-Readme explanation file.pdf"
+      ],
+      "record_unit": "writing",
+      "redistribution_notes": "User agreement or terms are present locally; exact permissions require manual review.",
+      "representative_files": [
+        "data/raw/EFCAMDAT/Cleaned_Error-coded_Subcorpus (Öksüz et al., 2025)/R scripts/1 - Processing EFCAMDAT/1 - parsing EFCAMDAT.R",
+        "data/raw/EFCAMDAT/Cleaned_Error-coded_Subcorpus (Öksüz et al., 2025)/R scripts/1 - Processing EFCAMDAT/EFCAMDAT_tbc.xml.zip",
+        "data/raw/EFCAMDAT/Cleaned_Error-coded_Subcorpus (Öksüz et al., 2025)/R scripts/3 - Detecting non-English texts/ef2_tbc_rmvhtml.csv.zip",
+        "data/raw/EFCAMDAT/Cleaned_Error-coded_Subcorpus (Öksüz et al., 2025)/R scripts/4 - POS tagging/Corrected.txt",
+        "data/raw/EFCAMDAT/Cleaned_Error-coded_Subcorpus (Öksüz et al., 2025)/R scripts/4 - POS tagging/Corrected.txt.zip",
+        "data/raw/EFCAMDAT/Cleaned_Error-coded_Subcorpus (Öksüz et al., 2025)/R scripts/4 - POS tagging/efcamdat_error_labelled_including_corrected_original_wordcount_columns.csv.zip",
+        "data/raw/EFCAMDAT/Cleaned_Error-coded_Subcorpus (Öksüz et al., 2025)/R scripts/4 - POS tagging/original_POStagged.txt.zip",
+        "data/raw/EFCAMDAT/Cleaned_Error-coded_Subcorpus (Öksüz et al., 2025)/ef_POStagged_original_corrected.csv",
+        "data/raw/EFCAMDAT/Cleaned_Subcorpus (Shatz, 2020)/Cleaned-Subcorpus-Readme explanation file.pdf",
+        "data/raw/EFCAMDAT/Cleaned_Subcorpus (Shatz, 2020)/Note on scripts.txt",
+        "data/raw/EFCAMDAT/EFCAMDAT_Database.xml",
+        "data/raw/EFCAMDAT/EFCamDat-User-Agreement-2023.pdf"
+      ],
+      "required_for_v1": true,
+      "root_path": "data/raw/EFCAMDAT",
+      "source_key": "efcamdat",
+      "source_name": "EFCAMDAT",
+      "source_role": [
+        "annotated_error_corpus",
+        "learner_corpus"
+      ],
+      "span_representation": "XML selection text in change markup, not normalized offsets; CSV original/corrected are derived text views.",
+      "status": "discovered",
+      "task_identifier_fields": [
+        "topic.id",
+        "topicID"
+      ],
+      "total_size_bytes": 3523881871
+    },
+    {
+      "approximate_record_count": 2543,
+      "archive_files": [],
+      "cefr_representation": [
+        "FCE exam level B2 documented in README"
+      ],
+      "correction_representation": "edits correction slot in JSON and c elements in XML",
+      "count_type": "exact",
+      "detected_version": "1.1",
+      "document_identifier_fields": [
+        "id",
+        "session",
+        "q"
+      ],
+      "error_annotation_unit": "edit span / XML e element",
+      "error_label_field": "JSON edit[3] or XML e.type",
+      "file_count": 12,
+      "file_formats": [
+        ".json",
+        ".pdf",
+        ".xml",
+        "[no_extension]"
+      ],
+      "files_by_extension": {
+        ".json": 5,
+        ".pdf": 1,
+        ".xml": 5,
+        "[no_extension]": 1
+      },
+      "has_corrected_text": true,
+      "has_error_annotations": true,
+      "has_original_text": true,
+      "has_revision_history": false,
+      "has_task_metadata": true,
+      "ingestion_readiness": "READY_WITH_KNOWN_QUIRKS",
+      "inspection_errors": [],
+      "inspection_warnings": [],
+      "known_quirks": [
+        "Dataset has both XML and line-delimited JSON representations.",
+        "JSON is derived and intentionally loses true nested XML structure."
+      ],
+      "learner_identifier_fields": [
+        "id",
+        "l1",
+        "age"
+      ],
+      "license_files": [],
+      "license_status": "needs_manual_review",
+      "licensing_files": [
+        "D:/code/NLP_Final/data/raw/_fce-released-dataset-1.1/README"
+      ],
+      "nested_archive_files": [],
+      "optional_enrichment": false,
+      "parser_requirements": [
+        "Prefer XML when nested error structure must be preserved.",
+        "JSONL is easier for answer-level parsing but flattens nested errors into compound tags.",
+        "Keep train/dev/test/outlier split metadata separate from script identifiers."
+      ],
+      "pii_risk": "possible_free_text",
+      "primary_identifiers": [
+        "id",
+        "session",
+        "q"
+      ],
+      "proficiency_representation": [
+        "FCE exam level B2 documented in README"
+      ],
+      "publication_year": "unknown",
+      "readme_files": [
+        "data/raw/_fce-released-dataset-1.1/README"
+      ],
+      "record_unit": "answer record",
+      "redistribution_notes": "Local README states release for non-commercial research and educational purposes; review full local terms before redistribution.",
+      "representative_files": [
+        "data/raw/_fce-released-dataset-1.1/FCE-Handbook-2001-writing(oeistein.andersen@cambridge.org).pdf",
+        "data/raw/_fce-released-dataset-1.1/README",
+        "data/raw/_fce-released-dataset-1.1/dev(oeistein.andersen@cambridge.org).json",
+        "data/raw/_fce-released-dataset-1.1/dev(oeistein.andersen@cambridge.org).xml",
+        "data/raw/_fce-released-dataset-1.1/outliers(oeistein.andersen@cambridge.org).json",
+        "data/raw/_fce-released-dataset-1.1/outliers(oeistein.andersen@cambridge.org).xml",
+        "data/raw/_fce-released-dataset-1.1/questions(oeistein.andersen@cambridge.org).json",
+        "data/raw/_fce-released-dataset-1.1/questions(oeistein.andersen@cambridge.org).xml",
+        "data/raw/_fce-released-dataset-1.1/test(oeistein.andersen@cambridge.org).json",
+        "data/raw/_fce-released-dataset-1.1/test(oeistein.andersen@cambridge.org).xml",
+        "data/raw/_fce-released-dataset-1.1/train(oeistein.andersen@cambridge.org).json",
+        "data/raw/_fce-released-dataset-1.1/train(oeistein.andersen@cambridge.org).xml"
+      ],
+      "required_for_v1": true,
+      "root_path": "data/raw/_fce-released-dataset-1.1",
+      "source_key": "clc_fce",
+      "source_name": "Cambridge Learner Corpus FCE",
+      "source_role": [
+        "annotated_error_corpus"
+      ],
+      "span_representation": "JSON character offsets; XML inline spans.",
+      "status": "discovered",
+      "task_identifier_fields": [
+        "q",
+        "session",
+        "questions XML/JSON prompt files"
+      ],
+      "total_size_bytes": 23089888
+    },
+    {
+      "approximate_record_count": 23216,
+      "archive_files": [],
+      "cefr_representation": {
+        "automarker_cefr_level": {
+          "A1": 20,
+          "A1+": 251,
+          "A2": 1560,
+          "A2+": 3191,
+          "B1": 3611,
+          "B1+": 3502,
+          "B2": 3414,
+          "B2+": 3018,
+          "C1": 2052,
+          "C1+": 1304,
+          "C2": 738,
+          "C2+": 554,
+          "pre-A1": 1
+        },
+        "humannotator_cefr_level": {
+          "A1": 1,
+          "A1+": 11,
+          "A2": 202,
+          "A2+": 846,
+          "B1": 959,
+          "B1+": 1073,
+          "B2": 919,
+          "B2+": 529,
+          "C1": 370,
+          "C1+": 102,
+          "C2": 38,
+          "NA": 18166
+        }
+      },
+      "correction_representation": ".corr and M2 corrections for train/dev; test may be original-only",
+      "count_type": "exact",
+      "detected_version": "2024-v2",
+      "document_identifier_fields": [
+        "public_essay_id"
+      ],
+      "error_annotation_unit": "M2 edit",
+      "error_label_field": "M2 error type between separators",
+      "file_count": 82,
+      "file_formats": [
+        ".conll",
+        ".corr",
+        ".ids",
+        ".m2",
+        ".md",
+        ".orig",
+        ".py",
+        ".tmp",
+        ".tsv",
+        "[no_extension]"
+      ],
+      "files_by_extension": {
+        ".conll": 8,
+        ".corr": 4,
+        ".ids": 6,
+        ".m2": 10,
+        ".md": 18,
+        ".orig": 6,
+        ".py": 6,
+        ".tmp": 17,
+        ".tsv": 6,
+        "[no_extension]": 1
+      },
+      "has_corrected_text": true,
+      "has_error_annotations": true,
+      "has_original_text": true,
+      "has_revision_history": true,
+      "has_task_metadata": true,
+      "ingestion_readiness": "READY_WITH_KNOWN_QUIRKS",
+      "inspection_errors": [],
+      "inspection_warnings": [],
+      "known_quirks": [
+        "Several files are derived views of the same responses.",
+        "First-version and final-version folders represent different slices of revision history.",
+        "M2 labels are ERRANT-style source-native labels, not normalized misconceptions."
+      ],
+      "learner_identifier_fields": [
+        "public_user_id"
+      ],
+      "license_files": [],
+      "license_status": "needs_manual_review",
+      "licensing_files": [
+        "D:/code/NLP_Final/data/raw/write-and-improve-corpus-2024-v2/README",
+        "D:/code/NLP_Final/data/raw/write-and-improve-corpus-2024-v2/multigec-2025-files/local_eval/README.md"
+      ],
+      "nested_archive_files": [],
+      "optional_enrichment": true,
+      "parser_requirements": [
+        "Use TSV whole-corpus metadata as the response/revision spine.",
+        "Use public_user_id + public_prompt_id + essay_version_num for revision ordering.",
+        "Parse M2 and CoNLL files as derived annotation views, preserving train/dev/test splits.",
+        "Do not assume test split has gold corrections."
+      ],
+      "pii_risk": "possible_free_text",
+      "primary_identifiers": [
+        "public_user_id"
+      ],
+      "proficiency_representation": "unavailable",
+      "publication_year": "2024",
+      "readme_files": [
+        "data/raw/write-and-improve-corpus-2024-v2/README",
+        "data/raw/write-and-improve-corpus-2024-v2/multigec-2025-files/local_eval/README.md"
+      ],
+      "record_unit": "essay version",
+      "redistribution_notes": "README is present locally, but no standalone license conclusion was inferred.",
+      "representative_files": [
+        "data/raw/write-and-improve-corpus-2024-v2/README",
+        "data/raw/write-and-improve-corpus-2024-v2/multigec-2025-files/en-writeandimprove2024-orig-dev.md",
+        "data/raw/write-and-improve-corpus-2024-v2/multigec-2025-files/en-writeandimprove2024-orig-dev.tmp",
+        "data/raw/write-and-improve-corpus-2024-v2/multigec-2025-files/en-writeandimprove2024-orig-test.md",
+        "data/raw/write-and-improve-corpus-2024-v2/multigec-2025-files/en-writeandimprove2024-orig-test.tmp",
+        "data/raw/write-and-improve-corpus-2024-v2/multigec-2025-files/en-writeandimprove2024-orig-train.md",
+        "data/raw/write-and-improve-corpus-2024-v2/multigec-2025-files/en-writeandimprove2024-orig-train.tmp",
+        "data/raw/write-and-improve-corpus-2024-v2/multigec-2025-files/en-writeandimprove2024-ref1-dev.m2",
+        "data/raw/write-and-improve-corpus-2024-v2/multigec-2025-files/en-writeandimprove2024-ref1-dev.md",
+        "data/raw/write-and-improve-corpus-2024-v2/multigec-2025-files/en-writeandimprove2024-ref1-dev.tmp",
+        "data/raw/write-and-improve-corpus-2024-v2/multigec-2025-files/en-writeandimprove2024-ref1-train.md",
+        "data/raw/write-and-improve-corpus-2024-v2/multigec-2025-files/en-writeandimprove2024-ref1-train.tmp"
+      ],
+      "required_for_v1": false,
+      "root_path": "data/raw/write-and-improve-corpus-2024-v2",
+      "source_key": "write_improve",
+      "source_name": "Write & Improve Corpus 2024",
+      "source_role": [
+        "revision_corpus",
+        "annotated_error_corpus"
+      ],
+      "span_representation": null,
+      "status": "discovered",
+      "task_identifier_fields": {
+        "prompt_count": 50,
+        "prompt_fields": [
+          "question_id",
+          "public_prompt_id",
+          "n.essay.sets",
+          "n.essays",
+          "topic",
+          "genre",
+          "min_words",
+          "max_words",
+          "prompt_level",
+          "prompt"
+        ]
+      },
+      "total_size_bytes": 180076732
+    },
+    {
+      "approximate_record_count": 16622,
+      "archive_files": [],
+      "cefr_representation": "unavailable",
+      "correction_representation": null,
+      "count_type": "exact",
+      "detected_version": "Universal Dependencies English Web Treebank v2.18 -- 2026-05-15",
+      "document_identifier_fields": [],
+      "error_annotation_unit": null,
+      "error_label_field": null,
+      "file_count": 1202,
+      "file_formats": [
+        ".conllu",
+        ".dev",
+        ".ini",
+        ".log",
+        ".md",
+        ".py",
+        ".sh",
+        ".test",
+        ".train",
+        ".txt",
+        ".xml",
+        "[no_extension]"
+      ],
+      "files_by_extension": {
+        ".conllu": 1177,
+        ".dev": 1,
+        ".ini": 7,
+        ".log": 1,
+        ".md": 3,
+        ".py": 3,
+        ".sh": 4,
+        ".test": 1,
+        ".train": 1,
+        ".txt": 2,
+        ".xml": 1,
+        "[no_extension]": 1
+      },
+      "has_corrected_text": false,
+      "has_error_annotations": false,
+      "has_original_text": false,
+      "has_revision_history": false,
+      "has_task_metadata": false,
+      "ingestion_readiness": "READY",
+      "inspection_errors": [],
+      "inspection_warnings": [],
+      "known_quirks": [
+        "Use only released train/dev/test CoNLL-U files for parser design; not-to-release files are provenance/source material.",
+        "Enhanced dependencies are present in DEPS but may not have identical review status for every sentence.",
+        "This source is structural linguistic evidence, not learner error data."
+      ],
+      "learner_identifier_fields": [],
+      "license_files": [
+        "data/raw/UD_English-EWT-master/UD_English-EWT-master/LICENSE.txt"
+      ],
+      "license_status": "locally_documented_with_caveats",
+      "licensing_files": [
+        "D:/code/NLP_Final/data/raw/UD_English-EWT-master/UD_English-EWT-master/LICENSE.txt"
+      ],
+      "nested_archive_files": [],
+      "optional_enrichment": true,
+      "parser_requirements": [
+        "Parse CoNLL-U with comment preservation.",
+        "Represent multiword tokens and empty nodes separately from syntactic tokens.",
+        "Preserve FEATS, DEPREL, DEPS, and MISC fields source-natively."
+      ],
+      "pii_risk": "possible_free_text",
+      "primary_identifiers": [],
+      "proficiency_representation": "unavailable",
+      "publication_year": "unknown",
+      "readme_files": [
+        "data/raw/UD_English-EWT-master/UD_English-EWT-master/README.md",
+        "data/raw/UD_English-EWT-master/UD_English-EWT-master/not-to-release/file-lists/README.md"
+      ],
+      "record_unit": "sentence",
+      "redistribution_notes": "LICENSE is present locally; README notes annotation license and underlying text caveats.",
+      "representative_files": [
+        "data/raw/UD_English-EWT-master/UD_English-EWT-master/.gitignore",
+        "data/raw/UD_English-EWT-master/UD_English-EWT-master/CONTRIBUTING.md",
+        "data/raw/UD_English-EWT-master/UD_English-EWT-master/LICENSE.txt",
+        "data/raw/UD_English-EWT-master/UD_English-EWT-master/README.md",
+        "data/raw/UD_English-EWT-master/UD_English-EWT-master/en_ewt-ud-dev.conllu",
+        "data/raw/UD_English-EWT-master/UD_English-EWT-master/en_ewt-ud-test.conllu",
+        "data/raw/UD_English-EWT-master/UD_English-EWT-master/en_ewt-ud-train.conllu",
+        "data/raw/UD_English-EWT-master/UD_English-EWT-master/eval.log",
+        "data/raw/UD_English-EWT-master/UD_English-EWT-master/not-to-release/file-lists/README.md",
+        "data/raw/UD_English-EWT-master/UD_English-EWT-master/not-to-release/file-lists/files.dev",
+        "data/raw/UD_English-EWT-master/UD_English-EWT-master/not-to-release/file-lists/files.test",
+        "data/raw/UD_English-EWT-master/UD_English-EWT-master/not-to-release/file-lists/files.train"
+      ],
+      "required_for_v1": false,
+      "root_path": "data/raw/UD_English-EWT-master",
+      "source_key": "ud_english_ewt",
+      "source_name": "Universal Dependencies English EWT",
+      "source_role": [
+        "linguistic_structure_resource"
+      ],
+      "span_representation": null,
+      "status": "discovered",
+      "task_identifier_fields": [],
+      "total_size_bytes": 37907012
+    },
+    {
+      "approximate_record_count": 273,
+      "archive_files": [],
+      "cefr_representation": "explicit CEFR level per record",
+      "correction_representation": null,
+      "count_type": "exact",
+      "detected_version": "unavailable",
+      "document_identifier_fields": [],
+      "error_annotation_unit": null,
+      "error_label_field": null,
+      "file_count": 35,
+      "file_formats": [
+        ".json",
+        ".jsonl",
+        ".parquet",
+        ".xlsx"
+      ],
+      "files_by_extension": {
+        ".json": 17,
+        ".jsonl": 2,
+        ".parquet": 2,
+        ".xlsx": 14
+      },
+      "has_corrected_text": false,
+      "has_error_annotations": false,
+      "has_original_text": false,
+      "has_revision_history": false,
+      "has_task_metadata": false,
+      "ingestion_readiness": "READY",
+      "inspection_errors": [],
+      "inspection_warnings": [],
+      "known_quirks": [
+        "Search/export can include category-mismatch rows; V1 exclusions are documented separately.",
+        "EGP is grammar evidence, not learner error data."
+      ],
+      "learner_identifier_fields": [],
+      "license_files": [],
+      "license_status": "needs_manual_review",
+      "licensing_files": [],
+      "nested_archive_files": [],
+      "optional_enrichment": false,
+      "parser_requirements": [
+        "Use existing normalized EGP artifacts for V1 inventory.",
+        "Keep source exclusions explicit rather than deleting raw rows."
+      ],
+      "pii_risk": "none_observed",
+      "primary_identifiers": [
+        "source_record_id",
+        "category_id",
+        "source_row_number"
+      ],
+      "proficiency_representation": "CEFR",
+      "publication_year": "unknown",
+      "readme_files": [],
+      "record_unit": "EGP grammar profile record",
+      "redistribution_notes": "No local EGP license conclusion inferred by this inspection.",
+      "representative_files": [
+        "data/external/english_profile/Grammar/Clauses/Conditionals/conditional.metadata.json",
+        "data/external/english_profile/Grammar/Clauses/Conditionals/conditional.xlsx",
+        "data/external/english_profile/Grammar/Determiners/Articles/articles.metadata.json",
+        "data/external/english_profile/Grammar/Determiners/Articles/articles.xlsx",
+        "data/external/english_profile/Grammar/Future/Will/future_will.xlsx",
+        "data/external/english_profile/Grammar/Modality/can/modality_can.metadata.json",
+        "data/external/english_profile/Grammar/Modality/can/modality_can.xlsx",
+        "data/external/english_profile/Grammar/Modality/could/modality_could.metadata.json",
+        "data/external/english_profile/Grammar/Modality/could/modality_could.xlsx",
+        "data/external/english_profile/Grammar/Modality/have got to/modality_have_got_to.metadata.json",
+        "data/external/english_profile/Grammar/Modality/have got to/modality_have_got_to.xlsx",
+        "data/external/english_profile/Grammar/Modality/must/modality_must.metadata.json"
+      ],
+      "required_for_v1": true,
+      "root_path": "data/external/english_profile",
+      "source_key": "english_grammar_profile",
+      "source_name": "English Grammar Profile",
+      "source_role": [
+        "canonical_grammar_evidence"
+      ],
+      "span_representation": null,
+      "status": "discovered",
+      "task_identifier_fields": [],
+      "total_size_bytes": 1465387
+    },
+    {
+      "approximate_record_count": 334,
+      "archive_files": [],
+      "cefr_representation": "explicit CEFR level per descriptor",
+      "correction_representation": null,
+      "count_type": "exact",
+      "detected_version": "Companion Volume 2020",
+      "document_identifier_fields": [],
+      "error_annotation_unit": null,
+      "error_label_field": null,
+      "file_count": 7,
+      "file_formats": [
+        ".json",
+        ".jsonl",
+        ".parquet",
+        ".pdf"
+      ],
+      "files_by_extension": {
+        ".json": 2,
+        ".jsonl": 2,
+        ".parquet": 2,
+        ".pdf": 1
+      },
+      "has_corrected_text": false,
+      "has_error_annotations": false,
+      "has_original_text": false,
+      "has_revision_history": false,
+      "has_task_metadata": false,
+      "ingestion_readiness": "READY",
+      "inspection_errors": [],
+      "inspection_warnings": [],
+      "known_quirks": [
+        "Only configured V1 scales are extracted; skipped appendix sections remain documented.",
+        "CEFR is a proficiency framework, not learner error data."
+      ],
+      "learner_identifier_fields": [],
+      "license_files": [],
+      "license_status": "needs_manual_review",
+      "licensing_files": [],
+      "nested_archive_files": [],
+      "optional_enrichment": false,
+      "parser_requirements": [
+        "Use existing CEFR extraction artifacts for V1 inventory.",
+        "Preserve page/table metadata for traceability."
+      ],
+      "pii_risk": "none_observed",
+      "primary_identifiers": [
+        "source_record_id",
+        "scale_name",
+        "page_number"
+      ],
+      "proficiency_representation": "CEFR",
+      "publication_year": "2020",
+      "readme_files": [],
+      "record_unit": "CEFR descriptor",
+      "redistribution_notes": "No local CEFR license conclusion inferred by this inspection.",
+      "representative_files": [
+        "data/external/cefr/CEFR Companion Volume_eng.pdf",
+        "data/interim/cefr/cefr_descriptors.jsonl",
+        "data/interim/cefr/cefr_descriptors.parquet",
+        "data/interim/cefr/cefr_learning_objective_candidates.jsonl",
+        "data/interim/cefr/cefr_learning_objective_candidates.parquet",
+        "data/reports/cefr/extraction_report.json",
+        "data/reports/cefr/source_inspection_report.json"
+      ],
+      "required_for_v1": true,
+      "root_path": "data/external/cefr",
+      "source_key": "cefr_companion_volume_2020",
+      "source_name": "CEFR Companion Volume 2020",
+      "source_role": [
+        "proficiency_framework"
+      ],
+      "span_representation": null,
+      "status": "discovered",
+      "task_identifier_fields": [],
+      "total_size_bytes": 2738742
+    }
+  ],
+  "validation": {
+    "checks": {
+      "all_expected_sources_accounted_for": true,
+      "all_raw_dataset_files_have_classification_context": true,
+      "all_raw_files_assigned_or_classified": true,
+      "canonical_taxonomy_unchanged": true,
+      "efcamdat_annotation_source_of_truth_documented": true,
+      "file_counts_internally_consistent": true,
+      "inspection_issues_reported": true,
+      "new_corpus_reports_generated": true,
+      "no_ingestion_artifacts_created": true,
+      "optional_sources_remain_inventoried": true,
+      "raw_data_unchanged": true,
+      "required_source_flags_correct": true
+    },
+    "error_count": 0,
+    "passed": true,
+    "warning_count": 0
+  },
+  "workspace": "D:\\code\\NLP_Final"
+}

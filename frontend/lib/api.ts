@@ -336,6 +336,7 @@ export type PendingClarificationResponse = {
   pending_intent: string;
   missing_fields: string[];
   collected_slots: Record<string, unknown>;
+  active_activity_id?: string | null;
   question: string;
 };
 
@@ -344,9 +345,12 @@ export type ConversationRouteResponse = {
   confidence: number;
   source: string;
   reason: string;
+  requires_context?: boolean;
   slots: Record<string, unknown>;
   missing_slots?: string[];
+  target_activity_id?: string | null;
   referenced_activity_id?: string | null;
+  next_action?: string;
   needs_clarification: boolean;
   clarification_question?: string | null;
 };
@@ -356,9 +360,11 @@ export type LearningActivityResponse = {
   conversation_id: string;
   learner_id: string;
   type: string;
+  parent_activity_id?: string | null;
   status: string;
   target_skills?: string[];
   difficulty?: string | null;
+  config?: Record<string, unknown>;
   created_at?: string | null;
   started_at?: string | null;
   submitted_at?: string | null;
@@ -374,6 +380,10 @@ export type LearningActivityResponse = {
   recommendation?: string;
   next_activity_suggestion?: NextActivitySuggestionResponse | null;
   ui_action?: string;
+};
+
+export type LearningActivityListResponse = {
+  activities: LearningActivityResponse[];
 };
 
 export type ActivityReviewResponse = {
@@ -686,6 +696,37 @@ export async function getActivity(
     throw new Error("Backend returned an invalid activity.");
   }
   return activity;
+}
+
+export async function listActivities(
+  userId: string,
+  options: { statuses?: string[]; limit?: number } = {},
+): Promise<LearningActivityPreview[]> {
+  const params = new URLSearchParams();
+  for (const status of options.statuses ?? []) {
+    params.append("status", status);
+  }
+  if (options.limit !== undefined) {
+    params.set("limit", String(options.limit));
+  }
+  const query = params.toString();
+  const response = await fetch(
+    `${API_BASE_URL}/api/users/${encodeURIComponent(userId)}/activities${
+      query ? `?${query}` : ""
+    }`,
+    {
+      headers: authHeaders(),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to load activities.");
+  }
+
+  const data = (await response.json()) as LearningActivityListResponse;
+  return data.activities
+    .map((activity) => mapLearningActivity(activity))
+    .filter((activity): activity is LearningActivityPreview => activity !== null);
 }
 
 export async function getActivityReview(payload: {
@@ -1265,6 +1306,7 @@ function mapPendingClarification(
     pendingIntent: data.pending_intent,
     missingFields: data.missing_fields,
     collectedSlots: data.collected_slots,
+    activeActivityId: data.active_activity_id,
     question: data.question,
   };
 }
@@ -1280,9 +1322,12 @@ function mapConversationRoute(
     confidence: data.confidence,
     source: data.source,
     reason: data.reason,
+    requiresContext: data.requires_context ?? false,
     slots: data.slots,
     missingSlots: data.missing_slots ?? [],
+    targetActivityId: data.target_activity_id ?? data.referenced_activity_id,
     referencedActivityId: data.referenced_activity_id,
+    nextAction: data.next_action ?? "conversation.reply",
     needsClarification: data.needs_clarification,
     clarificationQuestion: data.clarification_question,
   };
@@ -1319,11 +1364,13 @@ function mapLearningActivity(
     conversationId,
     learnerId,
     type,
+    parentActivityId: getString(rawActivity.parent_activity_id),
     status,
     targetSkills: Array.isArray(rawActivity.target_skills)
       ? rawActivity.target_skills.map(String).filter(Boolean)
       : [],
     difficulty: getString(rawActivity.difficulty),
+    config: isRecord(rawActivity.config) ? rawActivity.config : {},
     createdAt: getString(rawActivity.created_at),
     startedAt: getString(rawActivity.started_at),
     submittedAt: getString(rawActivity.submitted_at),

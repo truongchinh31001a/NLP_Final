@@ -31,20 +31,42 @@ class LearningActivityRepositoryTests(unittest.TestCase):
                 conversation_id=conversation_id,
                 learner_id="learner",
                 type=LearningActivityType.PRACTICE,
+                parent_activity_id="parent_activity",
                 target_skills=["grammar.passive_voice.present_simple_passive"],
                 difficulty="easy",
+                config={"mode": "drill"},
             )
         )
 
         repository.update_learning_activity_status(
             "learner",
             activity.activity_id,
-            LearningActivityStatus.READY,
+            LearningActivityStatus.GENERATING,
         )
         generated = self._generated_set("learner", activity_id=activity.activity_id)
         generation_run_id = repository.save_generated_exercise_set(
             generated,
             "test-generator",
+        )
+        repository.update_learning_activity_status(
+            "learner",
+            activity.activity_id,
+            LearningActivityStatus.READY,
+        )
+        repository.update_learning_activity_status(
+            "learner",
+            activity.activity_id,
+            LearningActivityStatus.IN_PROGRESS,
+        )
+        repository.update_learning_activity_status(
+            "learner",
+            activity.activity_id,
+            LearningActivityStatus.SUBMITTED,
+        )
+        repository.update_learning_activity_status(
+            "learner",
+            activity.activity_id,
+            LearningActivityStatus.GRADED,
         )
         diagnoses = ErrorDiagnosisService().diagnose_batch(
             generated.exercises,
@@ -79,13 +101,90 @@ class LearningActivityRepositoryTests(unittest.TestCase):
         self.assertEqual(loaded.generation_run_id, generation_run_id)
         self.assertEqual(loaded.session_code, session_code)
         self.assertEqual(loaded.status, LearningActivityStatus.COMPLETED)
+        self.assertEqual(loaded.parent_activity_id, "parent_activity")
+        self.assertEqual(loaded.config, {"mode": "drill"})
         self.assertEqual(latest_completed.activity_id, activity.activity_id)
         self.assertEqual(loaded_generated.activity_id, activity.activity_id)
+        user_activities = repository.list_user_activities("learner")
+        self.assertEqual([item.activity_id for item in user_activities], [activity.activity_id])
+        completed_activities = repository.list_user_activities(
+            "learner",
+            statuses=[LearningActivityStatus.COMPLETED],
+        )
+        self.assertEqual(
+            [item.activity_id for item in completed_activities],
+            [activity.activity_id],
+        )
         self.assertNotIn(
             conversation_id,
             repository.active_activity_by_chat_session,
         )
+        events = repository.list_activity_state_events("learner", activity.activity_id)
+        self.assertEqual(events[-1].event_type, "SESSION_RESULT_ATTACHED")
+        self.assertEqual(events[-1].from_status, LearningActivityStatus.GRADED)
+        self.assertEqual(events[-1].to_status, LearningActivityStatus.COMPLETED)
+        self.assertIsNone(events[-1].reason)
         self.assertGreaterEqual(len(repository.activity_events[activity.activity_id]), 3)
+
+    def test_inmemory_activity_rejects_invalid_status_transition(self) -> None:
+        repository = InMemoryLearningRepository()
+        conversation_id = str(repository.create_chat_session("learner")["session_id"])
+        activity = repository.create_learning_activity(
+            LearningActivity(
+                activity_id="activity_1",
+                conversation_id=conversation_id,
+                learner_id="learner",
+                type=LearningActivityType.PRACTICE,
+            )
+        )
+
+        with self.assertRaisesRegex(ValueError, "CREATED -> READY"):
+            repository.update_learning_activity_status(
+                "learner",
+                activity.activity_id,
+                LearningActivityStatus.READY,
+            )
+
+        loaded = repository.get_learning_activity("learner", activity.activity_id)
+        events = repository.list_activity_state_events("learner", activity.activity_id)
+        self.assertEqual(loaded.status, LearningActivityStatus.CREATED)
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0].to_status, LearningActivityStatus.CREATED)
+
+        cancelled = repository.create_learning_activity(
+            LearningActivity(
+                activity_id="activity_cancel",
+                conversation_id=conversation_id,
+                learner_id="learner",
+                type=LearningActivityType.PRACTICE,
+            )
+        )
+        cancelled = repository.update_learning_activity_status(
+            "learner",
+            cancelled.activity_id,
+            LearningActivityStatus.CANCELLED,
+        )
+        failed = repository.create_learning_activity(
+            LearningActivity(
+                activity_id="activity_fail",
+                conversation_id=conversation_id,
+                learner_id="learner",
+                type=LearningActivityType.PRACTICE,
+            )
+        )
+        failed = repository.update_learning_activity_status(
+            "learner",
+            failed.activity_id,
+            LearningActivityStatus.GENERATING,
+        )
+        failed = repository.update_learning_activity_status(
+            "learner",
+            failed.activity_id,
+            LearningActivityStatus.FAILED,
+        )
+
+        self.assertEqual(cancelled.status, LearningActivityStatus.CANCELLED)
+        self.assertEqual(failed.status, LearningActivityStatus.FAILED)
 
     def test_inmemory_activity_enforces_conversation_owner(self) -> None:
         repository = InMemoryLearningRepository()
@@ -125,8 +224,10 @@ class LearningActivityRepositoryTests(unittest.TestCase):
                     conversation_id=conversation_id,
                     learner_id="learner",
                     type=LearningActivityType.PRACTICE,
+                    parent_activity_id="parent_activity",
                     target_skills=["grammar.passive_voice.present_simple_passive"],
                     difficulty="easy",
+                    config={"mode": "drill"},
                     metadata={"source": "test"},
                 )
             )
@@ -134,12 +235,32 @@ class LearningActivityRepositoryTests(unittest.TestCase):
             repository.update_learning_activity_status(
                 "learner",
                 activity.activity_id,
-                LearningActivityStatus.READY,
+                LearningActivityStatus.GENERATING,
             )
             generated = self._generated_set("learner", activity_id=activity.activity_id)
             generation_run_id = repository.save_generated_exercise_set(
                 generated,
                 "test-generator",
+            )
+            repository.update_learning_activity_status(
+                "learner",
+                activity.activity_id,
+                LearningActivityStatus.READY,
+            )
+            repository.update_learning_activity_status(
+                "learner",
+                activity.activity_id,
+                LearningActivityStatus.IN_PROGRESS,
+            )
+            repository.update_learning_activity_status(
+                "learner",
+                activity.activity_id,
+                LearningActivityStatus.SUBMITTED,
+            )
+            repository.update_learning_activity_status(
+                "learner",
+                activity.activity_id,
+                LearningActivityStatus.GRADED,
             )
             diagnoses = ErrorDiagnosisService().diagnose_batch(
                 generated.exercises,
@@ -177,9 +298,24 @@ class LearningActivityRepositoryTests(unittest.TestCase):
             self.assertEqual(loaded.generation_run_id, generation_run_id)
             self.assertEqual(loaded.session_code, session_code)
             self.assertEqual(loaded.status, LearningActivityStatus.COMPLETED)
+            self.assertEqual(loaded.parent_activity_id, "parent_activity")
+            self.assertEqual(loaded.config, {"mode": "drill"})
             self.assertEqual(loaded.metadata, {"source": "test"})
             self.assertEqual(latest_completed.activity_id, activity.activity_id)
             self.assertEqual(loaded_generated.activity_id, activity.activity_id)
+            user_activities = repository.list_user_activities("learner")
+            self.assertEqual(
+                [item.activity_id for item in user_activities],
+                [activity.activity_id],
+            )
+            completed_activities = repository.list_user_activities(
+                "learner",
+                statuses=[LearningActivityStatus.COMPLETED],
+            )
+            self.assertEqual(
+                [item.activity_id for item in completed_activities],
+                [activity.activity_id],
+            )
 
             with closing(sqlite3.connect(db_path)) as connection:
                 activity_db_id = connection.execute(
@@ -222,7 +358,81 @@ class LearningActivityRepositoryTests(unittest.TestCase):
             self.assertEqual(generation_activity_id, activity_db_id)
             self.assertEqual(session_activity_id, activity_db_id)
             self.assertIsNone(active_activity_id)
+            events = repository.list_activity_state_events(
+                "learner",
+                activity.activity_id,
+            )
+            self.assertEqual(events[-1].event_type, "SESSION_RESULT_ATTACHED")
+            self.assertEqual(events[-1].from_status, LearningActivityStatus.GRADED)
+            self.assertEqual(events[-1].to_status, LearningActivityStatus.COMPLETED)
+            self.assertIsNone(events[-1].reason)
             self.assertGreaterEqual(event_count, 3)
+
+    def test_sqlite_activity_rejects_invalid_status_transition(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repository = SQLiteLearningRepository(
+                AppConfig(sqlite_db_path=str(Path(temp_dir) / "app.db")),
+            )
+            conversation_id = str(repository.create_chat_session("learner")["session_id"])
+            activity = repository.create_learning_activity(
+                LearningActivity(
+                    activity_id="activity_1",
+                    conversation_id=conversation_id,
+                    learner_id="learner",
+                    type=LearningActivityType.PRACTICE,
+                )
+            )
+
+            with self.assertRaisesRegex(ValueError, "CREATED -> READY"):
+                repository.update_learning_activity_status(
+                    "learner",
+                    activity.activity_id,
+                    LearningActivityStatus.READY,
+                )
+
+            loaded = repository.get_learning_activity("learner", activity.activity_id)
+            events = repository.list_activity_state_events(
+                "learner",
+                activity.activity_id,
+            )
+            self.assertEqual(loaded.status, LearningActivityStatus.CREATED)
+            self.assertEqual(len(events), 1)
+            self.assertEqual(events[0].to_status, LearningActivityStatus.CREATED)
+
+            cancelled = repository.create_learning_activity(
+                LearningActivity(
+                    activity_id="activity_cancel",
+                    conversation_id=conversation_id,
+                    learner_id="learner",
+                    type=LearningActivityType.PRACTICE,
+                )
+            )
+            cancelled = repository.update_learning_activity_status(
+                "learner",
+                cancelled.activity_id,
+                LearningActivityStatus.CANCELLED,
+            )
+            failed = repository.create_learning_activity(
+                LearningActivity(
+                    activity_id="activity_fail",
+                    conversation_id=conversation_id,
+                    learner_id="learner",
+                    type=LearningActivityType.PRACTICE,
+                )
+            )
+            failed = repository.update_learning_activity_status(
+                "learner",
+                failed.activity_id,
+                LearningActivityStatus.GENERATING,
+            )
+            failed = repository.update_learning_activity_status(
+                "learner",
+                failed.activity_id,
+                LearningActivityStatus.FAILED,
+            )
+
+            self.assertEqual(cancelled.status, LearningActivityStatus.CANCELLED)
+            self.assertEqual(failed.status, LearningActivityStatus.FAILED)
 
     def test_sqlite_activity_enforces_conversation_owner(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

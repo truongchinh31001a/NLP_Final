@@ -1,0 +1,85 @@
+inputs:
+  egp_records: "data/interim/english_profile/grammar/egp_records.jsonl"
+  egp_mappings: "data/interim/english_profile/grammar/egp_mappings.jsonl"
+  cefr_descriptors: "data/interim/cefr/cefr_descriptors.jsonl"
+  cefr_objectives: "data/interim/cefr/cefr_learning_objective_candidates.jsonl"
+
+outputs:
+  interim_dir: "data/interim/knowledge_alignment"
+  review_dir: "data/curated/review"
+  reports_dir: "data/reports/knowledge_alignment"
+
+egp:
+  establishing_statuses:
+    - exact
+    - candidate
+  ambiguous_statuses:
+    - ambiguous
+  status_weights:
+    exact: 1.0
+    candidate: 0.65
+
+cefr:
+  grammatical_accuracy_scale: grammatical_accuracy
+
+objective_alignment:
+  max_objectives_per_skill_per_mode: 5
+  max_level_distance_for_aligned_skills: 2
+  direct_confidence: 0.72
+  contextual_confidence: 0.62
+  rules:
+    - canonical_skill_id: grammar.present_simple.affirmative
+      contextual_terms:
+        - daily routines
+        - habits and routines
+        - familiar topics
+        - everyday situations
+    - canonical_skill_id: grammar.present_simple.questions
+      direct_terms:
+        - ask and answer questions about habits and routines
+      contextual_terms:
+        - ask and answer simple questions
+        - ask and answer questions
+    - canonical_skill_id: grammar.present_continuous.current_action
+      contextual_terms:
+        - current events
+        - current interest
+    - canonical_skill_id: grammar.past_simple.finished_past
+      contextual_terms:
+        - past activities
+        - events and experiences
+        - personal experiences
+    - canonical_skill_id: grammar.present_perfect.experience
+      contextual_terms:
+        - personal experiences
+        - accounts of experiences
+        - experiences in detail
+        - something experienced
+    - canonical_skill_id: grammar.future.will_prediction
+      contextual_terms:
+        - distant future
+    - canonical_skill_id: grammar.future.will_offer_promise
+      contextual_terms:
+        - offer a favour
+    - canonical_skill_id: grammar.modality.can_ability
+      direct_terms:
+        - what they are good at and not so good at
+      contextual_terms:
+        - able to
+    - canonical_skill_id: grammar.modality.can_permission
+      direct_terms:
+        - granting permission
+    - canonical_skill_id: grammar.modality.should_advice
+      direct_terms:
+        - offer advice
+      contextual_terms:
+        - advice on simple matters
+        - complex information and advice
+    - canonical_skill_id: grammar.conditionals.first
+      contextual_terms:
+        - state conditions
+        - conditions and warnings
+    - canonical_skill_id: grammar.conditionals.second
+      contextual_terms:
+        - imaginary events
+        - imaginary people

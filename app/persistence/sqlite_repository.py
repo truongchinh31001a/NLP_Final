@@ -14,6 +14,7 @@ from app.learner.spaced_repetition import next_review_at
 from app.language.translation import BilingualTextNormalizer
 from app.schemas import (
     AnswerDiagnosis,
+    ActivityStateEvent,
     ConversationIntent,
     ExerciseItem,
     ExerciseOption,
@@ -27,6 +28,7 @@ from app.schemas import (
     PracticeReview,
     PracticeRequest,
     SessionResult,
+    validate_learning_activity_transition,
 )
 
 
@@ -756,10 +758,12 @@ class SQLiteLearningRepository:
                     activity_code,
                     conversation_id,
                     user_id,
+                    parent_activity_id,
                     activity_type,
                     status,
                     target_skills_json,
                     difficulty,
+                    config_json,
                     metadata_json,
                     created_at,
                     started_at,
@@ -767,16 +771,18 @@ class SQLiteLearningRepository:
                     completed_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP), ?, ?, ?, CURRENT_TIMESTAMP)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP), ?, ?, ?, CURRENT_TIMESTAMP)
                 """,
                 (
                     activity_code,
                     int(conversation["id"]),
                     db_user_id,
+                    activity.parent_activity_id,
                     self._activity_type_value(activity.type),
                     self._activity_status_value(activity.status),
                     json.dumps(activity.target_skills, ensure_ascii=False),
                     activity.difficulty,
+                    json.dumps(activity.config, ensure_ascii=False),
                     json.dumps(activity.metadata, ensure_ascii=False),
                     activity.created_at,
                     activity.started_at,
@@ -821,6 +827,8 @@ class SQLiteLearningRepository:
             row = self._get_activity_row_by_code(connection, db_user_id, activity_id)
             if row is None:
                 raise LookupError(f"Learning activity not found: {activity_id}")
+            previous_status = self._status_from_value(row["status"])
+            validate_learning_activity_transition(previous_status, status)
 
             started_sql = (
                 "COALESCE(started_at, CURRENT_TIMESTAMP)"
@@ -861,8 +869,13 @@ class SQLiteLearningRepository:
                 int(row["id"]),
                 "STATUS_CHANGED",
                 status,
+                from_status=previous_status,
             )
-            updated = self._get_activity_row_by_db_id(connection, db_user_id, int(row["id"]))
+            updated = self._get_activity_row_by_db_id(
+                connection,
+                db_user_id,
+                int(row["id"]),
+            )
 
         return self._activity_from_row(updated)
 
@@ -974,6 +987,11 @@ class SQLiteLearningRepository:
             )
             if activity_row is None:
                 raise LookupError(f"Learning activity not found: {activity_id}")
+            previous_status = self._status_from_value(activity_row["status"])
+            validate_learning_activity_transition(
+                previous_status,
+                LearningActivityStatus.COMPLETED,
+            )
             session_row = connection.execute(
                 """
                 SELECT id
@@ -1022,6 +1040,7 @@ class SQLiteLearningRepository:
                 "SESSION_RESULT_ATTACHED",
                 LearningActivityStatus.COMPLETED,
                 {"session_code": session_code},
+                from_status=previous_status,
             )
             row = self._get_activity_row_by_db_id(
                 connection,
@@ -1077,6 +1096,82 @@ class SQLiteLearningRepository:
             ).fetchall()
 
         return self._activity_from_row(rows[0]) if rows else None
+
+    def list_user_activities(
+        self,
+        user_id: str,
+        statuses: list[LearningActivityStatus] | None = None,
+        limit: int = 50,
+    ) -> list[LearningActivity]:
+        with self._connect() as connection:
+            db_user_id = self._ensure_user(connection, user_id)
+            status_values = [status.value for status in statuses or []]
+            status_clause = ""
+            params: list[object] = [db_user_id]
+            if status_values:
+                placeholders = ",".join("?" for _ in status_values)
+                status_clause = f"AND la.status IN ({placeholders})"
+                params.extend(status_values)
+            params.append(max(limit, 0))
+            rows = connection.execute(
+                f"""
+                SELECT
+                    la.*,
+                    u.user_code,
+                    la.conversation_id AS conversation_db_id,
+                    cs.session_code AS conversation_code,
+                    gr.generation_run_id AS public_generation_run_id,
+                    ps.session_code AS practice_session_code
+                FROM learning_activities la
+                JOIN users u ON u.id = la.user_id
+                JOIN chat_sessions cs ON cs.id = la.conversation_id
+                LEFT JOIN generation_runs gr ON gr.id = la.generation_run_id
+                LEFT JOIN practice_sessions ps ON ps.id = la.practice_session_id
+                WHERE la.user_id = ?
+                {status_clause}
+                ORDER BY la.updated_at DESC, la.id DESC
+                LIMIT ?
+                """,
+                params,
+            ).fetchall()
+
+        return [self._activity_from_row(row) for row in rows]
+
+    def list_activity_state_events(
+        self,
+        user_id: str,
+        activity_id: str,
+    ) -> list[ActivityStateEvent]:
+        with self._connect() as connection:
+            db_user_id = self._ensure_user(connection, user_id)
+            activity_row = self._get_activity_row_by_code(
+                connection,
+                db_user_id,
+                activity_id,
+            )
+            if activity_row is None:
+                return []
+            rows = connection.execute(
+                """
+                SELECT
+                    event_code,
+                    event_type,
+                    from_status,
+                    to_status,
+                    reason,
+                    status,
+                    metadata_json,
+                    created_at
+                FROM learning_activity_events
+                WHERE activity_id = ?
+                ORDER BY id
+                """,
+                (int(activity_row["id"]),),
+            ).fetchall()
+        return [
+            self._activity_state_event_from_row(row, activity_id)
+            for row in rows
+        ]
 
     def get_pending_clarification(
         self,
@@ -1561,6 +1656,11 @@ class SQLiteLearningRepository:
             )
 
             if activity_row is not None:
+                previous_status = self._status_from_value(activity_row["status"])
+                validate_learning_activity_transition(
+                    previous_status,
+                    LearningActivityStatus.COMPLETED,
+                )
                 connection.execute(
                     """
                     UPDATE learning_activities
@@ -1590,6 +1690,7 @@ class SQLiteLearningRepository:
                     "SESSION_RESULT_ATTACHED",
                     LearningActivityStatus.COMPLETED,
                     {"session_code": session_code},
+                    from_status=previous_status,
                 )
         return session_code
 
@@ -2397,6 +2498,42 @@ class SQLiteLearningRepository:
             )
             self._ensure_column(
                 connection,
+                table_name="learning_activities",
+                column_name="parent_activity_id",
+                column_definition="TEXT",
+            )
+            self._ensure_column(
+                connection,
+                table_name="learning_activities",
+                column_name="config_json",
+                column_definition="TEXT NOT NULL DEFAULT '{}'",
+            )
+            self._ensure_column(
+                connection,
+                table_name="learning_activity_events",
+                column_name="event_code",
+                column_definition="TEXT",
+            )
+            self._ensure_column(
+                connection,
+                table_name="learning_activity_events",
+                column_name="from_status",
+                column_definition="TEXT",
+            )
+            self._ensure_column(
+                connection,
+                table_name="learning_activity_events",
+                column_name="to_status",
+                column_definition="TEXT",
+            )
+            self._ensure_column(
+                connection,
+                table_name="learning_activity_events",
+                column_name="reason",
+                column_definition="TEXT",
+            )
+            self._ensure_column(
+                connection,
                 table_name="session_exercises",
                 column_name="skill",
                 column_definition="TEXT NOT NULL DEFAULT 'grammar'",
@@ -2545,6 +2682,7 @@ class SQLiteLearningRepository:
             conversation_id=row["conversation_code"],
             learner_id=row["user_code"],
             type=self._activity_type_from_value(row["activity_type"]),
+            parent_activity_id=row["parent_activity_id"],
             status=self._status_from_value(row["status"]),
             target_skills=[
                 str(item)
@@ -2552,6 +2690,7 @@ class SQLiteLearningRepository:
                 if str(item).strip()
             ],
             difficulty=row["difficulty"],
+            config=self._json_object(row["config_json"]),
             created_at=row["created_at"],
             started_at=row["started_at"],
             submitted_at=row["submitted_at"],
@@ -2595,23 +2734,53 @@ class SQLiteLearningRepository:
         event_type: str,
         status: LearningActivityStatus,
         metadata: dict[str, object] | None = None,
+        from_status: LearningActivityStatus | None = None,
+        reason: str | None = None,
     ) -> None:
         connection.execute(
             """
             INSERT INTO learning_activity_events (
                 activity_id,
+                event_code,
                 event_type,
+                from_status,
+                to_status,
+                reason,
                 status,
                 metadata_json
             )
-            VALUES (?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 activity_id,
+                f"evt_{uuid.uuid4().hex}",
                 event_type,
+                from_status.value if from_status is not None else None,
+                status.value,
+                reason,
                 status.value,
                 json.dumps(metadata or {}, ensure_ascii=False),
             ),
+        )
+
+    def _activity_state_event_from_row(
+        self,
+        row: sqlite3.Row,
+        activity_id: str,
+    ) -> ActivityStateEvent:
+        from_status = row["from_status"]
+        to_status = row["to_status"] or row["status"]
+        return ActivityStateEvent(
+            event_id=str(row["event_code"] or ""),
+            activity_id=activity_id,
+            event_type=str(row["event_type"]),
+            from_status=(
+                LearningActivityStatus(str(from_status)) if from_status else None
+            ),
+            to_status=LearningActivityStatus(str(to_status)),
+            reason=row["reason"],
+            metadata=self._json_object(row["metadata_json"]),
+            created_at=row["created_at"],
         )
 
     def _activity_type_value(self, activity_type: LearningActivityType | str) -> str:
@@ -2665,6 +2834,7 @@ class SQLiteLearningRepository:
             "pending_intent": clarification.pending_intent.value,
             "missing_fields": list(clarification.missing_fields),
             "collected_slots": self._json_safe_dict(clarification.collected_slots),
+            "active_activity_id": clarification.active_activity_id,
             "question": clarification.question,
         }
 
@@ -2680,6 +2850,7 @@ class SQLiteLearningRepository:
             return None
         missing_fields = payload.get("missing_fields")
         collected_slots = payload.get("collected_slots")
+        active_activity_id = payload.get("active_activity_id")
         return PendingClarification(
             pending_intent=pending_intent,
             missing_fields=[
@@ -2688,6 +2859,11 @@ class SQLiteLearningRepository:
             ],
             collected_slots=(
                 dict(collected_slots) if isinstance(collected_slots, dict) else {}
+            ),
+            active_activity_id=(
+                str(active_activity_id)
+                if active_activity_id not in (None, "")
+                else None
             ),
             question=str(payload.get("question") or ""),
         )

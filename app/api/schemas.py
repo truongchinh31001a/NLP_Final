@@ -181,6 +181,7 @@ class PendingClarificationResponseModel(BaseModel):
     pending_intent: ConversationIntent
     missing_fields: list[str] = Field(default_factory=list)
     collected_slots: dict[str, Any] = Field(default_factory=dict)
+    active_activity_id: str | None = None
     question: str = ""
 
 
@@ -205,9 +206,11 @@ class LearningActivityResponseModel(BaseModel):
     conversation_id: str
     learner_id: str
     type: LearningActivityType
+    parent_activity_id: str | None = None
     status: LearningActivityStatus = LearningActivityStatus.CREATED
     target_skills: list[str] = Field(default_factory=list)
     difficulty: str | None = None
+    config: dict[str, Any] = Field(default_factory=dict)
     created_at: str | None = None
     started_at: str | None = None
     submitted_at: str | None = None
@@ -223,6 +226,10 @@ class LearningActivityResponseModel(BaseModel):
     recommendation: str = ""
     next_activity_suggestion: ActivityRecommendationResponseModel | None = None
     ui_action: str = "activity.open"
+
+
+class LearningActivityListResponseModel(BaseModel):
+    activities: list[LearningActivityResponseModel] = Field(default_factory=list)
 
 
 class ActivityReviewResponseModel(BaseModel):
@@ -343,9 +350,12 @@ class ConversationRouteResponseModel(BaseModel):
     confidence: float
     source: str
     reason: str
+    requires_context: bool = False
     slots: dict[str, Any] = Field(default_factory=dict)
     missing_slots: list[str] = Field(default_factory=list)
+    target_activity_id: str | None = None
     referenced_activity_id: str | None = None
+    next_action: str = "conversation.reply"
     needs_clarification: bool = False
     clarification_question: str | None = None
 

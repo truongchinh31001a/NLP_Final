@@ -1,0 +1,305 @@
+{
+  "cefr_labels": {
+    "automarker_cefr_level": {
+      "A1": 20,
+      "A1+": 251,
+      "A2": 1560,
+      "A2+": 3191,
+      "B1": 3611,
+      "B1+": 3502,
+      "B2": 3414,
+      "B2+": 3018,
+      "C1": 2052,
+      "C1+": 1304,
+      "C2": 738,
+      "C2+": 554,
+      "pre-A1": 1
+    },
+    "humannotator_cefr_level": {
+      "A1": 1,
+      "A1+": 11,
+      "A2": 202,
+      "A2+": 846,
+      "B1": 959,
+      "B1+": 1073,
+      "B2": 919,
+      "B2+": 529,
+      "C1": 370,
+      "C1+": 102,
+      "C2": 38,
+      "NA": 18166
+    }
+  },
+  "cefr_value_distribution": {
+    "A1": 21,
+    "A1+": 262,
+    "A2": 1762,
+    "A2+": 4037,
+    "B1": 4570,
+    "B1+": 4575,
+    "B2": 4333,
+    "B2+": 3547,
+    "C1": 2422,
+    "C1+": 1406,
+    "C2": 776,
+    "C2+": 554,
+    "NA": 18166,
+    "pre-A1": 1
+  },
+  "dataset_structure": "mixed: document-level TSV metadata plus sentence-level M2/CoNLL correction annotations and revision pairs",
+  "detected_version": "2024-v2",
+  "error_annotation_count": {
+    "count": 370911,
+    "count_type": "exact"
+  },
+  "feedback_labels": "wi_suspecttokens field observed; feedback label semantics not interpreted",
+  "grammatical_error_annotations": {
+    "count_type": "exact",
+    "m2_annotation_count": 370911,
+    "m2_sentence_count": 92589,
+    "unique_label_count": 54,
+    "unique_labels": [
+      "M:ADJ",
+      "M:ADV",
+      "M:CONJ",
+      "M:CONTR",
+      "M:DET",
+      "M:NOUN",
+      "M:OTHER",
+      "M:PART",
+      "M:PREP",
+      "M:PRON",
+      "M:PUNCT",
+      "M:VERB",
+      "M:VERB:FORM",
+      "M:VERB:TENSE",
+      "R:ADJ",
+      "R:ADJ:FORM",
+      "R:ADV",
+      "R:CONJ",
+      "R:CONTR",
+      "R:DET",
+      "R:MORPH",
+      "R:NOUN",
+      "R:NOUN:INFL",
+      "R:NOUN:NUM",
+      "R:NOUN:POSS",
+      "R:ORTH",
+      "R:OTHER",
+      "R:PART",
+      "R:PREP",
+      "R:PRON",
+      "R:PUNCT",
+      "R:SPELL",
+      "R:VERB",
+      "R:VERB:FORM",
+      "R:VERB:INFL",
+      "R:VERB:SVA",
+      "R:VERB:TENSE",
+      "R:WO",
+      "U:ADJ",
+      "U:ADV",
+      "U:CONJ",
+      "U:CONTR",
+      "U:DET",
+      "U:NOUN",
+      "U:NOUN:POSS",
+      "U:OTHER",
+      "U:PART",
+      "U:PREP",
+      "U:PRON",
+      "U:PUNCT",
+      "U:VERB",
+      "U:VERB:FORM",
+      "U:VERB:TENSE",
+      "noop"
+    ]
+  },
+  "ingestion_readiness": "READY_WITH_KNOWN_QUIRKS",
+  "inspection_errors": [],
+  "inspection_warnings": [],
+  "known_quirks": [
+    "Several files are derived views of the same responses.",
+    "First-version and final-version folders represent different slices of revision history.",
+    "M2 labels are ERRANT-style source-native labels, not normalized misconceptions."
+  ],
+  "learner_submissions": {
+    "count": 23216,
+    "count_type": "exact"
+  },
+  "licensing": {
+    "license_status": "needs_manual_review",
+    "licensing_files": [
+      "D:/code/NLP_Final/data/raw/write-and-improve-corpus-2024-v2/README",
+      "D:/code/NLP_Final/data/raw/write-and-improve-corpus-2024-v2/multigec-2025-files/local_eval/README.md"
+    ],
+    "redistribution_notes": "README is present locally, but no standalone license conclusion was inferred."
+  },
+  "local_documentation_files": [
+    "D:/code/NLP_Final/data/raw/write-and-improve-corpus-2024-v2/README",
+    "D:/code/NLP_Final/data/raw/write-and-improve-corpus-2024-v2/multigec-2025-files/local_eval/README.md"
+  ],
+  "original_vs_corrected_text": {
+    "corrected_text": ".corr and M2 corrections for train/dev; test may be original-only",
+    "gold_correction_availability": "available for train/dev derived files; not universal across splits",
+    "original_text": "TSV text plus .orig/.tmp/.md files"
+  },
+  "parser_requirements": [
+    "Use TSV whole-corpus metadata as the response/revision spine.",
+    "Use public_user_id + public_prompt_id + essay_version_num for revision ordering.",
+    "Parse M2 and CoNLL files as derived annotation views, preserving train/dev/test splits.",
+    "Do not assume test split has gold corrections."
+  ],
+  "pii_risk": "possible_free_text",
+  "publication_year": "2024",
+  "report_path": "data/reports/source_inventory/write_improve_inspection.json",
+  "response_identifiers": [
+    "public_essay_id"
+  ],
+  "revision_chains": {
+    "final_version_rows": 5050,
+    "first_version_rows": 5050,
+    "linkage_fields": [
+      "public_user_id",
+      "public_prompt_id",
+      "user_prompt",
+      "essay_version_num"
+    ],
+    "unique_user_prompt_count": 5050
+  },
+  "revision_count": {
+    "count": 23216,
+    "count_type": "exact"
+  },
+  "revision_identifiers": [
+    "public_user_id",
+    "public_prompt_id",
+    "essay_version_num"
+  ],
+  "revision_linkage_strategy": "Sort by user_prompt or public_user_id/public_prompt_id, then essay_version_num.",
+  "root_path": "data/raw/write-and-improve-corpus-2024-v2",
+  "schema_sample": {
+    "corpus_tsv_header": [
+      "public_essay_id",
+      "created_epoch",
+      "created_timestamp",
+      "public_prompt_id",
+      "public_user_id",
+      "user_prompt",
+      "essay_version_num",
+      "is_first_version",
+      "is_final_version",
+      "language",
+      "text",
+      "wi_suspecttokens",
+      "automarker_cefr_level",
+      "humannotator_cefr_level",
+      "split"
+    ],
+    "m2_shape": {
+      "annotation_prefix": "A",
+      "sentence_prefix": "S",
+      "separator": "|||"
+    },
+    "prompts_tsv_header": [
+      "question_id",
+      "public_prompt_id",
+      "n.essay.sets",
+      "n.essays",
+      "topic",
+      "genre",
+      "min_words",
+      "max_words",
+      "prompt_level",
+      "prompt"
+    ]
+  },
+  "source_key": "write_improve",
+  "source_name": "Write & Improve Corpus 2024",
+  "source_roles": [
+    "revision_corpus",
+    "annotated_error_corpus"
+  ],
+  "task_prompt_metadata": {
+    "prompt_count": 50,
+    "prompt_fields": [
+      "question_id",
+      "public_prompt_id",
+      "n.essay.sets",
+      "n.essays",
+      "topic",
+      "genre",
+      "min_words",
+      "max_words",
+      "prompt_level",
+      "prompt"
+    ]
+  },
+  "total_responses": {
+    "count": 23216,
+    "count_type": "exact"
+  },
+  "unique_annotation_labels": {
+    "count": 54,
+    "count_type": "exact",
+    "labels": [
+      "M:ADJ",
+      "M:ADV",
+      "M:CONJ",
+      "M:CONTR",
+      "M:DET",
+      "M:NOUN",
+      "M:OTHER",
+      "M:PART",
+      "M:PREP",
+      "M:PRON",
+      "M:PUNCT",
+      "M:VERB",
+      "M:VERB:FORM",
+      "M:VERB:TENSE",
+      "R:ADJ",
+      "R:ADJ:FORM",
+      "R:ADV",
+      "R:CONJ",
+      "R:CONTR",
+      "R:DET",
+      "R:MORPH",
+      "R:NOUN",
+      "R:NOUN:INFL",
+      "R:NOUN:NUM",
+      "R:NOUN:POSS",
+      "R:ORTH",
+      "R:OTHER",
+      "R:PART",
+      "R:PREP",
+      "R:PRON",
+      "R:PUNCT",
+      "R:SPELL",
+      "R:VERB",
+      "R:VERB:FORM",
+      "R:VERB:INFL",
+      "R:VERB:SVA",
+      "R:VERB:TENSE",
+      "R:WO",
+      "U:ADJ",
+      "U:ADV",
+      "U:CONJ",
+      "U:CONTR",
+      "U:DET",
+      "U:NOUN",
+      "U:NOUN:POSS",
+      "U:OTHER",
+      "U:PART",
+      "U:PREP",
+      "U:PRON",
+      "U:PUNCT",
+      "U:VERB",
+      "U:VERB:FORM",
+      "U:VERB:TENSE",
+      "noop"
+    ]
+  },
+  "user_learner_identifiers": [
+    "public_user_id"
+  ]
+}

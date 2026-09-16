@@ -1,0 +1,131 @@
+{
+  "additional_paths": [
+    "data/interim/cefr",
+    "data/reports/cefr"
+  ],
+  "cefr_levels": [
+    "A1",
+    "A2",
+    "B1",
+    "B2",
+    "C1",
+    "C2",
+    "Pre-A1"
+  ],
+  "cefr_representation": "explicit CEFR level per descriptor",
+  "descriptor_count": 334,
+  "detected_version": "Companion Volume 2020",
+  "file_count": 7,
+  "has_corrected_text": false,
+  "has_error_annotations": false,
+  "has_original_text": false,
+  "has_revision_history": false,
+  "has_task_metadata": false,
+  "ingestion_readiness": "READY",
+  "inspection_errors": [],
+  "inspection_warnings": [],
+  "known_extraction_limitations": [],
+  "known_quirks": [
+    "Only configured V1 scales are extracted; skipped appendix sections remain documented.",
+    "CEFR is a proficiency framework, not learner error data."
+  ],
+  "known_skipped_sections": [
+    {
+      "enabled": false,
+      "extraction": "skipped_rotated_grid_text_not_clean_for_v1",
+      "id": "appendix_2_self_assessment_grid",
+      "name": "Appendix 2: Self-assessment grid",
+      "page_end": 181,
+      "page_start": 179
+    },
+    {
+      "enabled": false,
+      "extraction": "skipped_rotated_grid_text_not_clean_for_v1",
+      "id": "appendix_3_qualitative_features",
+      "name": "Appendix 3: Qualitative features of spoken language",
+      "page_end": 185,
+      "page_start": 183
+    },
+    {
+      "enabled": false,
+      "extraction": "skipped_rotated_grid_text_not_clean_for_v1",
+      "id": "appendix_4_written_assessment_grid",
+      "name": "Appendix 4: Written assessment grid",
+      "page_end": 189,
+      "page_start": 187
+    }
+  ],
+  "learning_objective_candidate_count": 292,
+  "licensing": {
+    "license_status": "needs_manual_review",
+    "licensing_files": [],
+    "redistribution_notes": "No local CEFR license conclusion inferred by this inspection."
+  },
+  "linguistic_competence_scales": [
+    "general_linguistic_range",
+    "vocabulary_range",
+    "grammatical_accuracy",
+    "vocabulary_control",
+    "orthographic_control"
+  ],
+  "parser_requirements": [
+    "Use existing CEFR extraction artifacts for V1 inventory.",
+    "Preserve page/table metadata for traceability."
+  ],
+  "pdf_document_metadata": {
+    "path": "data/external/cefr/CEFR Companion Volume_eng.pdf",
+    "size_bytes": 1784779,
+    "tables_seen": 248,
+    "total_pages": 278
+  },
+  "pii_risk": "none_observed",
+  "primary_identifiers": [
+    "source_record_id",
+    "scale_name",
+    "page_number"
+  ],
+  "proficiency_representation": "CEFR",
+  "publication_year": "2020",
+  "record_unit": "CEFR descriptor",
+  "root_path": "data/external/cefr",
+  "selected_extraction_scope": {
+    "appendices": [
+      {
+        "enabled": true,
+        "extraction": "level_summary",
+        "id": "appendix_1_salient_features",
+        "name": "Appendix 1: Salient features of the CEFR levels",
+        "page_end": 175,
+        "page_start": 173
+      },
+      {
+        "enabled": false,
+        "extraction": "skipped_rotated_grid_text_not_clean_for_v1",
+        "id": "appendix_2_self_assessment_grid",
+        "name": "Appendix 2: Self-assessment grid",
+        "page_end": 181,
+        "page_start": 179
+      },
+      {
+        "enabled": false,
+        "extraction": "skipped_rotated_grid_text_not_clean_for_v1",
+        "id": "appendix_3_qualitative_features",
+        "name": "Appendix 3: Qualitative features of spoken language",
+        "page_end": 185,
+        "page_start": 183
+      },
+      {
+        "enabled": false,
+        "extraction": "skipped_rotated_grid_text_not_clean_for_v1",
+        "id": "appendix_4_written_assessment_grid",
+        "name": "Appendix 4: Written assessment grid",
+        "page_end": 189,
+        "page_start": 187
+      }
+    ],
+    "configured_scale_count": 19,
+    "missing_scales": []
+  },
+  "source_key": "cefr_companion_volume_2020",
+  "source_name": "CEFR Companion Volume 2020"
+}

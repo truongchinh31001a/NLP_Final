@@ -1,0 +1,110 @@
+{
+  "additional_paths": [
+    "data/interim/english_profile",
+    "data/reports/egp"
+  ],
+  "cefr_levels_present": [
+    "A1",
+    "A2",
+    "B1",
+    "B2",
+    "C1",
+    "C2"
+  ],
+  "cefr_representation": "explicit CEFR level per record",
+  "detected_version": "unavailable",
+  "feature_category_structure": {
+    "feature_types": [
+      "FORM",
+      "FORM/USE",
+      "USE"
+    ],
+    "super_categories": [
+      "CLAUSES",
+      "DETERMINERS",
+      "FUTURE",
+      "MODALITY",
+      "PASSIVES",
+      "PAST",
+      "PRESENT"
+    ]
+  },
+  "has_corrected_text": false,
+  "has_error_annotations": false,
+  "has_original_text": false,
+  "has_revision_history": false,
+  "has_task_metadata": false,
+  "ingestion_readiness": "READY",
+  "inspection_errors": [],
+  "inspection_warnings": [],
+  "known_exclusions": {
+    "category_counts": {
+      "future_will": 56,
+      "passives_form": 1
+    },
+    "excluded_records": 57,
+    "reason_counts": {
+      "category_mismatch": 56,
+      "empty_can_do_statement": 2
+    }
+  },
+  "known_quirks": [
+    "Search/export can include category-mismatch rows; V1 exclusions are documented separately.",
+    "EGP is grammar evidence, not learner error data."
+  ],
+  "licensing": {
+    "license_status": "needs_manual_review",
+    "licensing_files": [],
+    "redistribution_notes": "No local EGP license conclusion inferred by this inspection."
+  },
+  "mapping_coverage": {
+    "coverage_ratio": "37/43",
+    "mapped_coverage_ratio": "36/43",
+    "mapped_skills_with_egp_evidence": 36,
+    "skills_with_egp_evidence": 37,
+    "skills_with_zero_egp_evidence": 6,
+    "skills_with_zero_evidence": [
+      "grammar.present_simple.third_person_s",
+      "grammar.past_simple.finished_past",
+      "grammar.past_continuous.interrupted_action",
+      "grammar.future.will_spontaneous_decision",
+      "grammar.articles.first_vs_subsequent_mention",
+      "grammar.conditionals.first_vs_second"
+    ],
+    "skills_with_zero_mapped_evidence": [
+      "grammar.present_simple.third_person_s",
+      "grammar.past_simple.finished_past",
+      "grammar.past_continuous.interrupted_action",
+      "grammar.present_perfect.past_participle",
+      "grammar.future.will_spontaneous_decision",
+      "grammar.articles.first_vs_subsequent_mention",
+      "grammar.conditionals.first_vs_second"
+    ],
+    "total_v1_skills": 43
+  },
+  "mapping_status_counts": {
+    "ambiguous": 4,
+    "candidate": 46,
+    "exact": 76,
+    "unmapped": 147
+  },
+  "original_raw_records": 330,
+  "parser_requirements": [
+    "Use existing normalized EGP artifacts for V1 inventory.",
+    "Keep source exclusions explicit rather than deleting raw rows."
+  ],
+  "pii_risk": "none_observed",
+  "primary_identifiers": [
+    "source_record_id",
+    "category_id",
+    "source_row_number"
+  ],
+  "proficiency_representation": "CEFR",
+  "publication_year": "unknown",
+  "record_unit": "EGP grammar profile record",
+  "root_path": "data/external/english_profile",
+  "source_file_count": 14,
+  "source_key": "english_grammar_profile",
+  "source_name": "English Grammar Profile",
+  "valid_normalized_records": 273
+}

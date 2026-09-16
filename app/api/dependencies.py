@@ -339,6 +339,7 @@ def pending_clarification_payload(
         "pending_intent": clarification.pending_intent,
         "missing_fields": clarification.missing_fields,
         "collected_slots": clarification.collected_slots,
+        "active_activity_id": clarification.active_activity_id,
         "question": clarification.question,
     }
 
@@ -353,15 +354,12 @@ def conversation_route_response(
         confidence=route.confidence,
         source=route.source,
         reason=route.reason,
+        requires_context=route.requires_context,
         slots=route.slots,
-        missing_slots=(
-            route.pending_clarification.missing_fields
-            if route.pending_clarification is not None
-            else []
-        ),
-        referenced_activity_id=(
-            str(route.slots["activity_id"]) if route.slots.get("activity_id") else None
-        ),
+        missing_slots=route.missing_slots,
+        target_activity_id=route.target_activity_id,
+        referenced_activity_id=route.target_activity_id,
+        next_action=route.next_action,
         needs_clarification=route.needs_clarification,
         clarification_question=route.clarification_question,
     )

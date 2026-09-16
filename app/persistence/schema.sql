@@ -331,10 +331,12 @@ CREATE TABLE IF NOT EXISTS learning_activities (
     activity_code TEXT NOT NULL UNIQUE,
     conversation_id INTEGER NOT NULL,
     user_id INTEGER NOT NULL,
+    parent_activity_id TEXT,
     activity_type TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'CREATED',
     target_skills_json TEXT NOT NULL DEFAULT '[]',
     difficulty TEXT,
+    config_json TEXT NOT NULL DEFAULT '{}',
     generation_run_id INTEGER,
     practice_session_id INTEGER,
     metadata_json TEXT NOT NULL DEFAULT '{}',
@@ -355,7 +357,11 @@ ON learning_activities (user_id, conversation_id, updated_at);
 CREATE TABLE IF NOT EXISTS learning_activity_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     activity_id INTEGER NOT NULL,
+    event_code TEXT,
     event_type TEXT NOT NULL,
+    from_status TEXT,
+    to_status TEXT,
+    reason TEXT,
     status TEXT NOT NULL,
     metadata_json TEXT NOT NULL DEFAULT '{}',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -407,3 +413,368 @@ CREATE TABLE IF NOT EXISTS evaluation_records (
     FOREIGN KEY (generation_run_id) REFERENCES generation_runs(id),
     FOREIGN KEY (session_exercise_id) REFERENCES session_exercises(id)
 );
+
+-- Knowledge Core Storage V1
+-- Local development uses SQLite. Columns ending in _json intentionally use
+-- TEXT so the schema remains straightforward to port to PostgreSQL JSONB.
+
+CREATE TABLE IF NOT EXISTS knowledge_versions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    version_name TEXT NOT NULL UNIQUE,
+    description TEXT,
+    taxonomy_hash TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    activated_at TEXT,
+    metadata_json TEXT NOT NULL DEFAULT '{}'
+);
+
+CREATE TABLE IF NOT EXISTS knowledge_sources (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_key TEXT NOT NULL UNIQUE,
+    source_name TEXT NOT NULL,
+    source_type TEXT NOT NULL,
+    source_version TEXT,
+    source_year INTEGER,
+    source_url TEXT,
+    license_note TEXT,
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS source_documents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    knowledge_source_id INTEGER NOT NULL,
+    document_key TEXT NOT NULL,
+    title TEXT NOT NULL,
+    file_name TEXT,
+    file_hash TEXT,
+    language TEXT,
+    publication_year INTEGER,
+    page_count INTEGER,
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+    UNIQUE (knowledge_source_id, document_key),
+    FOREIGN KEY (knowledge_source_id) REFERENCES knowledge_sources(id)
+);
+
+CREATE TABLE IF NOT EXISTS source_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    knowledge_source_id INTEGER NOT NULL,
+    source_document_id INTEGER,
+    external_record_id TEXT NOT NULL,
+    record_type TEXT NOT NULL,
+    cefr_level TEXT,
+    raw_text TEXT,
+    normalized_text TEXT,
+    page_number INTEGER,
+    row_number INTEGER,
+    sheet_name TEXT,
+    raw_payload_json TEXT NOT NULL DEFAULT '{}',
+    record_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (knowledge_source_id, external_record_id, record_type),
+    FOREIGN KEY (knowledge_source_id) REFERENCES knowledge_sources(id),
+    FOREIGN KEY (source_document_id) REFERENCES source_documents(id)
+);
+
+CREATE TABLE IF NOT EXISTS knowledge_nodes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    knowledge_version_id INTEGER NOT NULL,
+    canonical_id TEXT NOT NULL,
+    node_type TEXT NOT NULL,
+    domain TEXT NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT,
+    parent_node_id INTEGER,
+    is_atomic INTEGER NOT NULL DEFAULT 0,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (knowledge_version_id, canonical_id),
+    FOREIGN KEY (knowledge_version_id) REFERENCES knowledge_versions(id),
+    FOREIGN KEY (parent_node_id) REFERENCES knowledge_nodes(id)
+);
+
+CREATE TABLE IF NOT EXISTS skill_profiles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    knowledge_node_id INTEGER NOT NULL UNIQUE,
+    cefr_min_level TEXT,
+    cefr_primary_level TEXT,
+    evidence_status TEXT NOT NULL,
+    alignment_confidence REAL,
+    notes TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (knowledge_node_id) REFERENCES knowledge_nodes(id)
+);
+
+CREATE TABLE IF NOT EXISTS skill_source_evidence (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    evidence_key TEXT NOT NULL,
+    knowledge_node_id INTEGER NOT NULL,
+    source_record_id INTEGER NOT NULL,
+    evidence_type TEXT NOT NULL,
+    confidence REAL NOT NULL,
+    status TEXT NOT NULL,
+    review_status TEXT NOT NULL,
+    reason TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (
+        knowledge_node_id,
+        source_record_id,
+        evidence_type,
+        status
+    ),
+    UNIQUE (knowledge_node_id, evidence_key),
+    FOREIGN KEY (knowledge_node_id) REFERENCES knowledge_nodes(id),
+    FOREIGN KEY (source_record_id) REFERENCES source_records(id)
+);
+
+CREATE TABLE IF NOT EXISTS learning_objectives (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    knowledge_version_id INTEGER NOT NULL,
+    objective_key TEXT NOT NULL,
+    cefr_level TEXT,
+    domain TEXT NOT NULL,
+    scale_name TEXT,
+    objective_text TEXT NOT NULL,
+    source_record_id INTEGER,
+    status TEXT NOT NULL,
+    confidence REAL NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (knowledge_version_id, objective_key),
+    FOREIGN KEY (knowledge_version_id) REFERENCES knowledge_versions(id),
+    FOREIGN KEY (source_record_id) REFERENCES source_records(id)
+);
+
+CREATE TABLE IF NOT EXISTS skill_learning_objectives (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    knowledge_node_id INTEGER NOT NULL,
+    learning_objective_id INTEGER NOT NULL,
+    alignment_type TEXT NOT NULL,
+    confidence REAL NOT NULL,
+    reason TEXT,
+    review_status TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (
+        knowledge_node_id,
+        learning_objective_id,
+        alignment_type
+    ),
+    FOREIGN KEY (knowledge_node_id) REFERENCES knowledge_nodes(id),
+    FOREIGN KEY (learning_objective_id) REFERENCES learning_objectives(id)
+);
+
+CREATE TABLE IF NOT EXISTS skill_cefr_alignments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    knowledge_node_id INTEGER NOT NULL UNIQUE,
+    inferred_min_level TEXT,
+    inferred_primary_level TEXT,
+    confidence REAL NOT NULL,
+    status TEXT NOT NULL,
+    review_status TEXT NOT NULL,
+    reason TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (knowledge_node_id) REFERENCES knowledge_nodes(id)
+);
+
+CREATE TABLE IF NOT EXISTS skill_relationships (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    knowledge_version_id INTEGER NOT NULL,
+    relationship_key TEXT NOT NULL,
+    source_node_id INTEGER NOT NULL,
+    target_node_id INTEGER NOT NULL,
+    relation_type TEXT NOT NULL,
+    dependency_strength TEXT NOT NULL,
+    confidence REAL NOT NULL,
+    status TEXT NOT NULL,
+    review_status TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    bidirectional INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (
+        knowledge_version_id,
+        source_node_id,
+        target_node_id,
+        relation_type
+    ),
+    CHECK (source_node_id != target_node_id),
+    FOREIGN KEY (knowledge_version_id) REFERENCES knowledge_versions(id),
+    FOREIGN KEY (source_node_id) REFERENCES knowledge_nodes(id),
+    FOREIGN KEY (target_node_id) REFERENCES knowledge_nodes(id)
+);
+
+CREATE TABLE IF NOT EXISTS relationship_evidence (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    relationship_id INTEGER NOT NULL,
+    source_record_id INTEGER,
+    external_reference_id TEXT,
+    evidence_type TEXT NOT NULL,
+    note TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (
+        relationship_id,
+        source_record_id,
+        external_reference_id,
+        evidence_type,
+        note
+    ),
+    FOREIGN KEY (relationship_id) REFERENCES skill_relationships(id),
+    FOREIGN KEY (source_record_id) REFERENCES source_records(id)
+);
+
+CREATE TABLE IF NOT EXISTS assessment_criteria (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    knowledge_version_id INTEGER NOT NULL,
+    criterion_key TEXT NOT NULL,
+    knowledge_node_id INTEGER NOT NULL,
+    criterion_type TEXT NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL,
+    observable_behavior TEXT NOT NULL,
+    cefr_level TEXT,
+    recommended_threshold REAL,
+    recommended_min_items INTEGER,
+    threshold_source TEXT,
+    confidence REAL NOT NULL,
+    status TEXT NOT NULL,
+    review_status TEXT NOT NULL,
+    reason TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (knowledge_version_id, criterion_key),
+    FOREIGN KEY (knowledge_version_id) REFERENCES knowledge_versions(id),
+    FOREIGN KEY (knowledge_node_id) REFERENCES knowledge_nodes(id)
+);
+
+CREATE TABLE IF NOT EXISTS assessment_evidence_requirements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    assessment_criterion_id INTEGER NOT NULL,
+    requirement_text TEXT NOT NULL,
+    position INTEGER NOT NULL,
+    UNIQUE (assessment_criterion_id, position, requirement_text),
+    FOREIGN KEY (assessment_criterion_id) REFERENCES assessment_criteria(id)
+);
+
+CREATE TABLE IF NOT EXISTS assessment_failure_signals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    assessment_criterion_id INTEGER NOT NULL,
+    signal_text TEXT NOT NULL,
+    position INTEGER NOT NULL,
+    UNIQUE (assessment_criterion_id, position, signal_text),
+    FOREIGN KEY (assessment_criterion_id) REFERENCES assessment_criteria(id)
+);
+
+CREATE TABLE IF NOT EXISTS assessment_task_types (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    assessment_criterion_id INTEGER NOT NULL,
+    task_type TEXT NOT NULL,
+    UNIQUE (assessment_criterion_id, task_type),
+    FOREIGN KEY (assessment_criterion_id) REFERENCES assessment_criteria(id)
+);
+
+CREATE TABLE IF NOT EXISTS assessment_evidence (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    assessment_criterion_id INTEGER NOT NULL,
+    source_record_id INTEGER,
+    external_reference_id TEXT,
+    evidence_type TEXT NOT NULL,
+    note TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (
+        assessment_criterion_id,
+        source_record_id,
+        external_reference_id,
+        evidence_type,
+        note
+    ),
+    FOREIGN KEY (assessment_criterion_id) REFERENCES assessment_criteria(id),
+    FOREIGN KEY (source_record_id) REFERENCES source_records(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_knowledge_nodes_canonical_id
+ON knowledge_nodes (canonical_id);
+
+CREATE INDEX IF NOT EXISTS idx_knowledge_nodes_parent_node_id
+ON knowledge_nodes (parent_node_id);
+
+CREATE INDEX IF NOT EXISTS idx_source_records_source_type
+ON source_records (knowledge_source_id, record_type);
+
+CREATE INDEX IF NOT EXISTS idx_source_records_cefr_level
+ON source_records (cefr_level);
+
+CREATE INDEX IF NOT EXISTS idx_skill_source_evidence_node
+ON skill_source_evidence (knowledge_node_id);
+
+CREATE INDEX IF NOT EXISTS idx_skill_source_evidence_source_record
+ON skill_source_evidence (source_record_id);
+
+CREATE INDEX IF NOT EXISTS idx_skill_learning_objectives_node
+ON skill_learning_objectives (knowledge_node_id);
+
+CREATE INDEX IF NOT EXISTS idx_skill_relationships_source_relation
+ON skill_relationships (source_node_id, relation_type);
+
+CREATE INDEX IF NOT EXISTS idx_skill_relationships_target_relation
+ON skill_relationships (target_node_id, relation_type);
+
+CREATE INDEX IF NOT EXISTS idx_skill_cefr_alignments_primary_level
+ON skill_cefr_alignments (inferred_primary_level);
+
+CREATE INDEX IF NOT EXISTS idx_assessment_criteria_node
+ON assessment_criteria (knowledge_node_id);
+
+CREATE INDEX IF NOT EXISTS idx_learning_objectives_cefr_level
+ON learning_objectives (cefr_level);
+
+CREATE VIEW IF NOT EXISTS v_atomic_skills AS
+SELECT
+    n.canonical_id,
+    n.name,
+    n.domain,
+    sp.cefr_min_level,
+    sp.cefr_primary_level,
+    sp.evidence_status
+FROM knowledge_nodes n
+JOIN knowledge_versions kv
+    ON kv.id = n.knowledge_version_id
+LEFT JOIN skill_profiles sp
+    ON sp.knowledge_node_id = n.id
+WHERE
+    kv.status = 'active'
+    AND n.is_atomic = 1
+    AND n.is_active = 1;
+
+CREATE VIEW IF NOT EXISTS v_skill_prerequisites AS
+SELECT
+    target_node.canonical_id AS skill_id,
+    source_node.canonical_id AS prerequisite_skill_id,
+    sr.confidence,
+    sr.dependency_strength
+FROM skill_relationships sr
+JOIN knowledge_versions kv
+    ON kv.id = sr.knowledge_version_id
+JOIN knowledge_nodes source_node
+    ON source_node.id = sr.source_node_id
+JOIN knowledge_nodes target_node
+    ON target_node.id = sr.target_node_id
+WHERE
+    kv.status = 'active'
+    AND sr.relation_type = 'prerequisite_of';
+
+CREATE VIEW IF NOT EXISTS v_skill_assessment_summary AS
+SELECT
+    n.canonical_id AS skill_id,
+    ac.criterion_key AS criterion_id,
+    ac.criterion_type,
+    ac.cefr_level,
+    ac.recommended_threshold
+FROM assessment_criteria ac
+JOIN knowledge_versions kv
+    ON kv.id = ac.knowledge_version_id
+JOIN knowledge_nodes n
+    ON n.id = ac.knowledge_node_id
+WHERE kv.status = 'active';

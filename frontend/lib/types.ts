@@ -116,9 +116,11 @@ export type LearningActivityPreview = {
   conversationId: string;
   learnerId: string;
   type: string;
+  parentActivityId?: string | null;
   status: string;
   targetSkills: string[];
   difficulty?: string | null;
+  config: Record<string, unknown>;
   createdAt?: string | null;
   startedAt?: string | null;
   submittedAt?: string | null;
@@ -161,6 +163,7 @@ export type PendingClarification = {
   pendingIntent: string;
   missingFields: string[];
   collectedSlots: Record<string, unknown>;
+  activeActivityId?: string | null;
   question: string;
 };
 
@@ -169,9 +172,12 @@ export type ConversationRoute = {
   confidence: number;
   source: string;
   reason: string;
+  requiresContext: boolean;
   slots: Record<string, unknown>;
   missingSlots: string[];
+  targetActivityId?: string | null;
   referencedActivityId?: string | null;
+  nextAction: string;
   needsClarification: boolean;
   clarificationQuestion?: string | null;
 };
