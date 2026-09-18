@@ -238,11 +238,11 @@
     "nationality"
   ],
   "licensing": {
-    "license_status": "needs_manual_review",
+    "license_status": "local_user_agreement_reviewed_restricted",
     "licensing_files": [
       "D:/code/NLP_Final/data/raw/EFCAMDAT/EFCamDat-User-Agreement-2023.pdf"
     ],
-    "redistribution_notes": "User agreement or terms are present locally; exact permissions require manual review."
+    "redistribution_notes": "Local user agreement permits academic private study and noncommercial research, permits brief extracts for teaching or academic publication with acknowledgement, and prohibits making EFCAMDAT available to others or transferring it without prior written consent."
   },
   "local_documentation_files": [
     "D:/code/NLP_Final/data/raw/EFCAMDAT/Cleaned_Subcorpus (Shatz, 2020)/Cleaned-Subcorpus-Readme explanation file.pdf",

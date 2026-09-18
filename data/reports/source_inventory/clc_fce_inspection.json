@@ -56,7 +56,7 @@
     "age"
   ],
   "licensing": {
-    "license_status": "needs_manual_review",
+    "license_status": "local_readme_reviewed_specific_license_missing",
     "licensing_files": [
       "D:/code/NLP_Final/data/raw/_fce-released-dataset-1.1/README"
     ],

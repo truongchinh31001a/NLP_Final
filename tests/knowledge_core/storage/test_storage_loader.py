@@ -55,6 +55,13 @@ class KnowledgeStorageLoaderTests(unittest.TestCase):
         self.assertEqual(validation.counts["cefr_alignments"], 43)
         self.assertEqual(validation.counts["relationships"], 93)
         self.assertEqual(validation.counts["assessment_criteria"], 79)
+        self.assertEqual(validation.counts["corpus_error_statistics"], 737)
+        self.assertEqual(validation.counts["corpus_error_skill_mappings"], 0)
+        self.assertEqual(validation.counts["misconceptions"], 1)
+        self.assertEqual(validation.counts["candidate_misconceptions"], 1)
+        self.assertEqual(validation.counts["accepted_misconceptions"], 0)
+        self.assertEqual(validation.counts["misconception_evidence"], 0)
+        self.assertEqual(validation.counts["skill_misconception_links"], 0)
 
     def test_idempotent_load_does_not_create_duplicates(self) -> None:
         first = load_knowledge_core(db_path=self.db_path, artifacts=self.artifacts)
@@ -224,10 +231,18 @@ class KnowledgeStorageLoaderTests(unittest.TestCase):
             assessment_count = connection.execute(
                 "SELECT COUNT(*) AS count FROM v_skill_assessment_summary",
             ).fetchone()["count"]
+            misconception_count = connection.execute(
+                "SELECT COUNT(*) AS count FROM v_skill_misconceptions",
+            ).fetchone()["count"]
+            error_stat_count = connection.execute(
+                "SELECT COUNT(*) AS count FROM v_corpus_error_statistics",
+            ).fetchone()["count"]
 
         self.assertEqual(atomic_count, 43)
         self.assertEqual(prerequisite_count, 15)
         self.assertEqual(assessment_count, 79)
+        self.assertEqual(misconception_count, 1)
+        self.assertEqual(error_stat_count, 737)
 
 
 if __name__ == "__main__":

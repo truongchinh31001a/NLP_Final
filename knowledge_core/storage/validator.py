@@ -178,6 +178,13 @@ def _expected_counts(
             for criterion in artifacts.assessment_criteria
         ),
         "assessment_profile_reconstructable_skills": len(artifacts.assessment_profiles),
+        "corpus_error_statistics": artifacts.counts()["corpus_error_statistics"],
+        "corpus_error_skill_mappings": len(artifacts.error_skill_mappings),
+        "misconceptions": artifacts.counts()["misconceptions"],
+        "candidate_misconceptions": len(artifacts.candidate_misconceptions),
+        "accepted_misconceptions": len(artifacts.accepted_misconceptions),
+        "misconception_evidence": artifacts.counts()["misconception_evidence"],
+        "skill_misconception_links": len(artifacts.skill_misconception_links),
     }
 
 
@@ -310,6 +317,55 @@ def _version_counts(connection: sqlite3.Connection, version_id: int) -> dict[str
             """,
             (version_id,),
         ),
+        "corpus_error_statistics": _count(
+            connection,
+            "SELECT COUNT(*) AS count FROM corpus_error_statistics WHERE knowledge_version_id = ?",
+            (version_id,),
+        ),
+        "corpus_error_skill_mappings": _count(
+            connection,
+            "SELECT COUNT(*) AS count FROM corpus_error_skill_mappings WHERE knowledge_version_id = ?",
+            (version_id,),
+        ),
+        "misconceptions": _count(
+            connection,
+            "SELECT COUNT(*) AS count FROM misconceptions WHERE knowledge_version_id = ?",
+            (version_id,),
+        ),
+        "candidate_misconceptions": _count(
+            connection,
+            """
+            SELECT COUNT(*) AS count
+            FROM misconceptions
+            WHERE knowledge_version_id = ? AND status = 'candidate'
+            """,
+            (version_id,),
+        ),
+        "accepted_misconceptions": _count(
+            connection,
+            """
+            SELECT COUNT(*) AS count
+            FROM misconceptions
+            WHERE knowledge_version_id = ? AND status = 'accepted'
+            """,
+            (version_id,),
+        ),
+        "misconception_evidence": _count(
+            connection,
+            """
+            SELECT COUNT(*) AS count
+            FROM misconception_evidence
+            WHERE misconception_id IN (
+                SELECT id FROM misconceptions WHERE knowledge_version_id = ?
+            )
+            """,
+            (version_id,),
+        ),
+        "skill_misconception_links": _count(
+            connection,
+            "SELECT COUNT(*) AS count FROM skill_misconception_links WHERE knowledge_version_id = ?",
+            (version_id,),
+        ),
     }
 
 
@@ -335,6 +391,15 @@ def _empty_version_counts() -> dict[str, int]:
         "view_skill_prerequisites": 0,
         "view_skill_assessment_summary": 0,
         "assessment_profile_reconstructable_skills": 0,
+        "corpus_error_statistics": 0,
+        "corpus_error_skill_mappings": 0,
+        "misconceptions": 0,
+        "candidate_misconceptions": 0,
+        "accepted_misconceptions": 0,
+        "misconception_evidence": 0,
+        "skill_misconception_links": 0,
+        "view_skill_misconceptions": 0,
+        "view_corpus_error_statistics": 0,
     }
 
 
@@ -351,6 +416,14 @@ def _view_counts(connection: sqlite3.Connection) -> dict[str, int]:
         "view_skill_assessment_summary": _count(
             connection,
             "SELECT COUNT(*) AS count FROM v_skill_assessment_summary",
+        ),
+        "view_skill_misconceptions": _count(
+            connection,
+            "SELECT COUNT(*) AS count FROM v_skill_misconceptions",
+        ),
+        "view_corpus_error_statistics": _count(
+            connection,
+            "SELECT COUNT(*) AS count FROM v_corpus_error_statistics",
         ),
     }
 
@@ -503,6 +576,58 @@ def _duplicate_count(connection: sqlite3.Connection, version_id: int | None) -> 
                 FROM assessment_criteria
                 WHERE knowledge_version_id = ?
                 GROUP BY knowledge_version_id, criterion_key
+                HAVING COUNT(*) > 1
+            )
+            """,
+            (version_id,),
+        ),
+        (
+            """
+            SELECT COALESCE(SUM(row_count - 1), 0) AS count
+            FROM (
+                SELECT COUNT(*) AS row_count
+                FROM corpus_error_statistics
+                WHERE knowledge_version_id = ?
+                GROUP BY knowledge_version_id, statistic_key
+                HAVING COUNT(*) > 1
+            )
+            """,
+            (version_id,),
+        ),
+        (
+            """
+            SELECT COALESCE(SUM(row_count - 1), 0) AS count
+            FROM (
+                SELECT COUNT(*) AS row_count
+                FROM corpus_error_skill_mappings
+                WHERE knowledge_version_id = ?
+                GROUP BY knowledge_version_id, mapping_key
+                HAVING COUNT(*) > 1
+            )
+            """,
+            (version_id,),
+        ),
+        (
+            """
+            SELECT COALESCE(SUM(row_count - 1), 0) AS count
+            FROM (
+                SELECT COUNT(*) AS row_count
+                FROM misconceptions
+                WHERE knowledge_version_id = ?
+                GROUP BY knowledge_version_id, misconception_key
+                HAVING COUNT(*) > 1
+            )
+            """,
+            (version_id,),
+        ),
+        (
+            """
+            SELECT COALESCE(SUM(row_count - 1), 0) AS count
+            FROM (
+                SELECT COUNT(*) AS row_count
+                FROM skill_misconception_links
+                WHERE knowledge_version_id = ?
+                GROUP BY knowledge_version_id, link_key
                 HAVING COUNT(*) > 1
             )
             """,

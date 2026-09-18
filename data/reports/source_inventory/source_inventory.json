@@ -98,7 +98,7 @@
     "english_grammar_profile",
     "cefr_companion_volume_2020"
   ],
-  "generated_at": "2026-09-16T10:51:53.123317+00:00",
+  "generated_at": "2026-09-16T15:30:28.370968+00:00",
   "inspection_errors": [],
   "inspection_warnings": [],
   "sources": [
@@ -160,7 +160,7 @@
       "license_files": [
         "data/raw/EFCAMDAT/EFCamDat-User-Agreement-2023.pdf"
       ],
-      "license_status": "needs_manual_review",
+      "license_status": "local_user_agreement_reviewed_restricted",
       "licensing_files": [
         "D:/code/NLP_Final/data/raw/EFCAMDAT/EFCamDat-User-Agreement-2023.pdf"
       ],
@@ -188,7 +188,7 @@
         "data/raw/EFCAMDAT/Cleaned_Subcorpus (Shatz, 2020)/Cleaned-Subcorpus-Readme explanation file.pdf"
       ],
       "record_unit": "writing",
-      "redistribution_notes": "User agreement or terms are present locally; exact permissions require manual review.",
+      "redistribution_notes": "Local user agreement permits academic private study and noncommercial research, permits brief extracts for teaching or academic publication with acknowledgement, and prohibits making EFCAMDAT available to others or transferring it without prior written consent.",
       "representative_files": [
         "data/raw/EFCAMDAT/Cleaned_Error-coded_Subcorpus (Öksüz et al., 2025)/R scripts/1 - Processing EFCAMDAT/1 - parsing EFCAMDAT.R",
         "data/raw/EFCAMDAT/Cleaned_Error-coded_Subcorpus (Öksüz et al., 2025)/R scripts/1 - Processing EFCAMDAT/EFCAMDAT_tbc.xml.zip",
@@ -266,7 +266,7 @@
         "age"
       ],
       "license_files": [],
-      "license_status": "needs_manual_review",
+      "license_status": "local_readme_reviewed_specific_license_missing",
       "licensing_files": [
         "D:/code/NLP_Final/data/raw/_fce-released-dataset-1.1/README"
       ],

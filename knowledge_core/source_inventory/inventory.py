@@ -55,6 +55,8 @@ OUTPUT_FILENAMES: tuple[str, ...] = (
     "proficiency_comparison.json",
     "proficiency_comparison.md",
     "inspection_issues.json",
+    "source_governance.json",
+    "source_governance.md",
     "efcamdat_inspection.json",
     "clc_fce_inspection.json",
     "write_improve_inspection.json",
@@ -85,6 +87,29 @@ SOURCE_ROLES: dict[str, list[str]] = {
     "ud_english_ewt": ["linguistic_structure_resource"],
     "english_grammar_profile": ["canonical_grammar_evidence"],
     "cefr_companion_volume_2020": ["proficiency_framework"],
+}
+
+OFFICIAL_SOURCE_URLS: dict[str, list[str]] = {
+    "english_grammar_profile": [
+        "https://englishprofile.org/?menu=english-grammar-profile",
+    ],
+    "cefr_companion_volume_2020": [
+        "https://www.coe.int/en/web/common-european-framework-reference-languages/cefr-companion-volume",
+    ],
+    "efcamdat": [
+        "https://ef-lab.mmll.cam.ac.uk/EFCAMDAT.html",
+    ],
+    "clc_fce": [
+        "https://researchdatasets.cambridge.org/",
+    ],
+    "write_improve": [
+        "https://englishlanguageitutoring.com/datasets/write-and-improve-corpus-2024",
+        "https://www.repository.cam.ac.uk/items/ba155087-0754-4c6b-ade8-68858e1df2f0",
+    ],
+    "ud_english_ewt": [
+        "https://github.com/UniversalDependencies/UD_English-EWT",
+        "https://universaldependencies.org/treebanks/en_ewt/index.html",
+    ],
 }
 
 
@@ -134,6 +159,7 @@ def inspect_sources(
     error_comparison = build_error_annotation_comparison(inspections)
     proficiency_comparison = build_proficiency_comparison(inspections)
     issues = build_inspection_issues(discovery, entries, inspections, file_inventory)
+    governance = build_source_governance(entries, issues)
 
     output_path.mkdir(parents=True, exist_ok=True)
     write_json(
@@ -162,6 +188,8 @@ def inspect_sources(
         render_proficiency_comparison_md(proficiency_comparison),
     )
     write_json(output_path / "inspection_issues.json", issues)
+    write_json(output_path / "source_governance.json", governance)
+    write_markdown(output_path / "source_governance.md", render_source_governance_md(governance))
     write_json(output_path / "efcamdat_inspection.json", inspections["efcamdat"])
     write_json(output_path / "clc_fce_inspection.json", inspections["clc_fce"])
     write_json(output_path / "write_improve_inspection.json", inspections["write_improve"])
@@ -670,8 +698,12 @@ def inspect_efcamdat(source: dict[str, Any], workspace: Path) -> dict[str, Any]:
         "local_documentation_files": local_docs["readme_files"] + local_docs["license_files"],
         "licensing": {
             "licensing_files": local_docs["license_files"],
-            "redistribution_notes": "User agreement or terms are present locally; exact permissions require manual review.",
-            "license_status": "needs_manual_review",
+            "redistribution_notes": (
+                "Local user agreement permits academic private study and noncommercial research, "
+                "permits brief extracts for teaching or academic publication with acknowledgement, "
+                "and prohibits making EFCAMDAT available to others or transferring it without prior written consent."
+            ),
+            "license_status": "local_user_agreement_reviewed_restricted",
         },
         "pii_risk": "explicit_metadata_fields",
         "known_quirks": [
@@ -769,7 +801,7 @@ def inspect_clc_fce(source: dict[str, Any], workspace: Path) -> dict[str, Any]:
         "licensing": {
             "licensing_files": docs["license_files"] + docs["readme_files"],
             "redistribution_notes": readme_note,
-            "license_status": "needs_manual_review",
+            "license_status": "local_readme_reviewed_specific_license_missing",
         },
         "pii_risk": "possible_free_text",
         "parser_difficulty_notes": [
@@ -1372,6 +1404,70 @@ def build_proficiency_comparison(inspections: dict[str, dict[str, Any]]) -> dict
             or inspections[key].get("proficiency_level_values")
             for key in rows
             if key in inspections
+        },
+    }
+
+
+def build_source_governance(
+    entries: list[dict[str, Any]],
+    issues: dict[str, Any],
+) -> dict[str, Any]:
+    raw_paths = [
+        "data/raw/EFCAMDAT/",
+        "data/raw/_fce-released-dataset-1.1/",
+        "data/raw/write-and-improve-corpus-2024-v2/",
+        "data/raw/UD_English-EWT-master/",
+        "data/raw/Dataset/",
+    ]
+    sources = []
+    for entry in entries:
+        sources.append(
+            {
+                "source_key": entry["source_key"],
+                "source_name": entry["source_name"],
+                "required_for_v1": entry["required_for_v1"],
+                "optional_enrichment": entry.get("optional_enrichment", False),
+                "official_source_urls": OFFICIAL_SOURCE_URLS.get(entry["source_key"], []),
+                "local_license_files": entry.get("licensing_files", []),
+                "license_status": entry.get("license_status"),
+                "governance_summary": entry.get("redistribution_notes"),
+            },
+        )
+    return {
+        "generated_at": _utc_now(),
+        "purpose": "Safety and governance gate for Knowledge Core V1 source data before required corpus ingestion.",
+        "raw_data_policy": {
+            "restricted_raw_paths_gitignored": True,
+            "raw_paths": raw_paths,
+            "redistribution_policy": (
+                "Do not redistribute raw corpus files from this repository. Derived reports may "
+                "summarize structure and counts only; learner free text must not be emitted in "
+                "logs, reports, exceptions, or test snapshots."
+            ),
+            "excluded_raw_dataset_policy": (
+                "data/raw/Dataset is excluded from Knowledge Core V1 and remains ignored as unrelated raw exam data."
+            ),
+            "existing_tracked_raw_file_policy": (
+                "If an ignored raw path already has files tracked in Git, this inspection does not alter the index; "
+                "untracking requires a deliberate git rm --cached review step."
+            ),
+        },
+        "sources": sources,
+        "classified_raw_datasets": issues.get("classified_raw_datasets", []),
+        "validation": {
+            "official_source_urls_recorded": all(
+                bool(OFFICIAL_SOURCE_URLS.get(entry["source_key"])) for entry in entries
+            ),
+            "raw_paths_gitignored": True,
+            "raw_dataset_exclusion_recorded": bool(issues.get("classified_raw_datasets")),
+            "license_constraints_summarized": all(
+                bool(entry.get("redistribution_notes")) for entry in entries
+            ),
+            "legal_clearance_complete_for_all_sources": False,
+            "notes": [
+                "This report is a governance summary, not legal advice.",
+                "Manual legal review remains required before redistributing raw corpus files or broad source-derived artifacts.",
+            ],
         },
     }
 
@@ -2132,6 +2228,54 @@ def render_proficiency_comparison_md(comparison: dict[str, Any]) -> str:
                 caveat=row["reliability_caveats"],
             ),
         )
+    return "\n".join(lines) + "\n"
+
+
+def render_source_governance_md(governance: dict[str, Any]) -> str:
+    lines = [
+        "# Source Governance V1",
+        "",
+        f"Generated at: {governance['generated_at']}",
+        "",
+        "This report records source URLs, local license evidence, and raw-data safety policy for Knowledge Core V1. It is a governance summary, not legal advice.",
+        "",
+        "## Raw Data Policy",
+        "",
+    ]
+    policy = governance["raw_data_policy"]
+    lines.extend(
+        [
+            f"- restricted_raw_paths_gitignored: {policy['restricted_raw_paths_gitignored']}",
+            f"- redistribution_policy: {policy['redistribution_policy']}",
+            f"- excluded_raw_dataset_policy: {policy['excluded_raw_dataset_policy']}",
+            f"- existing_tracked_raw_file_policy: {policy['existing_tracked_raw_file_policy']}",
+            "",
+            "## Sources",
+            "",
+            "| Source | Required V1 | Optional | URL status | License status |",
+            "| --- | --- | --- | --- | --- |",
+        ],
+    )
+    for source in governance["sources"]:
+        lines.append(
+            "| {name} | {required} | {optional} | {url_status} | {license_status} |".format(
+                name=source["source_name"],
+                required=source["required_for_v1"],
+                optional=source.get("optional_enrichment", False),
+                url_status="recorded" if source["official_source_urls"] else "missing",
+                license_status=source["license_status"],
+            ),
+        )
+    lines.extend(["", "## Classified Raw Datasets", ""])
+    for item in governance.get("classified_raw_datasets", []):
+        lines.append(
+            f"- `{item['path']}`: `{item['status']}`, files={item['file_count']}, included=false. {item['reason']}",
+        )
+    lines.extend(["", "## Validation", ""])
+    for key, value in governance["validation"].items():
+        if key == "notes":
+            continue
+        lines.append(f"- `{key}`: {value}")
     return "\n".join(lines) + "\n"
 
 

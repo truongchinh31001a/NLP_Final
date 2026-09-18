@@ -6,9 +6,11 @@ from pathlib import Path
 from typing import Iterator
 
 from knowledge_core.repository.assessment_repository import AssessmentRepository
+from knowledge_core.repository.corpus_error_repository import CorpusErrorRepository
 from knowledge_core.repository.knowledge_node_repository import KnowledgeNodeRepository
 from knowledge_core.repository.knowledge_query_repository import KnowledgeQueryRepository
 from knowledge_core.repository.knowledge_version_repository import KnowledgeVersionRepository
+from knowledge_core.repository.misconception_repository import MisconceptionRepository
 from knowledge_core.repository.objective_repository import LearningObjectiveRepository
 from knowledge_core.repository.relationship_repository import RelationshipRepository
 from knowledge_core.repository.source_evidence_repository import SourceEvidenceRepository
@@ -24,12 +26,16 @@ class KnowledgeRepositorySession:
         self.objectives = LearningObjectiveRepository(connection)
         self.relationships = RelationshipRepository(connection)
         self.assessments = AssessmentRepository(connection)
+        self.misconceptions = MisconceptionRepository(connection)
+        self.corpus_errors = CorpusErrorRepository(connection)
         self.queries = KnowledgeQueryRepository(
             nodes=self.nodes,
             evidence=self.evidence,
             objectives=self.objectives,
             relationships=self.relationships,
             assessments=self.assessments,
+            misconceptions=self.misconceptions,
+            corpus_errors=self.corpus_errors,
         )
 
 

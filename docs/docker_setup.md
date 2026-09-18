@@ -2,7 +2,8 @@
 
 ## Dich vu
 
-- `postgres`: PostgreSQL kem pgvector extension cho P2 storage/retrieval
+- `postgres`: PostgreSQL kem pgvector extension cho P2 storage/retrieval;
+  optional profile, khong chay trong SQLite/Chroma demo mac dinh
 - `ollama`: local LLM runtime cho fallback/demo
 - `backend`: Python + FastAPI + LangChain pipeline
 - `frontend`: Next.js App Router UI
@@ -13,6 +14,13 @@
 
 ```bash
 docker compose up --build
+```
+
+Lenh tren chi chay runtime mac dinh can thiet: backend, frontend va Ollama.
+PostgreSQL/pgvector chi can khi dung PostgreSQL repository hoac pgvector:
+
+```bash
+docker compose --profile postgres up --build
 ```
 
 Sau khi chay:
@@ -27,13 +35,15 @@ Sau khi chay:
 
 ```bash
 python scripts/smoke_docker_stack.py
+python scripts/smoke_docker_stack.py --with-postgres
 python scripts/smoke_conversation_flow.py --base-url http://localhost:8000
 python scripts/smoke_pgvector_retrieval.py
 ```
 
 `smoke_docker_stack.py` kiem tra `docker compose config`, backend health,
-Ollama debug port, backend-to-Ollama network call, va PostgreSQL `vector`
-extension. Script khong tu start container.
+Ollama debug port va backend-to-Ollama network call. Them `--with-postgres`
+de kiem tra PostgreSQL `vector` extension khi optional profile dang chay.
+Script khong tu start container.
 
 `smoke_conversation_flow.py` tao conversation, tao practice activity, submit
 bang `activity_id`, hoi review/progress, tao New Chat, va check learner state
@@ -52,7 +62,9 @@ Postgres dang chay. Mac dinh script dung table rieng `rag_smoke_documents`.
 - Service `ollama-embedding-models` tu pull `OLLAMA_EMBEDDING_MODEL` cho semantic retrieval
 - Backend mac dinh van co the dung SQLite/Chroma de demo gon nhe
 - Co the bat PostgreSQL repository bang `LEARNING_REPOSITORY_BACKEND=postgres`
-- Co the bat pgvector retrieval bang `VECTOR_STORE_BACKEND=pgvector`
+  va chay Compose voi `--profile postgres`
+- Co the bat pgvector retrieval bang `VECTOR_STORE_BACKEND=pgvector` va chay
+  Compose voi `--profile postgres`
 - Co the bat auth token bang `AUTH_MODE=demo_token`
 - Frontend khong con local generation/scoring fallback; backend can san sang truoc khi demo
 

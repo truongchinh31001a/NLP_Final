@@ -153,6 +153,70 @@ class AssessmentCriterionReadModel:
 
 
 @dataclass(frozen=True, slots=True)
+class MisconceptionEvidenceReadModel:
+    misconception_id: str
+    normalized_error_id: str
+    error_instance_id: str
+    source_record_id: str
+    source_key: str
+    source_label: str | None
+    proficiency_label: str | None
+    task_id: str | None
+    split: str | None
+    mapping_confidence: float
+    error_skill_mapping_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class MisconceptionReadModel:
+    misconception_id: str
+    canonical_skill_id: str
+    name: str
+    description: str
+    error_category: str
+    error_subtype: str | None
+    expected_pattern: str
+    observed_pattern: str
+    diagnostic_rule: str
+    source_evidence_count: int
+    frequency: float
+    frequency_scope: str
+    severity: str
+    confidence: float
+    status: str
+    review_status: str
+    reason: str
+    evidence: tuple[MisconceptionEvidenceReadModel, ...] = field(default_factory=tuple)
+
+
+@dataclass(frozen=True, slots=True)
+class CorpusErrorStatisticReadModel:
+    statistic_key: str
+    statistic_type: str
+    count: int
+    source_key: str | None = None
+    skill_id: str | None = None
+    normalized_category: str | None = None
+    normalized_subtype: str | None = None
+    mapping_status: str | None = None
+    source_label: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ErrorSkillMappingReadModel:
+    mapping_id: str
+    skill_id: str
+    source_key: str
+    normalized_error_id: str
+    error_instance_id: str
+    source_record_id: str
+    status: str
+    confidence: float
+    review_status: str
+    reason: str
+
+
+@dataclass(frozen=True, slots=True)
 class SkillSnapshotReadModel:
     skill: KnowledgeNodeReadModel
     profile: SkillProfileReadModel
@@ -161,3 +225,5 @@ class SkillSnapshotReadModel:
     learning_objectives: tuple[LearningObjectiveReadModel, ...]
     assessment_criteria: tuple[AssessmentCriterionReadModel, ...]
     source_evidence_summary: dict[str, object]
+    misconceptions: tuple[MisconceptionReadModel, ...] = field(default_factory=tuple)
+    corpus_error_summary: dict[str, object] = field(default_factory=dict)

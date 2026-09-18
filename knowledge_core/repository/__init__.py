@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from knowledge_core.repository.assessment_repository import AssessmentRepository
+from knowledge_core.repository.corpus_error_repository import CorpusErrorRepository
 from knowledge_core.repository.exceptions import (
     KnowledgeIntegrityError,
     KnowledgeNotFoundError,
@@ -13,9 +14,13 @@ from knowledge_core.repository.knowledge_version_repository import KnowledgeVers
 from knowledge_core.repository.models import (
     AssessmentCriterionReadModel,
     AssessmentEvidenceReadModel,
+    CorpusErrorStatisticReadModel,
+    ErrorSkillMappingReadModel,
     KnowledgeNodeReadModel,
     KnowledgeVersionReadModel,
     LearningObjectiveReadModel,
+    MisconceptionEvidenceReadModel,
+    MisconceptionReadModel,
     RelationshipEvidenceReadModel,
     RelationshipReadModel,
     SkillProfileReadModel,
@@ -23,6 +28,7 @@ from knowledge_core.repository.models import (
     SourceEvidenceReadModel,
     SourceRecordReadModel,
 )
+from knowledge_core.repository.misconception_repository import MisconceptionRepository
 from knowledge_core.repository.objective_repository import LearningObjectiveRepository
 from knowledge_core.repository.relationship_repository import RelationshipRepository
 from knowledge_core.repository.session import (
@@ -35,6 +41,9 @@ __all__ = [
     "AssessmentCriterionReadModel",
     "AssessmentEvidenceReadModel",
     "AssessmentRepository",
+    "CorpusErrorRepository",
+    "CorpusErrorStatisticReadModel",
+    "ErrorSkillMappingReadModel",
     "KnowledgeIntegrityError",
     "KnowledgeNodeReadModel",
     "KnowledgeNodeRepository",
@@ -47,6 +56,9 @@ __all__ = [
     "KnowledgeVersionRepository",
     "LearningObjectiveReadModel",
     "LearningObjectiveRepository",
+    "MisconceptionEvidenceReadModel",
+    "MisconceptionReadModel",
+    "MisconceptionRepository",
     "RelationshipEvidenceReadModel",
     "RelationshipReadModel",
     "RelationshipRepository",

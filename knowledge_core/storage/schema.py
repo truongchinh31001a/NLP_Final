@@ -26,12 +26,19 @@ KNOWLEDGE_TABLES = (
     "assessment_failure_signals",
     "assessment_task_types",
     "assessment_evidence",
+    "corpus_error_statistics",
+    "corpus_error_skill_mappings",
+    "misconceptions",
+    "misconception_evidence",
+    "skill_misconception_links",
 )
 
 KNOWLEDGE_VIEWS = (
     "v_atomic_skills",
     "v_skill_prerequisites",
     "v_skill_assessment_summary",
+    "v_skill_misconceptions",
+    "v_corpus_error_statistics",
 )
 
 

@@ -266,6 +266,40 @@ class KnowledgeRepositoryV1Tests(unittest.TestCase):
         self.assertTrue(full.task_types)
         self.assertTrue(full.evidence)
 
+    def test_misconception_queries(self) -> None:
+        with open_knowledge_repositories(self.db_path) as repos:
+            misconceptions = repos.misconceptions.list_for_skill(
+                "grammar.present_simple.third_person_s",
+            )
+            candidate = repos.misconceptions.get_misconception(
+                misconceptions[0].misconception_id,
+            )
+            evidence = repos.misconceptions.list_evidence(
+                candidate.misconception_id,
+                limit=1000,
+            )
+
+        self.assertEqual(len(misconceptions), 1)
+        self.assertEqual(candidate.status, "candidate")
+        self.assertEqual(candidate.review_status, "pending")
+        self.assertEqual(candidate.source_evidence_count, 0)
+        self.assertEqual(len(evidence), 0)
+
+    def test_corpus_error_statistic_queries(self) -> None:
+        with open_knowledge_repositories(self.db_path) as repos:
+            source_counts = repos.corpus_errors.list_statistics(
+                statistic_type="source_error_count",
+                limit=10,
+            )
+            skill_mappings = repos.corpus_errors.list_skill_mappings(
+                skill_id="grammar.present_simple.third_person_s",
+                limit=1000,
+            )
+
+        self.assertEqual(sum(item.count for item in source_counts), 6222430)
+        self.assertEqual(len(skill_mappings), 0)
+        self.assertEqual({item.source_key for item in skill_mappings}, set())
+
     def test_composite_skill_snapshot(self) -> None:
         with open_knowledge_repositories(self.db_path) as repos:
             snapshot = repos.queries.get_skill_snapshot(
@@ -277,6 +311,17 @@ class KnowledgeRepositoryV1Tests(unittest.TestCase):
         self.assertEqual(len(snapshot.learning_objectives), 5)
         self.assertEqual(len(snapshot.assessment_criteria), 1)
         self.assertEqual(snapshot.source_evidence_summary["total"], 8)
+
+        third_person_snapshot = None
+        with open_knowledge_repositories(self.db_path) as repos:
+            third_person_snapshot = repos.queries.get_skill_snapshot(
+                "grammar.present_simple.third_person_s",
+            )
+        self.assertEqual(len(third_person_snapshot.misconceptions), 1)
+        self.assertEqual(
+            third_person_snapshot.corpus_error_summary["skill_mapping_count"],
+            0,
+        )
 
     def test_version_isolation(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

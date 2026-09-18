@@ -18,13 +18,21 @@ from knowledge_core.assessment.models import (
     AssessmentCriterion,
     AssessmentEvidence,
 )
+from knowledge_core.enrichment.models import SkillMisconceptionLink
 from knowledge_core.assessment.rules import SKILL_ASSESSMENT_SPECS
 from knowledge_core.mapping.egp.canonical import CANONICAL_GRAMMAR_V1_SKILLS
+from knowledge_core.misconceptions.models import MisconceptionCandidate
+from knowledge_core.normalization.corpus_errors.models import ErrorSkillMapping
 from knowledge_core.relationships.models import RelationshipEvidence, SkillRelationship
 from knowledge_core.relationships.taxonomy import build_grammar_taxonomy
 from knowledge_core.sources.cefr.models import SOURCE_DOCUMENT, SOURCE_YEAR
 from knowledge_core.sources.egp.models import DEFAULT_EGP_ONLINE_URL
-from knowledge_core.storage.artifacts import StorageArtifacts, load_storage_artifacts
+from knowledge_core.storage.artifacts import (
+    StorageArtifacts,
+    corpus_error_statistic_rows,
+    load_storage_artifacts,
+    merged_misconceptions,
+)
 from knowledge_core.storage.config import DEFAULT_VERSION_NAME, resolve_db_path
 from knowledge_core.storage.schema import initialize_schema, sqlite_connection
 
@@ -132,6 +140,38 @@ def load_knowledge_core(
                 node_ids=node_ids,
                 source_record_ids=source_record_ids,
             )
+            mapping_ids = _load_corpus_error_skill_mappings(
+                connection,
+                version_id=version_id,
+                mappings=resolved_artifacts.error_skill_mappings,
+                source_ids=source_ids,
+                node_ids=node_ids,
+            )
+            _load_corpus_error_statistics(
+                connection,
+                version_id=version_id,
+                artifacts=resolved_artifacts,
+                source_ids=source_ids,
+                node_ids=node_ids,
+            )
+            misconception_ids = _load_misconceptions(
+                connection,
+                version_id=version_id,
+                misconceptions=merged_misconceptions(
+                    candidates=resolved_artifacts.candidate_misconceptions,
+                    accepted=resolved_artifacts.accepted_misconceptions,
+                ),
+                source_ids=source_ids,
+                node_ids=node_ids,
+                mapping_ids=mapping_ids,
+            )
+            _load_skill_misconception_links(
+                connection,
+                version_id=version_id,
+                links=resolved_artifacts.skill_misconception_links,
+                node_ids=node_ids,
+                misconception_ids=misconception_ids,
+            )
 
             _activate_version(connection, version_id)
             db_counts = _database_counts(connection, version_id)
@@ -193,7 +233,28 @@ def _clear_version_scoped_data(connection: sqlite3.Connection, version_id: int) 
     node_scope = "SELECT id FROM knowledge_nodes WHERE knowledge_version_id = ?"
     relationship_scope = "SELECT id FROM skill_relationships WHERE knowledge_version_id = ?"
     criterion_scope = "SELECT id FROM assessment_criteria WHERE knowledge_version_id = ?"
+    misconception_scope = "SELECT id FROM misconceptions WHERE knowledge_version_id = ?"
 
+    connection.execute(
+        f"DELETE FROM skill_misconception_links WHERE knowledge_version_id = ?",
+        (version_id,),
+    )
+    connection.execute(
+        f"DELETE FROM misconception_evidence WHERE misconception_id IN ({misconception_scope})",
+        (version_id,),
+    )
+    connection.execute(
+        "DELETE FROM misconceptions WHERE knowledge_version_id = ?",
+        (version_id,),
+    )
+    connection.execute(
+        "DELETE FROM corpus_error_skill_mappings WHERE knowledge_version_id = ?",
+        (version_id,),
+    )
+    connection.execute(
+        "DELETE FROM corpus_error_statistics WHERE knowledge_version_id = ?",
+        (version_id,),
+    )
     connection.execute(
         f"DELETE FROM assessment_evidence WHERE assessment_criterion_id IN ({criterion_scope})",
         (version_id,),
@@ -250,6 +311,46 @@ def _clear_version_scoped_data(connection: sqlite3.Connection, version_id: int) 
 
 def _load_sources(connection: sqlite3.Connection) -> dict[str, int]:
     source_rows = [
+        {
+            "source_key": "clc_fce",
+            "source_name": "CLC FCE Dataset",
+            "source_type": "annotated_error_corpus",
+            "source_version": "fce_released_dataset_1.1",
+            "source_year": None,
+            "source_url": None,
+            "license_note": "Learner corpus source files remain local raw data; redistribution requires manual review.",
+            "metadata_json": _json({"source_system": "cambridge_learner_corpus"}),
+        },
+        {
+            "source_key": "efcamdat",
+            "source_name": "EFCAMDAT",
+            "source_type": "learner_error_corpus",
+            "source_version": None,
+            "source_year": None,
+            "source_url": None,
+            "license_note": "Learner corpus source files remain local raw data; redistribution requires manual review.",
+            "metadata_json": _json({"source_system": "efcamdat"}),
+        },
+        {
+            "source_key": "write_improve",
+            "source_name": "Write & Improve",
+            "source_type": "revision_corpus",
+            "source_version": None,
+            "source_year": None,
+            "source_url": None,
+            "license_note": "Learner corpus source files remain local raw data; redistribution requires manual review.",
+            "metadata_json": _json({"source_system": "write_and_improve"}),
+        },
+        {
+            "source_key": "ud_english_ewt",
+            "source_name": "Universal Dependencies English EWT",
+            "source_type": "linguistic_structure_resource",
+            "source_version": None,
+            "source_year": None,
+            "source_url": None,
+            "license_note": "Local source inventory records licensing details separately.",
+            "metadata_json": _json({"source_system": "universal_dependencies"}),
+        },
         {
             "source_key": "english_grammar_profile",
             "source_name": "English Grammar Profile",
@@ -1033,6 +1134,298 @@ def _insert_assessment_evidence(
     )
 
 
+def _load_corpus_error_statistics(
+    connection: sqlite3.Connection,
+    *,
+    version_id: int,
+    artifacts: StorageArtifacts,
+    source_ids: dict[str, int],
+    node_ids: dict[str, int],
+) -> None:
+    for row in corpus_error_statistic_rows(artifacts):
+        statistic_key = _stable_key(
+            "errstat",
+            row.get("statistic_type"),
+            row.get("source_key"),
+            row.get("canonical_skill_id"),
+            row.get("normalized_category"),
+            row.get("normalized_subtype"),
+            row.get("mapping_status"),
+            row.get("source_label"),
+        )
+        source_key = row.get("source_key")
+        skill_id = row.get("canonical_skill_id")
+        connection.execute(
+            """
+            INSERT INTO corpus_error_statistics (
+                knowledge_version_id,
+                statistic_key,
+                knowledge_source_id,
+                knowledge_node_id,
+                statistic_type,
+                normalized_category,
+                normalized_subtype,
+                mapping_status,
+                source_label,
+                count,
+                metadata_json
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                version_id,
+                statistic_key,
+                source_ids.get(str(source_key)) if source_key else None,
+                node_ids.get(str(skill_id)) if skill_id else None,
+                row["statistic_type"],
+                row.get("normalized_category"),
+                row.get("normalized_subtype"),
+                row.get("mapping_status"),
+                row.get("source_label"),
+                int(row["count"]),
+                _json(
+                    {
+                        key: value
+                        for key, value in row.items()
+                        if key
+                        not in {
+                            "statistic_type",
+                            "source_key",
+                            "canonical_skill_id",
+                            "normalized_category",
+                            "normalized_subtype",
+                            "mapping_status",
+                            "source_label",
+                            "count",
+                        }
+                    },
+                ),
+            ),
+        )
+
+
+def _load_corpus_error_skill_mappings(
+    connection: sqlite3.Connection,
+    *,
+    version_id: int,
+    mappings: Iterable[ErrorSkillMapping],
+    source_ids: dict[str, int],
+    node_ids: dict[str, int],
+) -> dict[str, int]:
+    ids: dict[str, int] = {}
+    for mapping in mappings:
+        connection.execute(
+            """
+            INSERT INTO corpus_error_skill_mappings (
+                knowledge_version_id,
+                mapping_key,
+                knowledge_source_id,
+                knowledge_node_id,
+                normalized_error_id,
+                error_instance_id,
+                external_source_record_id,
+                source_key,
+                status,
+                confidence,
+                review_status,
+                reason,
+                provenance_json
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                version_id,
+                mapping.mapping_id,
+                _required_source_id(source_ids, mapping.source_key),
+                _required_node_id(node_ids, mapping.canonical_skill_id),
+                mapping.normalized_error_id,
+                mapping.error_instance_id,
+                mapping.source_record_id,
+                mapping.source_key,
+                mapping.status,
+                mapping.confidence,
+                mapping.review_status,
+                mapping.reason,
+                _json(mapping.provenance),
+            ),
+        )
+        ids[mapping.mapping_id] = int(
+            connection.execute("SELECT last_insert_rowid() AS id").fetchone()["id"],
+        )
+    return ids
+
+
+def _load_misconceptions(
+    connection: sqlite3.Connection,
+    *,
+    version_id: int,
+    misconceptions: Iterable[MisconceptionCandidate],
+    source_ids: dict[str, int],
+    node_ids: dict[str, int],
+    mapping_ids: dict[str, int],
+) -> dict[str, int]:
+    ids: dict[str, int] = {}
+    for misconception in misconceptions:
+        connection.execute(
+            """
+            INSERT INTO misconceptions (
+                knowledge_version_id,
+                misconception_key,
+                knowledge_node_id,
+                name,
+                description,
+                error_category,
+                error_subtype,
+                expected_pattern,
+                observed_pattern,
+                diagnostic_rule,
+                source_evidence_count,
+                frequency,
+                frequency_scope,
+                severity,
+                confidence,
+                status,
+                review_status,
+                reason,
+                provenance_json
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                version_id,
+                misconception.misconception_id,
+                _required_node_id(node_ids, misconception.canonical_skill_id),
+                misconception.name,
+                misconception.description,
+                misconception.error_category,
+                misconception.error_subtype,
+                misconception.expected_pattern,
+                misconception.observed_pattern,
+                misconception.diagnostic_rule,
+                misconception.source_evidence_count,
+                misconception.frequency,
+                misconception.frequency_scope,
+                misconception.severity,
+                misconception.confidence,
+                misconception.status,
+                misconception.review_status,
+                misconception.reason,
+                _json(
+                    {
+                        **misconception.provenance,
+                        "source_labels": misconception.source_labels,
+                        "source_distribution": misconception.source_distribution,
+                        "source_frequencies": misconception.source_frequencies,
+                        "proficiency_distribution": misconception.proficiency_distribution,
+                        "version": misconception.version,
+                    },
+                ),
+            ),
+        )
+        misconception_db_id = int(
+            connection.execute("SELECT last_insert_rowid() AS id").fetchone()["id"],
+        )
+        ids[misconception.misconception_id] = misconception_db_id
+        _load_misconception_evidence(
+            connection,
+            misconception_db_id=misconception_db_id,
+            evidence_links=misconception.evidence_links,
+            source_ids=source_ids,
+            mapping_ids=mapping_ids,
+        )
+    return ids
+
+
+def _load_misconception_evidence(
+    connection: sqlite3.Connection,
+    *,
+    misconception_db_id: int,
+    evidence_links: Iterable[Any],
+    source_ids: dict[str, int],
+    mapping_ids: dict[str, int],
+) -> None:
+    for link in evidence_links:
+        connection.execute(
+            """
+            INSERT INTO misconception_evidence (
+                misconception_id,
+                error_skill_mapping_id,
+                knowledge_source_id,
+                normalized_error_id,
+                error_instance_id,
+                external_source_record_id,
+                source_key,
+                source_label,
+                proficiency_label,
+                task_id,
+                split,
+                mapping_confidence
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                misconception_db_id,
+                mapping_ids.get(link.mapping_id),
+                _required_source_id(source_ids, link.source_key),
+                link.normalized_error_id,
+                link.error_instance_id,
+                link.source_record_id,
+                link.source_key,
+                link.source_label,
+                link.proficiency_label,
+                link.task_id,
+                link.split,
+                link.mapping_confidence,
+            ),
+        )
+
+
+def _load_skill_misconception_links(
+    connection: sqlite3.Connection,
+    *,
+    version_id: int,
+    links: Iterable[SkillMisconceptionLink],
+    node_ids: dict[str, int],
+    misconception_ids: dict[str, int],
+) -> None:
+    for link in links:
+        connection.execute(
+            """
+            INSERT INTO skill_misconception_links (
+                knowledge_version_id,
+                link_key,
+                misconception_id,
+                knowledge_node_id,
+                evidence_status,
+                source_evidence_count,
+                confidence,
+                review_status,
+                reason,
+                metadata_json
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                version_id,
+                link.link_id,
+                _required_misconception_id(misconception_ids, link.misconception_id),
+                _required_node_id(node_ids, link.canonical_skill_id),
+                link.evidence_status,
+                link.source_evidence_count,
+                link.confidence,
+                link.review_status,
+                link.reason,
+                _json(
+                    {
+                        "source_distribution": link.source_distribution,
+                        "proficiency_distribution": link.proficiency_distribution,
+                        "version": link.version,
+                    },
+                ),
+            ),
+        )
+
+
 def _activate_version(connection: sqlite3.Connection, version_id: int) -> None:
     connection.execute(
         "UPDATE knowledge_versions SET status = 'inactive' WHERE id != ? AND status = 'active'",
@@ -1163,6 +1556,55 @@ def _database_counts(connection: sqlite3.Connection, version_id: int) -> dict[st
             """,
             (version_id,),
         ),
+        "corpus_error_statistics": _count(
+            connection,
+            "SELECT COUNT(*) AS count FROM corpus_error_statistics WHERE knowledge_version_id = ?",
+            (version_id,),
+        ),
+        "corpus_error_skill_mappings": _count(
+            connection,
+            "SELECT COUNT(*) AS count FROM corpus_error_skill_mappings WHERE knowledge_version_id = ?",
+            (version_id,),
+        ),
+        "misconceptions": _count(
+            connection,
+            "SELECT COUNT(*) AS count FROM misconceptions WHERE knowledge_version_id = ?",
+            (version_id,),
+        ),
+        "candidate_misconceptions": _count(
+            connection,
+            """
+            SELECT COUNT(*) AS count
+            FROM misconceptions
+            WHERE knowledge_version_id = ? AND status = 'candidate'
+            """,
+            (version_id,),
+        ),
+        "accepted_misconceptions": _count(
+            connection,
+            """
+            SELECT COUNT(*) AS count
+            FROM misconceptions
+            WHERE knowledge_version_id = ? AND status = 'accepted'
+            """,
+            (version_id,),
+        ),
+        "misconception_evidence": _count(
+            connection,
+            """
+            SELECT COUNT(*) AS count
+            FROM misconception_evidence
+            WHERE misconception_id IN (
+                SELECT id FROM misconceptions WHERE knowledge_version_id = ?
+            )
+            """,
+            (version_id,),
+        ),
+        "skill_misconception_links": _count(
+            connection,
+            "SELECT COUNT(*) AS count FROM skill_misconception_links WHERE knowledge_version_id = ?",
+            (version_id,),
+        ),
     }
 
 
@@ -1238,6 +1680,25 @@ def _required_objective_id(objective_ids: dict[str, int], objective_id: str) -> 
         return objective_ids[objective_id]
     except KeyError as exc:
         raise KnowledgeStorageLoadError(f"Unknown objective_id: {objective_id}") from exc
+
+
+def _required_source_id(source_ids: dict[str, int], source_key: str) -> int:
+    try:
+        return source_ids[source_key]
+    except KeyError as exc:
+        raise KnowledgeStorageLoadError(f"Unknown knowledge source key: {source_key}") from exc
+
+
+def _required_misconception_id(
+    misconception_ids: dict[str, int],
+    misconception_id: str,
+) -> int:
+    try:
+        return misconception_ids[misconception_id]
+    except KeyError as exc:
+        raise KnowledgeStorageLoadError(
+            f"Unknown misconception_id: {misconception_id}",
+        ) from exc
 
 
 def _payload(model: BaseModel) -> dict[str, Any]:

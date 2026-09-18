@@ -1,13 +1,13 @@
 # Global Source Inventory V1
 
-Generated at: 2026-09-16T10:51:53.124316+00:00
+Generated at: 2026-09-16T15:30:28.370968+00:00
 
 ## Source Summary
 
 | Source | Required V1 | Optional | Status | Roles | Root | Files | Formats | Records | Count type | Readiness | License |
 | --- | --- | --- | --- | --- | --- | ---: | --- | ---: | --- | --- | --- |
-| EFCAMDAT | True | False | discovered | annotated_error_corpus, learner_corpus | data/raw/EFCAMDAT | 14 | .csv, .pdf, .r, .txt, .xml, .zip | 1425956 | estimated | READY_WITH_KNOWN_QUIRKS | needs_manual_review |
-| Cambridge Learner Corpus FCE | True | False | discovered | annotated_error_corpus | data/raw/_fce-released-dataset-1.1 | 12 | .json, .pdf, .xml, [no_extension] | 2543 | exact | READY_WITH_KNOWN_QUIRKS | needs_manual_review |
+| EFCAMDAT | True | False | discovered | annotated_error_corpus, learner_corpus | data/raw/EFCAMDAT | 14 | .csv, .pdf, .r, .txt, .xml, .zip | 1425956 | estimated | READY_WITH_KNOWN_QUIRKS | local_user_agreement_reviewed_restricted |
+| Cambridge Learner Corpus FCE | True | False | discovered | annotated_error_corpus | data/raw/_fce-released-dataset-1.1 | 12 | .json, .pdf, .xml, [no_extension] | 2543 | exact | READY_WITH_KNOWN_QUIRKS | local_readme_reviewed_specific_license_missing |
 | Write & Improve Corpus 2024 | False | True | discovered | revision_corpus, annotated_error_corpus | data/raw/write-and-improve-corpus-2024-v2 | 82 | .conll, .corr, .ids, .m2, .md, .orig, .py, .tmp, .tsv, [no_extension] | 23216 | exact | READY_WITH_KNOWN_QUIRKS | needs_manual_review |
 | Universal Dependencies English EWT | False | True | discovered | linguistic_structure_resource | data/raw/UD_English-EWT-master | 1202 | .conllu, .dev, .ini, .log, .md, .py, .sh, .test, .train, .txt, .xml, [no_extension] | 16622 | exact | READY | locally_documented_with_caveats |
 | English Grammar Profile | True | False | discovered | canonical_grammar_evidence | data/external/english_profile | 35 | .json, .jsonl, .parquet, .xlsx | 273 | exact | READY | needs_manual_review |

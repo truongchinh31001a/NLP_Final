@@ -1,0 +1,2 @@
+"""EFCAMDAT source tests."""
+

@@ -1,0 +1,204 @@
+{
+  "classified_raw_datasets": [
+    {
+      "file_count": 695,
+      "files_by_extension": {
+        ".docx": 186,
+        ".jpg": 2,
+        ".json": 185,
+        ".png": 320,
+        ".xlsx": 2
+      },
+      "included_in_knowledge_core_inventory": false,
+      "inferred_role": "unrelated_project_dataset",
+      "markers": {
+        "root_name": "Dataset",
+        "sample_file_names": [
+          "MET_Eng_IE_2019.json",
+          "MET_Eng_IE_2020.json",
+          "MET_Eng_IE_2021.json",
+          "MET_Eng_IE_2022.json",
+          "MET_Eng_IE_2023.json",
+          "MET_Eng_IE_2019.docx",
+          "MET_Eng_IE_2020.docx",
+          "MET_Eng_IE_2021.docx",
+          "MET_Eng_IE_2022.docx",
+          "MET_Eng_IE_2023.docx",
+          "MET_Bio_IE_2019.json",
+          "MET_Bio_IE_2020.json",
+          "MET_Bio_IE_2021.json",
+          "MET_Bio_IE_2022.json",
+          "MET_Bio_IE_2023.json",
+          "image001.png",
+          "image001.png",
+          "image001.png",
+          "image002.png",
+          "image001.png"
+        ],
+        "sample_relative_paths": [
+          "VNHSGE-E/JSON format/eval/English/MET_Eng_IE_2019.json",
+          "VNHSGE-E/JSON format/eval/English/MET_Eng_IE_2020.json",
+          "VNHSGE-E/JSON format/eval/English/MET_Eng_IE_2021.json",
+          "VNHSGE-E/JSON format/eval/English/MET_Eng_IE_2022.json",
+          "VNHSGE-E/JSON format/eval/English/MET_Eng_IE_2023.json",
+          "VNHSGE-E/Word format/eval/English/MET_Eng_IE_2019.docx",
+          "VNHSGE-E/Word format/eval/English/MET_Eng_IE_2020.docx",
+          "VNHSGE-E/Word format/eval/English/MET_Eng_IE_2021.docx",
+          "VNHSGE-E/Word format/eval/English/MET_Eng_IE_2022.docx",
+          "VNHSGE-E/Word format/eval/English/MET_Eng_IE_2023.docx",
+          "VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2019.json",
+          "VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2020.json",
+          "VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2021.json",
+          "VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2022.json",
+          "VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2023.json",
+          "VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2019/image001.png",
+          "VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2020/image001.png",
+          "VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2021/image001.png",
+          "VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2021/image002.png",
+          "VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2022/image001.png"
+        ],
+        "top_level_dirs": [
+          "VNHSGE-E",
+          "VNHSGE-V"
+        ]
+      },
+      "path": "data/raw/Dataset",
+      "reason": "Directory contains VNHSGE/MET exam-style files with JSON/DOCX/image assets across school subjects; it is not one of the six Knowledge Core V1 sources.",
+      "representative_files": [
+        "data/raw/Dataset/VNHSGE-E/JSON format/eval/English/MET_Eng_IE_2019.json",
+        "data/raw/Dataset/VNHSGE-E/JSON format/eval/English/MET_Eng_IE_2020.json",
+        "data/raw/Dataset/VNHSGE-E/JSON format/eval/English/MET_Eng_IE_2021.json",
+        "data/raw/Dataset/VNHSGE-E/JSON format/eval/English/MET_Eng_IE_2022.json",
+        "data/raw/Dataset/VNHSGE-E/JSON format/eval/English/MET_Eng_IE_2023.json",
+        "data/raw/Dataset/VNHSGE-E/Word format/eval/English/MET_Eng_IE_2019.docx",
+        "data/raw/Dataset/VNHSGE-E/Word format/eval/English/MET_Eng_IE_2020.docx",
+        "data/raw/Dataset/VNHSGE-E/Word format/eval/English/MET_Eng_IE_2021.docx",
+        "data/raw/Dataset/VNHSGE-E/Word format/eval/English/MET_Eng_IE_2022.docx",
+        "data/raw/Dataset/VNHSGE-E/Word format/eval/English/MET_Eng_IE_2023.docx",
+        "data/raw/Dataset/VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2019.json",
+        "data/raw/Dataset/VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2020.json",
+        "data/raw/Dataset/VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2021.json",
+        "data/raw/Dataset/VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2022.json",
+        "data/raw/Dataset/VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2023.json",
+        "data/raw/Dataset/VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2019/image001.png",
+        "data/raw/Dataset/VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2020/image001.png",
+        "data/raw/Dataset/VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2021/image001.png",
+        "data/raw/Dataset/VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2021/image002.png",
+        "data/raw/Dataset/VNHSGE-V/JSON format/eval/Biology/MET_Bio_IE_2022/image001.png"
+      ],
+      "source_key": "excluded_raw_dataset",
+      "status": "unrelated_to_knowledge_core_v1"
+    }
+  ],
+  "generated_at": "2026-09-16T15:30:28.370968+00:00",
+  "purpose": "Safety and governance gate for Knowledge Core V1 source data before required corpus ingestion.",
+  "raw_data_policy": {
+    "excluded_raw_dataset_policy": "data/raw/Dataset is excluded from Knowledge Core V1 and remains ignored as unrelated raw exam data.",
+    "existing_tracked_raw_file_policy": "If an ignored raw path already has files tracked in Git, this inspection does not alter the index; untracking requires a deliberate git rm --cached review step.",
+    "raw_paths": [
+      "data/raw/EFCAMDAT/",
+      "data/raw/_fce-released-dataset-1.1/",
+      "data/raw/write-and-improve-corpus-2024-v2/",
+      "data/raw/UD_English-EWT-master/",
+      "data/raw/Dataset/"
+    ],
+    "redistribution_policy": "Do not redistribute raw corpus files from this repository. Derived reports may summarize structure and counts only; learner free text must not be emitted in logs, reports, exceptions, or test snapshots.",
+    "restricted_raw_paths_gitignored": true
+  },
+  "sources": [
+    {
+      "governance_summary": "Local user agreement permits academic private study and noncommercial research, permits brief extracts for teaching or academic publication with acknowledgement, and prohibits making EFCAMDAT available to others or transferring it without prior written consent.",
+      "license_status": "local_user_agreement_reviewed_restricted",
+      "local_license_files": [
+        "D:/code/NLP_Final/data/raw/EFCAMDAT/EFCamDat-User-Agreement-2023.pdf"
+      ],
+      "official_source_urls": [
+        "https://ef-lab.mmll.cam.ac.uk/EFCAMDAT.html"
+      ],
+      "optional_enrichment": false,
+      "required_for_v1": true,
+      "source_key": "efcamdat",
+      "source_name": "EFCAMDAT"
+    },
+    {
+      "governance_summary": "Local README states release for non-commercial research and educational purposes; review full local terms before redistribution.",
+      "license_status": "local_readme_reviewed_specific_license_missing",
+      "local_license_files": [
+        "D:/code/NLP_Final/data/raw/_fce-released-dataset-1.1/README"
+      ],
+      "official_source_urls": [
+        "https://researchdatasets.cambridge.org/"
+      ],
+      "optional_enrichment": false,
+      "required_for_v1": true,
+      "source_key": "clc_fce",
+      "source_name": "Cambridge Learner Corpus FCE"
+    },
+    {
+      "governance_summary": "README is present locally, but no standalone license conclusion was inferred.",
+      "license_status": "needs_manual_review",
+      "local_license_files": [
+        "D:/code/NLP_Final/data/raw/write-and-improve-corpus-2024-v2/README",
+        "D:/code/NLP_Final/data/raw/write-and-improve-corpus-2024-v2/multigec-2025-files/local_eval/README.md"
+      ],
+      "official_source_urls": [
+        "https://englishlanguageitutoring.com/datasets/write-and-improve-corpus-2024",
+        "https://www.repository.cam.ac.uk/items/ba155087-0754-4c6b-ade8-68858e1df2f0"
+      ],
+      "optional_enrichment": true,
+      "required_for_v1": false,
+      "source_key": "write_improve",
+      "source_name": "Write & Improve Corpus 2024"
+    },
+    {
+      "governance_summary": "LICENSE is present locally; README notes annotation license and underlying text caveats.",
+      "license_status": "locally_documented_with_caveats",
+      "local_license_files": [
+        "D:/code/NLP_Final/data/raw/UD_English-EWT-master/UD_English-EWT-master/LICENSE.txt"
+      ],
+      "official_source_urls": [
+        "https://github.com/UniversalDependencies/UD_English-EWT",
+        "https://universaldependencies.org/treebanks/en_ewt/index.html"
+      ],
+      "optional_enrichment": true,
+      "required_for_v1": false,
+      "source_key": "ud_english_ewt",
+      "source_name": "Universal Dependencies English EWT"
+    },
+    {
+      "governance_summary": "No local EGP license conclusion inferred by this inspection.",
+      "license_status": "needs_manual_review",
+      "local_license_files": [],
+      "official_source_urls": [
+        "https://englishprofile.org/?menu=english-grammar-profile"
+      ],
+      "optional_enrichment": false,
+      "required_for_v1": true,
+      "source_key": "english_grammar_profile",
+      "source_name": "English Grammar Profile"
+    },
+    {
+      "governance_summary": "No local CEFR license conclusion inferred by this inspection.",
+      "license_status": "needs_manual_review",
+      "local_license_files": [],
+      "official_source_urls": [
+        "https://www.coe.int/en/web/common-european-framework-reference-languages/cefr-companion-volume"
+      ],
+      "optional_enrichment": false,
+      "required_for_v1": true,
+      "source_key": "cefr_companion_volume_2020",
+      "source_name": "CEFR Companion Volume 2020"
+    }
+  ],
+  "validation": {
+    "legal_clearance_complete_for_all_sources": false,
+    "license_constraints_summarized": true,
+    "notes": [
+      "This report is a governance summary, not legal advice.",
+      "Manual legal review remains required before redistributing raw corpus files or broad source-derived artifacts."
+    ],
+    "official_source_urls_recorded": true,
+    "raw_dataset_exclusion_recorded": true,
+    "raw_paths_gitignored": true
+  }
+}

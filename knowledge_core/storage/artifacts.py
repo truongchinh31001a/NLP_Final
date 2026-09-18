@@ -13,6 +13,9 @@ from knowledge_core.alignment.models import (
     SkillSourceEvidence,
 )
 from knowledge_core.assessment.models import AssessmentCriterion, SkillAssessmentProfile
+from knowledge_core.enrichment.models import SkillMisconceptionLink
+from knowledge_core.misconceptions.models import MisconceptionCandidate
+from knowledge_core.normalization.corpus_errors.models import ErrorSkillMapping
 from knowledge_core.relationships.models import SkillRelationship
 from knowledge_core.sources.cefr.models import (
     CEFRDescriptorRecord,
@@ -51,6 +54,27 @@ class StorageArtifactPaths:
     assessment_profiles: Path = Path(
         "data/curated/assessment/grammar_assessment_profiles.jsonl",
     )
+    error_normalization_report: Path = Path(
+        "data/reports/corpus_errors/error_normalization_report.json",
+    )
+    error_skill_mappings: Path = Path(
+        "data/curated/error_mapping/accepted_error_skill_mappings.jsonl",
+    )
+    candidate_misconceptions: Path = Path(
+        "data/interim/misconceptions/candidate_misconceptions.jsonl",
+    )
+    accepted_misconceptions: Path = Path(
+        "data/curated/misconceptions/accepted_misconceptions.jsonl",
+    )
+    skill_misconception_links: Path = Path(
+        "data/curated/knowledge_enrichment/skill_misconception_links.jsonl",
+    )
+    misconception_report: Path = Path(
+        "data/reports/misconceptions/misconception_report.json",
+    )
+    knowledge_enrichment_report: Path = Path(
+        "data/reports/knowledge_enrichment/knowledge_enrichment_report.json",
+    )
 
 
 @dataclass(slots=True)
@@ -64,8 +88,19 @@ class StorageArtifacts:
     relationships: list[SkillRelationship]
     assessment_criteria: list[AssessmentCriterion]
     assessment_profiles: list[SkillAssessmentProfile]
+    error_normalization_report: dict[str, object]
+    error_skill_mappings: list[ErrorSkillMapping]
+    candidate_misconceptions: list[MisconceptionCandidate]
+    accepted_misconceptions: list[MisconceptionCandidate]
+    skill_misconception_links: list[SkillMisconceptionLink]
+    misconception_report: dict[str, object]
+    knowledge_enrichment_report: dict[str, object]
 
     def counts(self) -> dict[str, int]:
+        misconception_records = merged_misconceptions(
+            candidates=self.candidate_misconceptions,
+            accepted=self.accepted_misconceptions,
+        )
         return {
             "egp_records": len(self.egp_records),
             "cefr_descriptors": len(self.cefr_descriptors),
@@ -77,6 +112,26 @@ class StorageArtifacts:
             "relationships": len(self.relationships),
             "assessment_criteria": len(self.assessment_criteria),
             "assessment_profiles": len(self.assessment_profiles),
+            "normalized_errors": int(
+                self.error_normalization_report.get("normalized_error_count", 0) or 0,
+            ),
+            "source_errors": sum(
+                int(value)
+                for value in (
+                    self.error_normalization_report.get("source_error_counts", {})
+                    or {}
+                ).values()
+            ),
+            "error_skill_mappings": len(self.error_skill_mappings),
+            "candidate_misconceptions": len(self.candidate_misconceptions),
+            "accepted_misconceptions": len(self.accepted_misconceptions),
+            "misconceptions": len(misconception_records),
+            "misconception_evidence": sum(
+                len(misconception.evidence_links)
+                for misconception in misconception_records
+            ),
+            "skill_misconception_links": len(self.skill_misconception_links),
+            "corpus_error_statistics": len(corpus_error_statistic_rows(self)),
         }
 
 
@@ -110,6 +165,25 @@ def load_storage_artifacts(paths: StorageArtifactPaths | None = None) -> Storage
             resolved.assessment_profiles,
             SkillAssessmentProfile,
         ),
+        error_normalization_report=load_json(resolved.error_normalization_report),
+        error_skill_mappings=load_jsonl_models(
+            resolved.error_skill_mappings,
+            ErrorSkillMapping,
+        ),
+        candidate_misconceptions=load_jsonl_models(
+            resolved.candidate_misconceptions,
+            MisconceptionCandidate,
+        ),
+        accepted_misconceptions=load_jsonl_models(
+            resolved.accepted_misconceptions,
+            MisconceptionCandidate,
+        ),
+        skill_misconception_links=load_jsonl_models(
+            resolved.skill_misconception_links,
+            SkillMisconceptionLink,
+        ),
+        misconception_report=load_json(resolved.misconception_report),
+        knowledge_enrichment_report=load_json(resolved.knowledge_enrichment_report),
     )
 
 
@@ -130,3 +204,106 @@ def load_jsonl_models(path: str | Path, model_cls: type[ModelT]) -> list[ModelT]
                 ) from exc
             records.append(model_cls.model_validate(payload))
     return records
+
+
+def load_json(path: str | Path) -> dict[str, object]:
+    source_path = Path(path)
+    if not source_path.exists():
+        raise StorageArtifactError(f"Input artifact not found: {source_path}")
+    try:
+        payload = json.loads(source_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise StorageArtifactError(f"Invalid JSON in {source_path}: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise StorageArtifactError(f"Expected JSON object in {source_path}")
+    return payload
+
+
+def merged_misconceptions(
+    *,
+    candidates: list[MisconceptionCandidate],
+    accepted: list[MisconceptionCandidate],
+) -> list[MisconceptionCandidate]:
+    by_id = {candidate.misconception_id: candidate for candidate in candidates}
+    for misconception in accepted:
+        by_id[misconception.misconception_id] = misconception
+    return sorted(by_id.values(), key=lambda item: item.misconception_id)
+
+
+def corpus_error_statistic_rows(artifacts: StorageArtifacts) -> list[dict[str, object]]:
+    report = artifacts.error_normalization_report
+    rows: list[dict[str, object]] = []
+
+    for source_key, count in sorted(
+        (report.get("source_error_counts", {}) or {}).items(),
+    ):
+        rows.append(
+            {
+                "statistic_type": "source_error_count",
+                "source_key": source_key,
+                "count": int(count),
+            },
+        )
+
+    for status, count in sorted(
+        (report.get("normalization_status_counts", {}) or {}).items(),
+    ):
+        rows.append(
+            {
+                "statistic_type": "normalization_status_count",
+                "mapping_status": status,
+                "count": int(count),
+            },
+        )
+
+    for category, count in sorted(
+        (report.get("normalized_category_counts", {}) or {}).items(),
+    ):
+        rows.append(
+            {
+                "statistic_type": "normalized_category_count",
+                "normalized_category": category,
+                "count": int(count),
+            },
+        )
+
+    for status, count in sorted(
+        (report.get("skill_mapping_status_counts", {}) or {}).items(),
+    ):
+        rows.append(
+            {
+                "statistic_type": "skill_mapping_status_count",
+                "mapping_status": status,
+                "count": int(count),
+            },
+        )
+
+    for skill_id, count in sorted(
+        (report.get("skill_mapping_skill_counts", {}) or {}).items(),
+    ):
+        rows.append(
+            {
+                "statistic_type": "skill_mapping_skill_count",
+                "canonical_skill_id": skill_id,
+                "count": int(count),
+            },
+        )
+
+    for item in report.get("source_label_rule_summary", []) or []:
+        if not isinstance(item, dict):
+            continue
+        rows.append(
+            {
+                "statistic_type": "source_label_rule_count",
+                "source_key": item.get("source_key"),
+                "source_label": item.get("source_label"),
+                "normalized_category": item.get("normalized_category"),
+                "normalized_subtype": item.get("normalized_subtype"),
+                "mapping_status": item.get("normalization_status"),
+                "canonical_skill_ids": item.get("canonical_skill_candidates") or [],
+                "reason": item.get("reason"),
+                "count": int(item.get("count") or 0),
+            },
+        )
+
+    return rows

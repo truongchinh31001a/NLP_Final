@@ -694,6 +694,115 @@ CREATE TABLE IF NOT EXISTS assessment_evidence (
     FOREIGN KEY (source_record_id) REFERENCES source_records(id)
 );
 
+CREATE TABLE IF NOT EXISTS corpus_error_statistics (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    knowledge_version_id INTEGER NOT NULL,
+    statistic_key TEXT NOT NULL,
+    knowledge_source_id INTEGER,
+    knowledge_node_id INTEGER,
+    statistic_type TEXT NOT NULL,
+    normalized_category TEXT,
+    normalized_subtype TEXT,
+    mapping_status TEXT,
+    source_label TEXT,
+    count INTEGER NOT NULL,
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (knowledge_version_id, statistic_key),
+    FOREIGN KEY (knowledge_version_id) REFERENCES knowledge_versions(id),
+    FOREIGN KEY (knowledge_source_id) REFERENCES knowledge_sources(id),
+    FOREIGN KEY (knowledge_node_id) REFERENCES knowledge_nodes(id)
+);
+
+CREATE TABLE IF NOT EXISTS corpus_error_skill_mappings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    knowledge_version_id INTEGER NOT NULL,
+    mapping_key TEXT NOT NULL,
+    knowledge_source_id INTEGER NOT NULL,
+    knowledge_node_id INTEGER NOT NULL,
+    normalized_error_id TEXT NOT NULL,
+    error_instance_id TEXT NOT NULL,
+    external_source_record_id TEXT NOT NULL,
+    source_key TEXT NOT NULL,
+    status TEXT NOT NULL,
+    confidence REAL NOT NULL,
+    review_status TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    provenance_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (knowledge_version_id, mapping_key),
+    FOREIGN KEY (knowledge_version_id) REFERENCES knowledge_versions(id),
+    FOREIGN KEY (knowledge_source_id) REFERENCES knowledge_sources(id),
+    FOREIGN KEY (knowledge_node_id) REFERENCES knowledge_nodes(id)
+);
+
+CREATE TABLE IF NOT EXISTS misconceptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    knowledge_version_id INTEGER NOT NULL,
+    misconception_key TEXT NOT NULL,
+    knowledge_node_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL,
+    error_category TEXT NOT NULL,
+    error_subtype TEXT,
+    expected_pattern TEXT NOT NULL,
+    observed_pattern TEXT NOT NULL,
+    diagnostic_rule TEXT NOT NULL,
+    source_evidence_count INTEGER NOT NULL,
+    frequency REAL NOT NULL,
+    frequency_scope TEXT NOT NULL,
+    severity TEXT NOT NULL,
+    confidence REAL NOT NULL,
+    status TEXT NOT NULL,
+    review_status TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    provenance_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (knowledge_version_id, misconception_key),
+    FOREIGN KEY (knowledge_version_id) REFERENCES knowledge_versions(id),
+    FOREIGN KEY (knowledge_node_id) REFERENCES knowledge_nodes(id)
+);
+
+CREATE TABLE IF NOT EXISTS misconception_evidence (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    misconception_id INTEGER NOT NULL,
+    error_skill_mapping_id INTEGER,
+    knowledge_source_id INTEGER NOT NULL,
+    normalized_error_id TEXT NOT NULL,
+    error_instance_id TEXT NOT NULL,
+    external_source_record_id TEXT NOT NULL,
+    source_key TEXT NOT NULL,
+    source_label TEXT,
+    proficiency_label TEXT,
+    task_id TEXT,
+    split TEXT,
+    mapping_confidence REAL NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (misconception_id, error_instance_id, normalized_error_id),
+    FOREIGN KEY (misconception_id) REFERENCES misconceptions(id),
+    FOREIGN KEY (error_skill_mapping_id) REFERENCES corpus_error_skill_mappings(id),
+    FOREIGN KEY (knowledge_source_id) REFERENCES knowledge_sources(id)
+);
+
+CREATE TABLE IF NOT EXISTS skill_misconception_links (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    knowledge_version_id INTEGER NOT NULL,
+    link_key TEXT NOT NULL,
+    misconception_id INTEGER NOT NULL,
+    knowledge_node_id INTEGER NOT NULL,
+    evidence_status TEXT NOT NULL,
+    source_evidence_count INTEGER NOT NULL,
+    confidence REAL NOT NULL,
+    review_status TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (knowledge_version_id, link_key),
+    FOREIGN KEY (knowledge_version_id) REFERENCES knowledge_versions(id),
+    FOREIGN KEY (misconception_id) REFERENCES misconceptions(id),
+    FOREIGN KEY (knowledge_node_id) REFERENCES knowledge_nodes(id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_knowledge_nodes_canonical_id
 ON knowledge_nodes (canonical_id);
 
@@ -729,6 +838,24 @@ ON assessment_criteria (knowledge_node_id);
 
 CREATE INDEX IF NOT EXISTS idx_learning_objectives_cefr_level
 ON learning_objectives (cefr_level);
+
+CREATE INDEX IF NOT EXISTS idx_corpus_error_stats_version_type
+ON corpus_error_statistics (knowledge_version_id, statistic_type);
+
+CREATE INDEX IF NOT EXISTS idx_corpus_error_skill_mappings_node
+ON corpus_error_skill_mappings (knowledge_node_id);
+
+CREATE INDEX IF NOT EXISTS idx_corpus_error_skill_mappings_source
+ON corpus_error_skill_mappings (knowledge_source_id, source_key);
+
+CREATE INDEX IF NOT EXISTS idx_misconceptions_node
+ON misconceptions (knowledge_node_id);
+
+CREATE INDEX IF NOT EXISTS idx_misconception_evidence_misconception
+ON misconception_evidence (misconception_id);
+
+CREATE INDEX IF NOT EXISTS idx_skill_misconception_links_node
+ON skill_misconception_links (knowledge_node_id);
 
 CREATE VIEW IF NOT EXISTS v_atomic_skills AS
 SELECT
@@ -777,4 +904,44 @@ JOIN knowledge_versions kv
     ON kv.id = ac.knowledge_version_id
 JOIN knowledge_nodes n
     ON n.id = ac.knowledge_node_id
+WHERE kv.status = 'active';
+
+CREATE VIEW IF NOT EXISTS v_skill_misconceptions AS
+SELECT
+    n.canonical_id AS skill_id,
+    m.misconception_key AS misconception_id,
+    m.name,
+    m.error_category,
+    m.error_subtype,
+    m.source_evidence_count,
+    m.frequency,
+    m.severity,
+    m.confidence,
+    m.status,
+    m.review_status
+FROM misconceptions m
+JOIN knowledge_versions kv
+    ON kv.id = m.knowledge_version_id
+JOIN knowledge_nodes n
+    ON n.id = m.knowledge_node_id
+WHERE kv.status = 'active';
+
+CREATE VIEW IF NOT EXISTS v_corpus_error_statistics AS
+SELECT
+    ces.statistic_key,
+    ces.statistic_type,
+    ks.source_key,
+    n.canonical_id AS skill_id,
+    ces.normalized_category,
+    ces.normalized_subtype,
+    ces.mapping_status,
+    ces.source_label,
+    ces.count
+FROM corpus_error_statistics ces
+JOIN knowledge_versions kv
+    ON kv.id = ces.knowledge_version_id
+LEFT JOIN knowledge_sources ks
+    ON ks.id = ces.knowledge_source_id
+LEFT JOIN knowledge_nodes n
+    ON n.id = ces.knowledge_node_id
 WHERE kv.status = 'active';

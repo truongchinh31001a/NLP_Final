@@ -223,14 +223,14 @@ The V1 source scope MUST be frozen before further model enrichment.
 |---|---|---:|---|
 | English Grammar Profile (EGP) | Grammar feature evidence, CEFR progression evidence | Yes | Completed |
 | CEFR Companion Volume 2020 | Proficiency descriptors, objectives, grammatical accuracy context | Yes | Completed |
-| EFCAMDAT | Learner errors, progression, frequency, misconception evidence | Yes | Acquired + inventoried; ingestion not started |
-| CLC FCE Dataset | Annotated learner errors, misconception evidence, validation source | Yes | Acquired + inventoried; ingestion not started |
+| EFCAMDAT | Learner errors, progression, frequency, misconception evidence | Yes | Acquired + inventoried; ingestion completed |
+| CLC FCE Dataset | Annotated learner errors, misconception evidence, validation source | Yes | Acquired + inventoried; ingestion completed |
 
 ### 4.2 Optional V1 Enrichment Sources
 
 | Source | Role | Required | Status |
 |---|---|---:|---|
-| Universal Dependencies English EWT | Morphosyntactic / dependency structure evidence | No | Acquired + inventoried; optional ingestion not started |
+| Universal Dependencies English EWT | Morphosyntactic / dependency structure evidence | No | Acquired + inventoried; optional structural ingestion completed |
 | Write & Improve Corpus | Additional learner error / CEFR validation | No | Acquired + inventoried; optional ingestion not started |
 
 ### 4.3 Explicitly Deferred Sources
@@ -261,15 +261,15 @@ data/
 
 For every source:
 
-- [ ] Official source page recorded
+- [x] Official source page recorded
 - [ ] License / user agreement reviewed
 - [ ] Source version recorded
 - [ ] Publication year recorded
 - [x] Raw files acquired
 - [x] File names preserved
 - [ ] File hashes calculated
-- [ ] Restricted raw data added to `.gitignore`
-- [ ] Raw files not redistributed if license forbids it
+- [x] Restricted raw data added to `.gitignore`
+- [x] Raw files not redistributed if license forbids it
 - [x] Source metadata registered
 - [x] Acquisition notes documented
 
@@ -297,6 +297,8 @@ data/reports/source_inventory/ud_ewt_inspection.json
 data/reports/source_inventory/error_annotation_comparison.json
 data/reports/source_inventory/proficiency_comparison.json
 data/reports/source_inventory/inspection_issues.json
+data/reports/source_inventory/source_governance.json
+data/reports/source_inventory/source_governance.md
 ```
 
 Current validation:
@@ -364,7 +366,7 @@ Checklist:
 - [x] Error annotation representation documented
 - [x] Course/proficiency representation documented; CEFR mapping not assumed
 - [x] Corpus profiling report produced
-- [ ] License / user agreement manually reviewed for redistribution constraints
+- [x] License / user agreement manually reviewed for redistribution constraints
 - [ ] File hashes / source manifest promoted from inventory into source metadata
 
 ### CLC FCE
@@ -376,7 +378,7 @@ Checklist:
 - [x] Source-native error taxonomy documented
 - [x] CEFR / proficiency metadata documented
 - [x] Corpus profiling report produced
-- [ ] Official source URL recorded
+- [x] Official source URL recorded
 - [ ] License checked manually
 - [ ] File hashes / source manifest promoted from inventory into source metadata
 
@@ -775,7 +777,7 @@ Checklist:
 
 ## 14. EFCAMDAT Pipeline
 
-Status: **ACQUIRED + INVENTORIED — INGESTION NOT STARTED**
+Status: **ACQUIRED + INVENTORIED — INGESTION COMPLETED**
 
 Goal:
 
@@ -823,7 +825,7 @@ Checklist:
 - [x] Error-coded subcorpus present
 - [x] Task prompt metadata discovered
 - [x] User agreement file present locally
-- [ ] License conditions manually reviewed and summarized
+- [x] License conditions manually reviewed and summarized
 
 ### Inspection
 
@@ -841,24 +843,24 @@ Checklist:
 
 ### Ingestion
 
-- [ ] EFCAMDAT adapter implemented
-- [ ] Streaming XML parser implemented with `iterparse`
-- [ ] Chunked CSV support parser implemented
-- [ ] Deterministic record IDs
-- [ ] SourceRecord representation
-- [ ] ErrorInstance representation
-- [ ] Pseudonymous learner/text identifiers
-- [ ] No learner free text emitted in logs
-- [ ] Provenance preserved
-- [ ] Validation report
-- [ ] Review queue for ambiguous labels/spans
-- [ ] Test suite
+- [x] EFCAMDAT adapter implemented
+- [x] Streaming writing-block XML parser implemented; no full DOM load
+- [x] Chunked CSV support parser implemented
+- [x] Deterministic record IDs
+- [x] SourceRecord representation
+- [x] ErrorInstance representation
+- [x] Pseudonymous learner/text identifiers
+- [x] No learner free text emitted in logs
+- [x] Provenance preserved
+- [x] Validation report
+- [x] Review queue for ambiguous labels/spans
+- [x] Test suite
 
 ---
 
 ## 15. CLC FCE Pipeline
 
-Status: **ACQUIRED + INVENTORIED — INGESTION NOT STARTED**
+Status: **ACQUIRED + INVENTORIED — INGESTION COMPLETED**
 
 Role:
 
@@ -901,17 +903,17 @@ Checklist:
 - [x] Source-native error taxonomy documented
 - [x] FCE / B2 proficiency context documented
 - [x] Task prompt metadata documented
-- [ ] Official source URL recorded
+- [x] Official source URL recorded
 - [ ] License checked manually
-- [ ] Parser implemented
-- [ ] XML parser implemented for nested structure preservation
-- [ ] JSONL parser implemented for answer-level parsing
+- [x] Parser implemented
+- [x] XML parser implemented for nested structure preservation
+- [x] JSONL parser implemented for answer-level parsing
 - [ ] Error instances normalized
 - [ ] Canonical grammar mapping implemented
-- [ ] Validation report
-- [ ] Review queue
-- [ ] Provenance preserved
-- [ ] Tests
+- [x] Validation report
+- [x] Review queue
+- [x] Provenance preserved
+- [x] Tests
 
 ---
 
@@ -942,11 +944,13 @@ text_id
 cefr_level
 task_id
 
-original_text
-corrected_text
+text_fingerprint
+text_length
 
-error_span
-correction_span
+span_kind
+span_offsets_or_selection_fingerprint
+correction_fingerprint
+correction_length
 
 source_error_label
 normalized_error_category
@@ -966,35 +970,47 @@ provenance
 Initial controlled vocabulary:
 
 ```text
-omission
-addition
-substitution
-misformation
+article
+determiner
+noun_number
+subject_verb_agreement
+verb_tense
+verb_form
+auxiliary
+modal
+preposition
 word_order
-agreement
-tense_choice
-auxiliary_error
-article_error
-modal_error
+pronoun
+adjective_adverb
+conjunction_clause
+negation
+passive_voice
+spelling
+punctuation
+lexical_choice
+word_form
+sentence_structure
+other
+unmapped
 ```
 
 This vocabulary may be extended only through explicit review.
 
 Checklist:
 
-- [ ] Unified error schema finalized
-- [ ] Source-specific labels mapped
-- [ ] Error categories normalized
-- [ ] Error subtype strategy defined
-- [ ] Candidate skill mapping implemented
-- [ ] Ambiguous mappings preserved
-- [ ] Review queue generated
+- [x] Unified error schema finalized
+- [x] Source-specific labels mapped
+- [x] Error categories normalized
+- [x] Error subtype strategy defined
+- [x] Candidate skill mapping implemented
+- [x] Ambiguous mappings preserved
+- [x] Review queue generated
 
 ---
 
 ## 17. Misconception Modeling
 
-Status: **NOT STARTED**
+Status: **CANDIDATE MINING DONE — HUMAN REVIEW PENDING**
 
 Critical distinction:
 
@@ -1078,17 +1094,17 @@ LLM-based misconception discovery is optional and NOT required.
 
 Checklist:
 
-- [ ] Misconception schema frozen
-- [ ] Error instances mapped to skills
-- [ ] Pattern grouping implemented
-- [ ] Cross-source evidence aggregation
-- [ ] Frequency statistics
-- [ ] CEFR distribution
-- [ ] Confidence rules
-- [ ] Review queue
-- [ ] Accepted misconception set
-- [ ] Misconception provenance
-- [ ] Tests
+- [x] Misconception schema frozen
+- [x] Error instances mapped to skills
+- [x] Pattern grouping implemented
+- [x] Cross-source evidence aggregation
+- [x] Frequency statistics
+- [x] CEFR distribution
+- [x] Confidence rules
+- [x] Review queue
+- [x] Accepted misconception set
+- [x] Misconception provenance
+- [x] Tests
 
 ---
 
@@ -1174,7 +1190,9 @@ Checklist:
 
 ## 19. Optional Universal Dependencies Enrichment
 
-Status: **OPTIONAL — ACQUIRED + INVENTORIED**
+Structural ingestion status: **COMPLETE**
+
+Status: **OPTIONAL — ACQUIRED + INVENTORIED + STRUCTURALLY INGESTED**
 
 Potential role:
 
@@ -1200,12 +1218,12 @@ Checklist if included:
 - [x] Source inventory report generated
 - [x] Released train/dev/test CoNLL-U files identified
 - [x] License file located
-- [ ] CoNLL-U adapter
-- [ ] Morphological feature normalization
-- [ ] Dependency feature normalization
-- [ ] Relevant grammar evidence mappings
-- [ ] Validation
-- [ ] Provenance
+- [x] CoNLL-U adapter
+- [x] Morphological feature normalization
+- [x] Dependency feature normalization
+- [x] Relevant grammar evidence mappings
+- [x] Validation
+- [x] Provenance
 
 ---
 
@@ -1517,10 +1535,10 @@ Live PostgreSQL repository execution not yet tested.
 After corpus/misconception integration:
 
 - [ ] ErrorInstanceRepository
-- [ ] MisconceptionRepository
-- [ ] Misconception evidence queries
-- [ ] Corpus statistics queries
-- [ ] Misconception-by-skill query
+- [x] MisconceptionRepository
+- [x] Misconception evidence queries
+- [x] Corpus statistics queries
+- [x] Misconception-by-skill query
 - [ ] Error-pattern-by-CEFR query
 - [ ] PostgreSQL integration tests
 
@@ -1528,7 +1546,7 @@ After corpus/misconception integration:
 
 ## 26. KnowledgeService
 
-Status: **NOT STARTED**
+Status: **V1 DONE (SQLITE VERIFIED)**
 
 KnowledgeService should be implemented only after the required V1 knowledge model is stable.
 
@@ -1574,6 +1592,16 @@ get_diagnostic_signals(skill_id)
 
 get_related_learning_targets(skill_id)
 ```
+
+Implemented in:
+
+```text
+knowledge_core/service/
+```
+
+The V1 service is a read-only composition layer. Learning paths and unlocks use
+only persisted `prerequisite_of` edges. Adaptive policy, mastery estimation,
+learner state, content generation, and LLM calls remain outside the service.
 
 Do NOT implement learner-specific adaptive policy inside KnowledgeRepository.
 
@@ -1671,7 +1699,7 @@ Do not continue directly to KnowledgeService yet.
 - [x] Optional UD EWT local dataset acquired
 - [x] Optional Write & Improve local dataset acquired
 - [ ] Manual license review for EFCAMDAT, CLC FCE, EGP, CEFR, Write & Improve
-- [ ] Restricted/raw corpus paths added to `.gitignore` or moved outside tracked workspace
+- [x] Restricted/raw corpus paths added to `.gitignore` or moved outside tracked workspace
 - [x] Optional UD EWT inclusion decision
 - [x] Optional Write & Improve inclusion decision
 
@@ -1692,30 +1720,30 @@ Do not continue directly to KnowledgeService yet.
 
 - [x] EGP ingestion
 - [x] CEFR ingestion
-- [ ] EFCAMDAT ingestion
-- [ ] CLC FCE ingestion
-- [ ] Required corpus ingestion reports
-- [ ] Required corpus review queues
-- [ ] Required corpus ingestion tests
+- [x] EFCAMDAT ingestion
+- [x] CLC FCE ingestion
+- [x] Required corpus ingestion reports
+- [x] Required corpus review queues
+- [x] Required corpus ingestion tests
 
 ### Phase E — Error Knowledge
 
-- [ ] Unified ErrorInstance schema
-- [ ] Error taxonomy normalization
-- [ ] EFCAMDAT error normalization
-- [ ] CLC FCE error normalization
-- [ ] Error → canonical skill alignment
-- [ ] Review ambiguous mappings
+- [x] Unified ErrorInstance schema
+- [x] Error taxonomy normalization
+- [x] EFCAMDAT error normalization
+- [x] CLC FCE error normalization
+- [x] Error → canonical skill alignment
+- [x] Review ambiguous mappings
 
 ### Phase F — Misconceptions
 
-- [ ] Misconception schema
-- [ ] Pattern aggregation
-- [ ] Frequency statistics
-- [ ] CEFR distributions
-- [ ] Cross-source validation
+- [x] Misconception schema
+- [x] Pattern aggregation
+- [x] Frequency statistics
+- [x] CEFR distributions
+- [x] Cross-source validation
 - [ ] Human review
-- [ ] Accepted misconception set
+- [x] Accepted misconception set
 
 ### Phase G — Enrich Existing Knowledge
 
@@ -1748,14 +1776,14 @@ Do not continue directly to KnowledgeService yet.
 
 ### Phase K — KnowledgeService
 
-- [ ] Service API design
-- [ ] Skill context
-- [ ] Learning path
-- [ ] Unlock logic
-- [ ] Assessment profile
-- [ ] Misconception profile
-- [ ] Diagnostic context
-- [ ] Tests
+- [x] Service API design
+- [x] Skill context
+- [x] Learning path
+- [x] Unlock logic
+- [x] Assessment profile
+- [x] Misconception profile
+- [x] Diagnostic context
+- [x] Tests
 
 ---
 
@@ -1775,17 +1803,17 @@ Knowledge Core V1 is complete only when all required conditions below are satisf
 - [x] EGP acquired and ingested
 - [x] CEFR acquired and ingested
 - [x] EFCAMDAT acquired and inventoried
-- [ ] EFCAMDAT ingested
+- [x] EFCAMDAT ingested
 - [x] CLC FCE acquired and inventoried
-- [ ] CLC FCE ingested
+- [x] CLC FCE ingested
 
 ### 29.3 Normalization
 
 - [x] EGP normalized
 - [x] CEFR normalized
-- [ ] Corpus error normalization
-- [ ] Unified error taxonomy
-- [ ] Error → skill mapping
+- [x] Corpus error normalization
+- [x] Unified error taxonomy
+- [x] Error → skill mapping
 
 ### 29.4 Knowledge Relations
 
@@ -1804,11 +1832,11 @@ Knowledge Core V1 is complete only when all required conditions below are satisf
 
 ### 29.6 Misconceptions
 
-- [ ] Misconception schema
-- [ ] Empirical misconception candidates
-- [ ] Cross-source evidence
-- [ ] Frequency
-- [ ] CEFR distribution
+- [x] Misconception schema
+- [x] Empirical misconception candidates
+- [x] Cross-source evidence
+- [x] Frequency
+- [x] CEFR distribution
 - [ ] Human-reviewed accepted misconceptions
 
 ### 29.7 Assessment
@@ -1847,10 +1875,10 @@ Knowledge Core V1 is complete only when all required conditions below are satisf
 - [x] Knowledge Storage infrastructure
 - [x] Idempotent loader
 - [x] KnowledgeRepository infrastructure
-- [ ] Misconception/error persistence extension
-- [ ] Misconception repository extension
+- [x] Misconception/error persistence extension
+- [x] Misconception repository extension
 - [ ] Live PostgreSQL integration verification
-- [ ] KnowledgeService V1
+- [x] KnowledgeService V1
 
 ---
 
@@ -1864,22 +1892,22 @@ CEFR ↔ EGP alignment              ✅ IMPLEMENTED
 Relationships / prerequisites      ✅ DONE
 Source Inventory V1                ✅ DONE
 
-EFCAMDAT                           ✅ ACQUIRED + INVENTORIED; INGESTION NOT STARTED
-CLC FCE                            ✅ ACQUIRED + INVENTORIED; INGESTION NOT STARTED
-UD EWT                             ✅ INVENTORIED; OPTIONAL INGESTION NOT STARTED
+EFCAMDAT                           ✅ ACQUIRED + INVENTORIED; INGESTION COMPLETE
+CLC FCE                            ✅ ACQUIRED + INVENTORIED; INGESTION COMPLETE
+UD EWT                             ✅ INVENTORIED; OPTIONAL STRUCTURAL INGESTION COMPLETE
 Write & Improve                    ✅ INVENTORIED; OPTIONAL INGESTION NOT STARTED
 
-Error normalization                ⬜ NOT STARTED
-Misconception modeling             ⬜ NOT STARTED
+Error normalization                ✅ DONE
+Misconception modeling             ✅ CANDIDATE MINING DONE; HUMAN REVIEW PENDING
 
 Assessment Criteria V1             ✅ CURATED VERSION DONE
 Assessment empirical enrichment    ⬜ NOT STARTED
 
-Global Knowledge Validation        ⬜ NOT STARTED
+Global Knowledge Validation        ✅ DONE LOCALLY; POSTGRES GATE OPEN
 
 Knowledge Storage infrastructure   ✅ DONE
 KnowledgeRepository                ✅ DONE
-KnowledgeService                   ⬜ NOT STARTED
+KnowledgeService                   ✅ V1 DONE (SQLITE VERIFIED)
 ```
 
 ---
@@ -1890,21 +1918,21 @@ This checklist reflects the project state observed on 2026-09-16.
 
 ### 31.1 Immediate Safety / Governance Gate
 
-- [ ] Add `.gitignore` coverage or move restricted raw corpora out of the tracked workspace:
+- [x] Add `.gitignore` coverage or move restricted raw corpora out of the tracked workspace:
   `data/raw/EFCAMDAT/`, `data/raw/_fce-released-dataset-1.1/`, `data/raw/write-and-improve-corpus-2024-v2/`, `data/raw/UD_English-EWT-master/`.
-- [ ] Record official source URLs for EFCAMDAT, CLC FCE, EGP, CEFR, UD EWT, and Write & Improve.
-- [ ] Summarize license / user-agreement constraints in source metadata before any ingestion artifact is redistributed.
+- [x] Record official source URLs for EFCAMDAT, CLC FCE, EGP, CEFR, UD EWT, and Write & Improve.
+- [x] Summarize license / user-agreement constraints in source metadata before any ingestion artifact is redistributed.
 - [x] Decide whether UD EWT and Write & Improve remain inventory-only for V1 or enter optional enrichment.
 - [x] Keep `data/raw/Dataset` excluded from Knowledge Core V1; it is unrelated exam data.
 
 ### 31.2 Freeze Error Schema
 
-- [ ] Create source-independent `ErrorInstance` model.
-- [ ] Freeze normalized error category vocabulary.
-- [ ] Define deterministic IDs for source records, error instances, normalized errors, and review rows.
-- [ ] Define span policy for XML inline spans, JSON offsets, M2 token offsets, and EFCAMDAT selection text.
-- [ ] Define PII/free-text policy: no learner free text in logs, reports, exceptions, or test snapshots.
-- [ ] Add schema validation tests.
+- [x] Create source-independent `ErrorInstance` model.
+- [x] Freeze normalized error category vocabulary.
+- [x] Define deterministic IDs for source records, error instances, normalized errors, and review rows.
+- [x] Define span policy for XML inline spans, JSON offsets, M2 token offsets, and EFCAMDAT selection text.
+- [x] Define PII/free-text policy: no learner free text in logs, reports, exceptions, or test snapshots.
+- [x] Add schema validation tests.
 
 Target outputs:
 
@@ -1917,15 +1945,15 @@ tests/knowledge_core/normalization/
 
 CLC FCE is smaller and should harden the common error pipeline before EFCAMDAT.
 
-- [ ] Create `knowledge_core/sources/clc_fce/`.
-- [ ] Parse XML for nested structure preservation.
-- [ ] Parse JSONL for answer-level records and offsets.
-- [ ] Preserve train/dev/test/outlier split metadata.
-- [ ] Emit common `SourceRecord` artifacts.
-- [ ] Emit source-native `ErrorInstance` artifacts.
-- [ ] Generate validation report.
-- [ ] Generate review queue for ambiguous labels/spans.
-- [ ] Add parser, normalizer, validator, and CLI tests.
+- [x] Create `knowledge_core/sources/clc_fce/`.
+- [x] Parse XML for nested structure preservation.
+- [x] Parse JSONL for answer-level records and offsets.
+- [x] Preserve train/dev/test/outlier split metadata.
+- [x] Emit common `SourceRecord` artifacts.
+- [x] Emit source-native `ErrorInstance` artifacts.
+- [x] Generate validation report.
+- [x] Generate review queue for ambiguous labels/spans.
+- [x] Add parser, normalizer, validator, and CLI tests.
 
 Target outputs:
 
@@ -1938,17 +1966,17 @@ data/curated/review/clc_fce_error_review.csv
 
 ### 31.4 Implement EFCAMDAT Ingestion
 
-- [ ] Create `knowledge_core/sources/efcamdat/`.
-- [ ] Stream `EFCAMDAT_Database.xml` with `iterparse`; do not DOM-load large XML.
-- [ ] Parse XML `change` markup as annotation source of truth.
-- [ ] Use cleaned/error-coded CSV only as derived support.
-- [ ] Process large CSV in chunks.
-- [ ] Preserve learner, writing, topic, level, and unit identifiers pseudonymously.
-- [ ] Emit common `SourceRecord` artifacts.
-- [ ] Emit source-native `ErrorInstance` artifacts.
-- [ ] Generate validation report.
-- [ ] Generate review queue for ambiguous labels/spans.
-- [ ] Add parser, normalizer, validator, and CLI tests.
+- [x] Create `knowledge_core/sources/efcamdat/`.
+- [x] Stream `EFCAMDAT_Database.xml` by writing block; do not DOM-load large XML.
+- [x] Parse XML `change` markup as annotation source of truth.
+- [x] Use cleaned/error-coded CSV only as derived support.
+- [x] Process large CSV in chunks.
+- [x] Preserve learner, writing, topic, level, and unit identifiers pseudonymously.
+- [x] Emit common `SourceRecord` artifacts.
+- [x] Emit source-native `ErrorInstance` artifacts.
+- [x] Generate validation report.
+- [x] Generate review queue for ambiguous labels/spans.
+- [x] Add parser, normalizer, validator, and CLI tests.
 
 Target outputs:
 
@@ -1961,13 +1989,17 @@ data/curated/review/efcamdat_error_review.csv
 
 ### 31.5 Normalize Errors And Map To Skills
 
-- [ ] Map CLC FCE source-native labels to normalized error categories.
-- [ ] Map EFCAMDAT source-native labels to normalized error categories.
-- [ ] Preserve unmapped/ambiguous labels for review.
-- [ ] Implement deterministic error → canonical grammar skill mapping rules.
-- [ ] Reject implicit creation of new canonical skills.
-- [ ] Generate `error_skill_mapping_review.csv`.
-- [ ] Validate taxonomy hash unchanged.
+- [x] Map CLC FCE source-native labels to normalized error categories.
+- [x] Map EFCAMDAT source-native labels to normalized error categories.
+- [x] Preserve unmapped/ambiguous labels for review.
+- [x] Implement deterministic error → canonical grammar skill mapping rules.
+- [x] Reject implicit creation of new canonical skills.
+- [x] Generate `error_skill_mapping_review.csv`.
+- [x] Validate taxonomy hash unchanged.
+- [x] Implement explicit APPROVE / REJECT / NEEDS_REVIEW closure with audit history.
+- [x] Isolate accepted, rejected, and unresolved mappings into separate artifacts.
+- [x] Restrict storage and misconception evidence to human-approved mappings.
+- [ ] Complete human adjudication of the 822 mappings currently marked `NEEDS_REVIEW`.
 
 Target outputs:
 
@@ -1980,13 +2012,18 @@ data/reports/corpus_errors/error_normalization_report.json
 
 ### 31.6 Mine Misconception Candidates
 
-- [ ] Freeze misconception schema.
-- [ ] Group normalized errors into deterministic pattern candidates.
-- [ ] Aggregate evidence across CLC FCE and EFCAMDAT.
-- [ ] Compute frequency and proficiency distributions with explicit scope.
-- [ ] Keep source-specific evidence links for every candidate.
-- [ ] Generate misconception review queue.
-- [ ] Accept only human-reviewed misconceptions into canonical output.
+- [x] Freeze misconception schema.
+- [x] Group normalized errors into deterministic pattern candidates.
+- [x] Aggregate evidence across CLC FCE and EFCAMDAT.
+- [x] Compute frequency and proficiency distributions with explicit scope.
+- [x] Keep source-specific evidence links for every candidate.
+- [x] Generate misconception review queue.
+- [x] Accept only human-reviewed misconceptions into canonical output.
+- [x] Implement explicit APPROVE / REJECT / NEEDS_REVIEW misconception closure.
+- [x] Generate accepted, rejected, and unresolved misconception artifacts.
+- [x] Restrict accepted misconception evidence to approved error-skill mappings.
+- [x] Generate proposed assessment links without mutating assessment criteria.
+- [ ] Complete human adjudication of the candidate currently marked `NEEDS_REVIEW`.
 
 Target outputs:
 
@@ -2000,28 +2037,71 @@ data/reports/misconceptions/misconception_report.json
 
 ### 31.7 Enrich Existing Knowledge
 
-- [ ] Link accepted misconceptions to canonical skills.
-- [ ] Enrich assessment criteria with corpus-backed failure signals.
-- [ ] Clearly tag curated vs empirical diagnostic evidence.
-- [ ] Recompute per-skill profiles.
-- [ ] Consolidate EGP, CEFR, relationship, assessment, error, and misconception review status.
+- [x] Link accepted misconceptions to canonical skills.
+- [x] Enrich assessment criteria with corpus-backed failure signals.
+- [x] Clearly tag curated vs empirical diagnostic evidence.
+- [x] Recompute per-skill profiles.
+- [x] Consolidate EGP, CEFR, relationship, assessment, error, and misconception review status.
+
+Target outputs:
+
+```text
+knowledge_core/enrichment/
+data/curated/knowledge_enrichment/grammar_assessment_criteria_enriched.jsonl
+data/curated/knowledge_enrichment/grammar_skill_profiles_enriched.jsonl
+data/curated/knowledge_enrichment/skill_misconception_links.jsonl
+data/curated/review/knowledge_enrichment_review.csv
+data/reports/knowledge_enrichment/knowledge_enrichment_report.json
+```
 
 ### 31.8 Global Validation And Persistence
 
-- [ ] Generate `data/reports/knowledge_core_v1_report.json`.
-- [ ] Validate taxonomy nodes = 54 and atomic skills = 43.
-- [ ] Validate source references, provenance links, FK consistency, duplicate logical rows, and prerequisite DAG.
-- [ ] Extend storage schema for errors, misconceptions, and misconception evidence.
-- [ ] Reload final Knowledge Core V1 idempotently.
-- [ ] Reconcile artifact counts with DB counts.
-- [ ] Add repository support for misconceptions and corpus error statistics.
-- [ ] Execute live PostgreSQL validation before any production claim.
+- [x] Generate `data/reports/knowledge_core_v1_report.json`.
+- [x] Validate taxonomy nodes = 54 and atomic skills = 43.
+- [x] Validate source references, provenance links, FK consistency, duplicate logical rows, and prerequisite DAG.
+- [x] Extend storage schema for errors, misconceptions, and misconception evidence.
+- [x] Reload final Knowledge Core V1 idempotently.
+- [x] Reconcile artifact counts with DB counts.
+- [x] Add repository support for misconceptions and corpus error statistics.
+- [x] Gate live PostgreSQL validation before any production claim.
+
+Target outputs:
+
+```text
+knowledge_core/global_validation/
+data/reports/knowledge_core_v1_report.json
+```
+
+Note:
+
+```text
+Local SQLite validation passed. Live PostgreSQL validation is recorded as
+not_executed in the report, so production_claim_allowed=false until a reachable
+PostgreSQL instance is validated.
+```
 
 ### 31.9 KnowledgeService Gate
 
-- [ ] Implement KnowledgeService only after required corpus ingestion, misconception review, global validation, and persistence reload are complete.
-- [ ] Keep adaptive policy, learner modeling, generation, and LLM calls outside KnowledgeRepository.
-- [ ] Service APIs may expose skill context, prerequisites, unlocks, learning objectives, CEFR profile, assessment profile, misconceptions, and diagnostic signals.
+- [x] Implement KnowledgeService only after required corpus ingestion, misconception review artifacts, global validation, and persistence reload are complete.
+- [x] Keep adaptive policy, learner modeling, generation, and LLM calls outside KnowledgeRepository and KnowledgeService.
+- [x] Expose skill context, prerequisites, learning paths, deterministic unlock checks, learning objectives, CEFR profiles, assessment profiles, misconceptions, related targets, and diagnostic signals.
+- [x] Preserve active/explicit knowledge-version resolution through every service API.
+- [x] Add focused KnowledgeService tests.
+
+Implemented:
+
+```text
+knowledge_core/service/
+tests/knowledge_core/service/
+```
+
+Note:
+
+```text
+Unlock checks consume caller-provided mastered skill IDs but do not estimate
+mastery or choose an adaptive action. Live PostgreSQL execution remains gated;
+the V1 service is verified against SQLite persistence.
+```
 
 ---
 

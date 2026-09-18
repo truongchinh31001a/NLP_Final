@@ -13,6 +13,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--backend-url", default="http://localhost:8000")
     parser.add_argument("--ollama-debug-url", default="http://localhost:11435")
     parser.add_argument(
+        "--with-postgres",
+        action="store_true",
+        help="Also require the optional PostgreSQL/pgvector profile.",
+    )
+    parser.add_argument(
         "--soft",
         action="store_true",
         help="Print report but return exit code 0 even when checks fail.",
@@ -30,8 +35,9 @@ def main() -> None:
             f"{args.ollama_debug_url.rstrip('/')}/api/tags",
         ),
         backend_to_ollama_check(),
-        postgres_pgvector_check(),
     ]
+    if args.with_postgres:
+        checks.append(postgres_pgvector_check())
     report = {
         "status": "ok" if all(check["passed"] for check in checks) else "failed",
         "checks": checks,

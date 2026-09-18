@@ -2,6 +2,7 @@ services:
   postgres:
     image: pgvector/pgvector:pg17
     container_name: english-exercise-postgres
+    profiles: ["postgres"]
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-english_tutor}
       POSTGRES_USER: ${POSTGRES_USER:-english_tutor}
@@ -58,8 +59,6 @@ services:
       dockerfile: Dockerfile.backend
     container_name: english-exercise-backend
     depends_on:
-      postgres:
-        condition: service_healthy
       ollama:
         condition: service_healthy
       ollama-models:

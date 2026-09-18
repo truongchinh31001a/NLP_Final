@@ -92,6 +92,7 @@ class SourceInventoryTests(unittest.TestCase):
         report_dir = self.workspace / "data" / "reports" / "source_inventory"
         self.assertTrue((report_dir / "source_inventory.json").exists())
         self.assertTrue((report_dir / "file_inventory.jsonl").exists())
+        self.assertTrue((report_dir / "source_governance.json").exists())
         self.assertTrue((report_dir / "schema_samples" / "ud_ewt_schema_sample.json").exists())
 
         inventory = json.loads((report_dir / "source_inventory.json").read_text(encoding="utf-8"))
@@ -123,6 +124,19 @@ class SourceInventoryTests(unittest.TestCase):
         self.assertFalse(efcamdat["csv_has_standalone_error_labels"])
         self.assertEqual(efcamdat["csv_embedded_label_field"], "text")
         self.assertEqual(efcamdat["annotation_source_of_truth"]["source"], "xml_change_markup")
+
+        governance = json.loads((report_dir / "source_governance.json").read_text(encoding="utf-8"))
+        self.assertTrue(governance["validation"]["official_source_urls_recorded"])
+        self.assertTrue(governance["validation"]["raw_dataset_exclusion_recorded"])
+        self.assertFalse(governance["validation"]["legal_clearance_complete_for_all_sources"])
+        source_statuses = {
+            source["source_key"]: source["license_status"]
+            for source in governance["sources"]
+        }
+        self.assertEqual(
+            source_statuses["efcamdat"],
+            "local_user_agreement_reviewed_restricted",
+        )
 
     def test_missing_source_handling_reports_blocked_readiness(self) -> None:
         missing_workspace = self.workspace / "missing"

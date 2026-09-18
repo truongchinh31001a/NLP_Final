@@ -121,10 +121,14 @@ Docker:
 docker compose up --build
 ```
 
-Docker Compose starts PostgreSQL with pgvector, Ollama, the FastAPI backend, and
-the Next.js frontend. SQLite/Chroma remain the default app storage/vector-store
-backends, while Docker demo retrieval uses Ollama semantic embeddings by
-default.
+Docker Compose starts Ollama, the FastAPI backend, and the Next.js frontend.
+SQLite/Chroma are the default app storage/vector-store backends, while Docker
+demo retrieval uses Ollama semantic embeddings by default. PostgreSQL/pgvector
+is optional and starts only with:
+
+```bash
+docker compose --profile postgres up --build
+```
 Inside Docker, the backend calls Ollama at `http://ollama:11434`. The compose
 file exposes container Ollama on host port `11435` for debugging so it does not
 get confused with a separate host Ollama running on `11434`.
