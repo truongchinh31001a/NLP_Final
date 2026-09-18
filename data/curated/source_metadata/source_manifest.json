@@ -1,0 +1,189 @@
+{
+  "file_count": 1338,
+  "generated_at": "2026-09-18T05:22:42.799249+00:00",
+  "inventory_generated_at": "2026-09-16T15:30:28.370968+00:00",
+  "limitations": [
+    "Manifest records only locally evidenced versions, years, licenses, and checksums.",
+    "Files marked checksum_unavailable are retained explicitly and are not re-hashed by this promotion step.",
+    "A needs_manual_review license status is not a license conclusion."
+  ],
+  "schema_version": "knowledge_source_manifest_v1",
+  "source_count": 6,
+  "sources": [
+    {
+      "checksum_coverage": 1.0,
+      "checksum_unavailable_count": 0,
+      "detected_version": "Companion Volume 2020",
+      "license_status": "needs_manual_review",
+      "manifest_file_count": 1,
+      "manifest_size_bytes": 1784779,
+      "official_source_urls": [
+        "https://www.coe.int/en/web/common-european-framework-reference-languages/cefr-companion-volume"
+      ],
+      "publication_year": "2020",
+      "publication_year_status": "locally_evidenced",
+      "redistribution_notes": "No local CEFR license conclusion inferred by this inspection.",
+      "required_for_v1": true,
+      "root_path": "data/external/cefr",
+      "sha256_file_count": 1,
+      "source_key": "cefr_companion_volume_2020",
+      "source_manifest_hash": "ac8b2b112d914c2fbb0909a65c7052238f5bda8138e5915548076c58608df74f",
+      "source_name": "CEFR Companion Volume 2020",
+      "source_roles": [
+        "proficiency_framework"
+      ],
+      "version_status": "locally_evidenced"
+    },
+    {
+      "checksum_coverage": 1.0,
+      "checksum_unavailable_count": 0,
+      "detected_version": "1.1",
+      "license_status": "local_readme_reviewed_specific_license_missing",
+      "manifest_file_count": 12,
+      "manifest_size_bytes": 23089888,
+      "official_source_urls": [
+        "https://researchdatasets.cambridge.org/"
+      ],
+      "publication_year": null,
+      "publication_year_status": "unavailable",
+      "redistribution_notes": "Local README states release for non-commercial research and educational purposes; review full local terms before redistribution.",
+      "required_for_v1": true,
+      "root_path": "data/raw/_fce-released-dataset-1.1",
+      "sha256_file_count": 12,
+      "source_key": "clc_fce",
+      "source_manifest_hash": "e6d28b2cd04cdfe188054c0d840bc5b9f21e36857202c9d787be2e51e3be714e",
+      "source_name": "Cambridge Learner Corpus FCE",
+      "source_roles": [
+        "annotated_error_corpus"
+      ],
+      "version_status": "locally_evidenced"
+    },
+    {
+      "checksum_coverage": 0.42857143,
+      "checksum_unavailable_count": 8,
+      "detected_version": null,
+      "license_status": "local_user_agreement_reviewed_restricted",
+      "manifest_file_count": 14,
+      "manifest_size_bytes": 3523881871,
+      "official_source_urls": [
+        "https://ef-lab.mmll.cam.ac.uk/EFCAMDAT.html"
+      ],
+      "publication_year": null,
+      "publication_year_status": "unavailable",
+      "redistribution_notes": "Local user agreement permits academic private study and noncommercial research, permits brief extracts for teaching or academic publication with acknowledgement, and prohibits making EFCAMDAT available to others or transferring it without prior written consent.",
+      "required_for_v1": true,
+      "root_path": "data/raw/EFCAMDAT",
+      "sha256_file_count": 6,
+      "source_key": "efcamdat",
+      "source_manifest_hash": "b34b31658b1dca6e3b7a4661f7de98847b29af14796460d221447beb184353c9",
+      "source_name": "EFCAMDAT",
+      "source_roles": [
+        "annotated_error_corpus",
+        "learner_corpus"
+      ],
+      "version_status": "unavailable"
+    },
+    {
+      "checksum_coverage": 1.0,
+      "checksum_unavailable_count": 0,
+      "detected_version": null,
+      "license_status": "needs_manual_review",
+      "manifest_file_count": 27,
+      "manifest_size_bytes": 499217,
+      "official_source_urls": [
+        "https://englishprofile.org/?menu=english-grammar-profile"
+      ],
+      "publication_year": null,
+      "publication_year_status": "unavailable",
+      "redistribution_notes": "No local EGP license conclusion inferred by this inspection.",
+      "required_for_v1": true,
+      "root_path": "data/external/english_profile",
+      "sha256_file_count": 27,
+      "source_key": "english_grammar_profile",
+      "source_manifest_hash": "9fc4afe7a0655324551ae8c3decffff2030d126c0cad22bfdcca7952553e5431",
+      "source_name": "English Grammar Profile",
+      "source_roles": [
+        "canonical_grammar_evidence"
+      ],
+      "version_status": "unavailable"
+    },
+    {
+      "checksum_coverage": 1.0,
+      "checksum_unavailable_count": 0,
+      "detected_version": "Universal Dependencies English Web Treebank v2.18 -- 2026-05-15",
+      "license_status": "locally_documented_with_caveats",
+      "manifest_file_count": 1202,
+      "manifest_size_bytes": 37907012,
+      "official_source_urls": [
+        "https://github.com/UniversalDependencies/UD_English-EWT",
+        "https://universaldependencies.org/treebanks/en_ewt/index.html"
+      ],
+      "publication_year": null,
+      "publication_year_status": "unavailable",
+      "redistribution_notes": "LICENSE is present locally; README notes annotation license and underlying text caveats.",
+      "required_for_v1": false,
+      "root_path": "data/raw/UD_English-EWT-master",
+      "sha256_file_count": 1202,
+      "source_key": "ud_english_ewt",
+      "source_manifest_hash": "7f005c002ed42a9ddab1b1936946e8bec4630a3cf4654214bec2c90cda953383",
+      "source_name": "Universal Dependencies English EWT",
+      "source_roles": [
+        "linguistic_structure_resource"
+      ],
+      "version_status": "locally_evidenced"
+    },
+    {
+      "checksum_coverage": 1.0,
+      "checksum_unavailable_count": 0,
+      "detected_version": "2024-v2",
+      "license_status": "needs_manual_review",
+      "manifest_file_count": 82,
+      "manifest_size_bytes": 180076732,
+      "official_source_urls": [
+        "https://englishlanguageitutoring.com/datasets/write-and-improve-corpus-2024",
+        "https://www.repository.cam.ac.uk/items/ba155087-0754-4c6b-ade8-68858e1df2f0"
+      ],
+      "publication_year": "2024",
+      "publication_year_status": "locally_evidenced",
+      "redistribution_notes": "README is present locally, but no standalone license conclusion was inferred.",
+      "required_for_v1": false,
+      "root_path": "data/raw/write-and-improve-corpus-2024-v2",
+      "sha256_file_count": 82,
+      "source_key": "write_improve",
+      "source_manifest_hash": "2ad43535c51c2e99553c46c64b1810918ae0896c03b94d39a04266342dd57a48",
+      "source_name": "Write & Improve Corpus 2024",
+      "source_roles": [
+        "revision_corpus",
+        "annotated_error_corpus"
+      ],
+      "version_status": "locally_evidenced"
+    }
+  ],
+  "validation": {
+    "error_count": 0,
+    "issues": [
+      {
+        "code": "license_needs_manual_review",
+        "message": "cefr_companion_volume_2020",
+        "severity": "warning"
+      },
+      {
+        "code": "checksum_coverage_incomplete",
+        "message": "efcamdat: 8 file(s)",
+        "severity": "warning"
+      },
+      {
+        "code": "license_needs_manual_review",
+        "message": "english_grammar_profile",
+        "severity": "warning"
+      },
+      {
+        "code": "license_needs_manual_review",
+        "message": "write_improve",
+        "severity": "warning"
+      }
+    ],
+    "passed": true,
+    "warning_count": 4
+  }
+}

@@ -28,6 +28,8 @@ class KnowledgeCoreGlobalValidationTests(unittest.TestCase):
             self.assertEqual(result.report["taxonomy"]["atomic_skill_count"], 43)
             self.assertTrue(result.report["storage"]["idempotency"]["passed"])
             self.assertTrue(result.report["storage"]["reconciliation"]["passed"])
+            self.assertTrue(result.report["source_manifest"]["validation_passed"])
+            self.assertEqual(result.report["source_manifest"]["source_count"], 6)
             self.assertEqual(
                 result.report["postgres_validation"]["status"],
                 "not_executed",
@@ -38,4 +40,3 @@ class KnowledgeCoreGlobalValidationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

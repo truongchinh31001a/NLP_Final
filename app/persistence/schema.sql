@@ -714,6 +714,107 @@ CREATE TABLE IF NOT EXISTS corpus_error_statistics (
     FOREIGN KEY (knowledge_node_id) REFERENCES knowledge_nodes(id)
 );
 
+CREATE TABLE IF NOT EXISTS learner_corpus_source_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    knowledge_version_id INTEGER NOT NULL,
+    knowledge_source_id INTEGER NOT NULL,
+    source_record_id TEXT NOT NULL,
+    source_key TEXT NOT NULL,
+    native_record_id TEXT NOT NULL,
+    record_unit TEXT NOT NULL,
+    split TEXT,
+    learner_id_pseudonym TEXT,
+    document_id_pseudonym TEXT,
+    task_id TEXT,
+    proficiency_label TEXT,
+    source_path TEXT,
+    text_fingerprint TEXT,
+    text_length INTEGER,
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+    provenance_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (knowledge_version_id, source_record_id),
+    FOREIGN KEY (knowledge_version_id) REFERENCES knowledge_versions(id),
+    FOREIGN KEY (knowledge_source_id) REFERENCES knowledge_sources(id)
+);
+
+CREATE TABLE IF NOT EXISTS error_instances (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    knowledge_version_id INTEGER NOT NULL,
+    knowledge_source_id INTEGER NOT NULL,
+    corpus_source_record_id INTEGER,
+    error_instance_id TEXT NOT NULL,
+    source_record_id TEXT NOT NULL,
+    source_key TEXT NOT NULL,
+    native_error_id TEXT,
+    label_system TEXT,
+    source_label TEXT,
+    label_path TEXT,
+    label_description TEXT,
+    span_kind TEXT NOT NULL,
+    source_field TEXT,
+    start_char INTEGER,
+    end_char INTEGER,
+    token_start INTEGER,
+    token_end INTEGER,
+    selection_fingerprint TEXT,
+    selected_text_length INTEGER,
+    source_markup_path TEXT,
+    span_confidence REAL NOT NULL,
+    correction_type TEXT,
+    correction_fingerprint TEXT,
+    correction_length INTEGER,
+    correction_count INTEGER,
+    status TEXT NOT NULL,
+    review_status TEXT NOT NULL,
+    parser_notes_json TEXT NOT NULL DEFAULT '[]',
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+    provenance_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (knowledge_version_id, error_instance_id),
+    FOREIGN KEY (knowledge_version_id) REFERENCES knowledge_versions(id),
+    FOREIGN KEY (knowledge_source_id) REFERENCES knowledge_sources(id),
+    FOREIGN KEY (corpus_source_record_id) REFERENCES learner_corpus_source_records(id)
+);
+
+CREATE TABLE IF NOT EXISTS normalized_error_instances (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    knowledge_version_id INTEGER NOT NULL,
+    error_instance_db_id INTEGER NOT NULL,
+    normalized_error_id TEXT NOT NULL,
+    error_instance_id TEXT NOT NULL,
+    source_record_id TEXT NOT NULL,
+    source_key TEXT NOT NULL,
+    category TEXT NOT NULL,
+    subtype TEXT,
+    status TEXT NOT NULL,
+    confidence REAL NOT NULL,
+    reason TEXT NOT NULL,
+    review_status TEXT NOT NULL,
+    taxonomy_version TEXT NOT NULL,
+    canonical_skill_candidates_json TEXT NOT NULL DEFAULT '[]',
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+    provenance_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (knowledge_version_id, normalized_error_id),
+    UNIQUE (knowledge_version_id, error_instance_id),
+    FOREIGN KEY (knowledge_version_id) REFERENCES knowledge_versions(id),
+    FOREIGN KEY (error_instance_db_id) REFERENCES error_instances(id)
+);
+
+CREATE TABLE IF NOT EXISTS corpus_error_cefr_patterns (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    knowledge_version_id INTEGER NOT NULL,
+    source_key TEXT NOT NULL,
+    proficiency_label TEXT NOT NULL,
+    category TEXT NOT NULL,
+    subtype TEXT,
+    error_count INTEGER NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (knowledge_version_id, source_key, proficiency_label, category, subtype),
+    FOREIGN KEY (knowledge_version_id) REFERENCES knowledge_versions(id)
+);
+
 CREATE TABLE IF NOT EXISTS corpus_error_skill_mappings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     knowledge_version_id INTEGER NOT NULL,
@@ -842,6 +943,30 @@ ON learning_objectives (cefr_level);
 CREATE INDEX IF NOT EXISTS idx_corpus_error_stats_version_type
 ON corpus_error_statistics (knowledge_version_id, statistic_type);
 
+CREATE INDEX IF NOT EXISTS idx_learner_corpus_records_source
+ON learner_corpus_source_records (knowledge_version_id, source_key);
+
+CREATE INDEX IF NOT EXISTS idx_learner_corpus_records_proficiency
+ON learner_corpus_source_records (knowledge_version_id, proficiency_label);
+
+CREATE INDEX IF NOT EXISTS idx_error_instances_source_record
+ON error_instances (knowledge_version_id, source_record_id);
+
+CREATE INDEX IF NOT EXISTS idx_error_instances_source_label
+ON error_instances (knowledge_version_id, source_key, source_label);
+
+CREATE INDEX IF NOT EXISTS idx_normalized_errors_category
+ON normalized_error_instances (knowledge_version_id, category, subtype);
+
+CREATE INDEX IF NOT EXISTS idx_normalized_errors_source
+ON normalized_error_instances (knowledge_version_id, source_key);
+
+CREATE INDEX IF NOT EXISTS idx_normalized_errors_instance
+ON normalized_error_instances (error_instance_db_id);
+
+CREATE INDEX IF NOT EXISTS idx_corpus_error_cefr_patterns_lookup
+ON corpus_error_cefr_patterns (knowledge_version_id, source_key, proficiency_label);
+
 CREATE INDEX IF NOT EXISTS idx_corpus_error_skill_mappings_node
 ON corpus_error_skill_mappings (knowledge_node_id);
 
@@ -905,6 +1030,16 @@ JOIN knowledge_versions kv
 JOIN knowledge_nodes n
     ON n.id = ac.knowledge_node_id
 WHERE kv.status = 'active';
+
+CREATE VIEW IF NOT EXISTS v_error_patterns_by_cefr AS
+SELECT
+    knowledge_version_id,
+    source_key,
+    proficiency_label,
+    category,
+    subtype,
+    error_count
+FROM corpus_error_cefr_patterns;
 
 CREATE VIEW IF NOT EXISTS v_skill_misconceptions AS
 SELECT

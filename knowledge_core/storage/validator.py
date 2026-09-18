@@ -131,6 +131,16 @@ def validate_storage(
             "Skill source evidence rows are missing stable evidence keys: "
             f"{counts['skill_source_evidence_missing_keys']}.",
         )
+    if counts.get("error_instances_missing_source_records", 0) != 0:
+        errors.append(
+            "Error instances are missing corpus source-record links: "
+            f"{counts['error_instances_missing_source_records']}.",
+        )
+    if counts.get("error_instances_missing_normalization", 0) != 0:
+        errors.append(
+            "Error instances are missing normalized-error rows: "
+            f"{counts['error_instances_missing_normalization']}.",
+        )
 
     return KnowledgeStorageValidationResult(
         active_version=active_version,
@@ -322,6 +332,43 @@ def _version_counts(connection: sqlite3.Connection, version_id: int) -> dict[str
             "SELECT COUNT(*) AS count FROM corpus_error_statistics WHERE knowledge_version_id = ?",
             (version_id,),
         ),
+        "learner_corpus_source_records": _count(
+            connection,
+            "SELECT COUNT(*) AS count FROM learner_corpus_source_records WHERE knowledge_version_id = ?",
+            (version_id,),
+        ),
+        "error_instances": _count(
+            connection,
+            "SELECT COUNT(*) AS count FROM error_instances WHERE knowledge_version_id = ?",
+            (version_id,),
+        ),
+        "normalized_error_instances": _count(
+            connection,
+            "SELECT COUNT(*) AS count FROM normalized_error_instances WHERE knowledge_version_id = ?",
+            (version_id,),
+        ),
+        "corpus_error_cefr_patterns": _count(
+            connection,
+            "SELECT COUNT(*) AS count FROM corpus_error_cefr_patterns WHERE knowledge_version_id = ?",
+            (version_id,),
+        ),
+        "error_instances_missing_source_records": _count(
+            connection,
+            "SELECT COUNT(*) AS count FROM error_instances WHERE knowledge_version_id = ? AND corpus_source_record_id IS NULL",
+            (version_id,),
+        ),
+        "error_instances_missing_normalization": _count(
+            connection,
+            """
+            SELECT COUNT(*) AS count FROM error_instances ei
+            WHERE ei.knowledge_version_id = ?
+              AND NOT EXISTS (
+                  SELECT 1 FROM normalized_error_instances nei
+                  WHERE nei.error_instance_db_id = ei.id
+              )
+            """,
+            (version_id,),
+        ),
         "corpus_error_skill_mappings": _count(
             connection,
             "SELECT COUNT(*) AS count FROM corpus_error_skill_mappings WHERE knowledge_version_id = ?",
@@ -392,6 +439,12 @@ def _empty_version_counts() -> dict[str, int]:
         "view_skill_assessment_summary": 0,
         "assessment_profile_reconstructable_skills": 0,
         "corpus_error_statistics": 0,
+        "learner_corpus_source_records": 0,
+        "error_instances": 0,
+        "normalized_error_instances": 0,
+        "corpus_error_cefr_patterns": 0,
+        "error_instances_missing_source_records": 0,
+        "error_instances_missing_normalization": 0,
         "corpus_error_skill_mappings": 0,
         "misconceptions": 0,
         "candidate_misconceptions": 0,
@@ -400,6 +453,7 @@ def _empty_version_counts() -> dict[str, int]:
         "skill_misconception_links": 0,
         "view_skill_misconceptions": 0,
         "view_corpus_error_statistics": 0,
+        "view_error_patterns_by_cefr": 0,
     }
 
 
@@ -424,6 +478,10 @@ def _view_counts(connection: sqlite3.Connection) -> dict[str, int]:
         "view_corpus_error_statistics": _count(
             connection,
             "SELECT COUNT(*) AS count FROM v_corpus_error_statistics",
+        ),
+        "view_error_patterns_by_cefr": _count(
+            connection,
+            "SELECT COUNT(*) AS count FROM v_error_patterns_by_cefr",
         ),
     }
 

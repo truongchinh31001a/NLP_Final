@@ -217,6 +217,40 @@ class ErrorSkillMappingReadModel:
 
 
 @dataclass(frozen=True, slots=True)
+class ErrorInstanceReadModel:
+    error_instance_id: str
+    normalized_error_id: str | None
+    source_record_id: str
+    source_key: str
+    native_error_id: str | None
+    source_label: str | None
+    label_system: str | None
+    span_kind: str
+    start_char: int | None
+    end_char: int | None
+    token_start: int | None
+    token_end: int | None
+    correction_type: str | None
+    category: str | None
+    subtype: str | None
+    normalization_status: str | None
+    confidence: float | None
+    review_status: str
+    proficiency_label: str | None
+    task_id: str | None
+    split: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class ErrorPatternByCefrReadModel:
+    source_key: str
+    proficiency_label: str
+    category: str
+    subtype: str | None
+    error_count: int
+
+
+@dataclass(frozen=True, slots=True)
 class SkillSnapshotReadModel:
     skill: KnowledgeNodeReadModel
     profile: SkillProfileReadModel

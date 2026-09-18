@@ -7,6 +7,7 @@ from typing import Iterator
 
 from knowledge_core.repository.assessment_repository import AssessmentRepository
 from knowledge_core.repository.corpus_error_repository import CorpusErrorRepository
+from knowledge_core.repository.error_instance_repository import ErrorInstanceRepository
 from knowledge_core.repository.knowledge_node_repository import KnowledgeNodeRepository
 from knowledge_core.repository.knowledge_query_repository import KnowledgeQueryRepository
 from knowledge_core.repository.knowledge_version_repository import KnowledgeVersionRepository
@@ -28,6 +29,7 @@ class KnowledgeRepositorySession:
         self.assessments = AssessmentRepository(connection)
         self.misconceptions = MisconceptionRepository(connection)
         self.corpus_errors = CorpusErrorRepository(connection)
+        self.error_instances = ErrorInstanceRepository(connection)
         self.queries = KnowledgeQueryRepository(
             nodes=self.nodes,
             evidence=self.evidence,

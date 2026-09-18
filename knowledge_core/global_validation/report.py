@@ -97,6 +97,7 @@ def build_global_report(
     graph = SkillRelationshipGraph(artifacts.relationships, taxonomy)
     graph_analysis = graph.analyze()
     source_validation = _validate_source_and_provenance_references(artifacts)
+    source_manifest = _source_manifest_status()
     reconciliation = _reconcile_counts(
         artifacts=artifacts,
         db_counts=storage_validation.counts,
@@ -115,6 +116,8 @@ def build_global_report(
         validation_errors.extend(issue.message for issue in relationship_validation.errors)
     if source_validation["error_count"]:
         validation_errors.extend(issue["message"] for issue in source_validation["issues"])
+    if not source_manifest["validation_passed"]:
+        validation_errors.append("Knowledge source manifest is missing or invalid.")
     if not idempotency["passed"]:
         validation_errors.append("Storage reload is not idempotent.")
     if not reconciliation["passed"]:
@@ -162,12 +165,36 @@ def build_global_report(
             "analysis": graph_analysis.model_dump(mode="json"),
         },
         "source_and_provenance_validation": source_validation,
+        "source_manifest": source_manifest,
         "review_status": _review_status_summary(artifacts),
         "postgres_validation": postgres,
         "production_claim_allowed": production_claim_allowed,
         "validation_result": "pass" if not validation_errors else "fail",
         "validation_errors": validation_errors,
         "known_limitations": _known_limitations(postgres),
+    }
+
+
+def _source_manifest_status(
+    path: str | Path = "data/curated/source_metadata/source_manifest.json",
+) -> dict[str, Any]:
+    source = Path(path)
+    if not source.exists():
+        return {
+            "path": str(source).replace("\\", "/"),
+            "available": False,
+            "validation_passed": False,
+        }
+    payload = json.loads(source.read_text(encoding="utf-8"))
+    validation = payload.get("validation") or {}
+    return {
+        "path": str(source).replace("\\", "/"),
+        "available": True,
+        "schema_version": payload.get("schema_version"),
+        "source_count": payload.get("source_count"),
+        "file_count": payload.get("file_count"),
+        "validation_passed": validation.get("passed") is True,
+        "warning_count": validation.get("warning_count", 0),
     }
 
 

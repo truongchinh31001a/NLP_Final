@@ -27,6 +27,10 @@ KNOWLEDGE_TABLES = (
     "assessment_task_types",
     "assessment_evidence",
     "corpus_error_statistics",
+    "learner_corpus_source_records",
+    "error_instances",
+    "normalized_error_instances",
+    "corpus_error_cefr_patterns",
     "corpus_error_skill_mappings",
     "misconceptions",
     "misconception_evidence",
@@ -39,6 +43,7 @@ KNOWLEDGE_VIEWS = (
     "v_skill_assessment_summary",
     "v_skill_misconceptions",
     "v_corpus_error_statistics",
+    "v_error_patterns_by_cefr",
 )
 
 
@@ -120,6 +125,15 @@ def _ensure_sqlite_knowledge_migrations(connection: sqlite3.Connection) -> None:
         """
         CREATE UNIQUE INDEX IF NOT EXISTS uq_skill_source_evidence_node_key
         ON skill_source_evidence (knowledge_node_id, evidence_key)
+        """,
+    )
+    connection.execute("DROP VIEW IF EXISTS v_error_patterns_by_cefr")
+    connection.execute(
+        """
+        CREATE VIEW v_error_patterns_by_cefr AS
+        SELECT knowledge_version_id, source_key, proficiency_label,
+               category, subtype, error_count
+        FROM corpus_error_cefr_patterns
         """,
     )
 

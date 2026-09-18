@@ -7,6 +7,7 @@ from typing import Any
 
 from knowledge_core.storage.artifacts import load_storage_artifacts
 from knowledge_core.storage.config import DEFAULT_VERSION_NAME, resolve_db_path
+from knowledge_core.storage.corpus_loader import load_corpus_error_storage
 from knowledge_core.storage.loader import load_knowledge_core
 from knowledge_core.storage.schema import (
     KNOWLEDGE_TABLES,
@@ -60,6 +61,12 @@ def build_parser() -> argparse.ArgumentParser:
         parents=[common],
         help="Validate persisted Knowledge Core data.",
     )
+    corpus_parser = subparsers.add_parser(
+        "load-corpus-errors",
+        parents=[common],
+        help="Stream learner-corpus source records and ErrorInstance artifacts into storage.",
+    )
+    corpus_parser.add_argument("--batch-size", type=int, default=10_000)
     subparsers.add_parser(
         "inspect",
         parents=[common],
@@ -129,6 +136,15 @@ def main(argv: list[str] | None = None) -> int:
         )
         _print_json(validation.to_dict())
         return 0 if validation.is_valid else 1
+
+    if args.command == "load-corpus-errors":
+        result = load_corpus_error_storage(
+            db_path=args.db_path,
+            version_name=args.version_name,
+            batch_size=args.batch_size,
+        )
+        _print_json(result.to_dict())
+        return 0 if result.is_valid else 1
 
     if args.command == "inspect":
         initialize_schema(args.db_path, args.schema)
@@ -203,6 +219,22 @@ def _reset_version(db_path: str | Path | None, version_name: str) -> bool:
         if row is None:
             return False
         version_id = int(row["id"])
+        connection.execute(
+            "DELETE FROM corpus_error_cefr_patterns WHERE knowledge_version_id = ?",
+            (version_id,),
+        )
+        connection.execute(
+            "DELETE FROM normalized_error_instances WHERE knowledge_version_id = ?",
+            (version_id,),
+        )
+        connection.execute(
+            "DELETE FROM error_instances WHERE knowledge_version_id = ?",
+            (version_id,),
+        )
+        connection.execute(
+            "DELETE FROM learner_corpus_source_records WHERE knowledge_version_id = ?",
+            (version_id,),
+        )
         _clear_version_scoped_data(connection, version_id)
         connection.execute("DELETE FROM knowledge_versions WHERE id = ?", (version_id,))
         return True
