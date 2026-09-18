@@ -181,8 +181,8 @@ def _expected_counts(
         "corpus_error_statistics": artifacts.counts()["corpus_error_statistics"],
         "corpus_error_skill_mappings": len(artifacts.error_skill_mappings),
         "misconceptions": artifacts.counts()["misconceptions"],
-        "candidate_misconceptions": len(artifacts.candidate_misconceptions),
-        "accepted_misconceptions": len(artifacts.accepted_misconceptions),
+        "candidate_misconceptions": artifacts.counts()["candidate_misconceptions"],
+        "accepted_misconceptions": artifacts.counts()["accepted_misconceptions"],
         "misconception_evidence": artifacts.counts()["misconception_evidence"],
         "skill_misconception_links": len(artifacts.skill_misconception_links),
     }

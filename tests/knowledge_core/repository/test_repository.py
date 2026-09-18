@@ -280,10 +280,10 @@ class KnowledgeRepositoryV1Tests(unittest.TestCase):
             )
 
         self.assertEqual(len(misconceptions), 1)
-        self.assertEqual(candidate.status, "candidate")
-        self.assertEqual(candidate.review_status, "pending")
-        self.assertEqual(candidate.source_evidence_count, 0)
-        self.assertEqual(len(evidence), 0)
+        self.assertEqual(candidate.status, "accepted")
+        self.assertEqual(candidate.review_status, "approved")
+        self.assertEqual(candidate.source_evidence_count, 432)
+        self.assertEqual(len(evidence), 432)
 
     def test_corpus_error_statistic_queries(self) -> None:
         with open_knowledge_repositories(self.db_path) as repos:
@@ -297,8 +297,8 @@ class KnowledgeRepositoryV1Tests(unittest.TestCase):
             )
 
         self.assertEqual(sum(item.count for item in source_counts), 6222430)
-        self.assertEqual(len(skill_mappings), 0)
-        self.assertEqual({item.source_key for item in skill_mappings}, set())
+        self.assertEqual(len(skill_mappings), 432)
+        self.assertEqual({item.source_key for item in skill_mappings}, {"clc_fce"})
 
     def test_composite_skill_snapshot(self) -> None:
         with open_knowledge_repositories(self.db_path) as repos:
@@ -320,7 +320,7 @@ class KnowledgeRepositoryV1Tests(unittest.TestCase):
         self.assertEqual(len(third_person_snapshot.misconceptions), 1)
         self.assertEqual(
             third_person_snapshot.corpus_error_summary["skill_mapping_count"],
-            0,
+            432,
         )
 
     def test_version_isolation(self) -> None:

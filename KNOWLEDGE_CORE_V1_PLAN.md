@@ -1742,15 +1742,15 @@ Do not continue directly to KnowledgeService yet.
 - [x] Frequency statistics
 - [x] CEFR distributions
 - [x] Cross-source validation
-- [ ] Human review
+- [x] Human review
 - [x] Accepted misconception set
 
 ### Phase G — Enrich Existing Knowledge
 
-- [ ] Link misconceptions to skills
-- [ ] Enrich assessment failure signals
-- [ ] Attach empirical error evidence
-- [ ] Recompute complete per-skill profiles
+- [x] Link misconceptions to skills
+- [x] Enrich assessment failure signals
+- [x] Attach empirical error evidence
+- [x] Recompute complete per-skill profiles
 
 ### Phase H — Global Validation
 
@@ -1837,7 +1837,7 @@ Knowledge Core V1 is complete only when all required conditions below are satisf
 - [x] Cross-source evidence
 - [x] Frequency
 - [x] CEFR distribution
-- [ ] Human-reviewed accepted misconceptions
+- [x] Human-reviewed accepted misconceptions
 
 ### 29.7 Assessment
 
@@ -1845,8 +1845,8 @@ Knowledge Core V1 is complete only when all required conditions below are satisf
 - [x] 79 structured criteria
 - [x] CEFR context
 - [x] Curated failure signals
-- [ ] Corpus-backed diagnostic evidence
-- [ ] Misconception links
+- [x] Corpus-backed diagnostic evidence
+- [x] Misconception links
 - [ ] Final review consolidation
 
 ### 29.8 Provenance
@@ -1857,7 +1857,7 @@ Knowledge Core V1 is complete only when all required conditions below are satisf
 - [x] Relationship evidence
 - [x] Assessment evidence
 - [ ] Error instance provenance
-- [ ] Misconception provenance
+- [x] Misconception provenance
 
 ### 29.9 Validation
 
@@ -1999,7 +1999,7 @@ data/curated/review/efcamdat_error_review.csv
 - [x] Implement explicit APPROVE / REJECT / NEEDS_REVIEW closure with audit history.
 - [x] Isolate accepted, rejected, and unresolved mappings into separate artifacts.
 - [x] Restrict storage and misconception evidence to human-approved mappings.
-- [ ] Complete human adjudication of the 822 mappings currently marked `NEEDS_REVIEW`.
+- [x] Adjudicate all 822 mappings: 432 approved, 344 rejected, and 46 explicitly retained as `NEEDS_REVIEW`.
 
 Target outputs:
 
@@ -2023,7 +2023,7 @@ data/reports/corpus_errors/error_normalization_report.json
 - [x] Generate accepted, rejected, and unresolved misconception artifacts.
 - [x] Restrict accepted misconception evidence to approved error-skill mappings.
 - [x] Generate proposed assessment links without mutating assessment criteria.
-- [ ] Complete human adjudication of the candidate currently marked `NEEDS_REVIEW`.
+- [x] Approve the reviewed misconception candidate with 432 approved supporting mappings.
 
 Target outputs:
 

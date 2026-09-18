@@ -123,8 +123,12 @@ class StorageArtifacts:
                 ).values()
             ),
             "error_skill_mappings": len(self.error_skill_mappings),
-            "candidate_misconceptions": len(self.candidate_misconceptions),
-            "accepted_misconceptions": len(self.accepted_misconceptions),
+            "candidate_misconceptions": sum(
+                item.status == "candidate" for item in misconception_records
+            ),
+            "accepted_misconceptions": sum(
+                item.status == "accepted" for item in misconception_records
+            ),
             "misconceptions": len(misconception_records),
             "misconception_evidence": sum(
                 len(misconception.evidence_links)

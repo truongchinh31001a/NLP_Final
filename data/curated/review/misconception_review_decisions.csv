@@ -1,2 +1,2 @@
 misconception_id,reviewer_decision,reviewer_note,reviewed_by,reviewed_at
-mis_9fb2cf2e276a8c518ec1fadf,NEEDS_REVIEW,No explicit human approval or rejection supplied; retained as unresolved.,,
+mis_9fb2cf2e276a8c518ec1fadf,APPROVE,"432 approved mappings consistently confirm the present-simple lexical verb base/non-3SG versus third-person singular -s contrast; the pattern is repeatable, skill-specific, and diagnostically useful.",codex_assisted_review_on_user_request,2026-09-18T00:00:00+07:00

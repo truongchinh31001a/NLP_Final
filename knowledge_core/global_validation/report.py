@@ -442,8 +442,8 @@ def _review_status_summary(artifacts: StorageArtifacts) -> dict[str, Any]:
             "validation_passed": (error_review.get("validation") or {}).get("passed"),
         },
         "misconceptions": {
-            "candidate_count": len(artifacts.candidate_misconceptions),
-            "accepted_count": len(artifacts.accepted_misconceptions),
+            "candidate_count": artifacts.counts()["candidate_misconceptions"],
+            "accepted_count": artifacts.counts()["accepted_misconceptions"],
             "approved": misconception_review.get("approved"),
             "rejected": misconception_review.get("rejected"),
             "needs_review": misconception_review.get("needs_review"),

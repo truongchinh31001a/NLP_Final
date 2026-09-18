@@ -8,13 +8,14 @@ from knowledge_core.error_mapping.processor import (
     apply_review_decisions,
     prepare_review_package,
 )
+from knowledge_core.error_mapping.adjudication import adjudicate_clc_agv_mappings
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Manage error-to-skill human review.")
     parser.add_argument(
         "command",
-        choices=["prepare-review", "apply-review", "run"],
+        choices=["prepare-review", "adjudicate-clc-agv", "apply-review", "run"],
         nargs="?",
         default="run",
     )
@@ -31,6 +32,11 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=getattr(logging, args.log_level))
     logger = logging.getLogger(__name__)
     prepared = None
+    if args.command == "adjudicate-clc-agv":
+        summary = adjudicate_clc_agv_mappings()
+        logger.info("Adjudication result: %s", json.dumps(summary, sort_keys=True))
+        result = apply_review_decisions()
+        return 0 if result.report["validation"]["passed"] else 1
     if args.command in {"prepare-review", "run"}:
         prepared = prepare_review_package()
         logger.info("Prepared mapping review rows: %s", prepared.report["mapping_review_queue"])

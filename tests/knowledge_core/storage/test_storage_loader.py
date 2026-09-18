@@ -56,12 +56,12 @@ class KnowledgeStorageLoaderTests(unittest.TestCase):
         self.assertEqual(validation.counts["relationships"], 93)
         self.assertEqual(validation.counts["assessment_criteria"], 79)
         self.assertEqual(validation.counts["corpus_error_statistics"], 737)
-        self.assertEqual(validation.counts["corpus_error_skill_mappings"], 0)
+        self.assertEqual(validation.counts["corpus_error_skill_mappings"], 432)
         self.assertEqual(validation.counts["misconceptions"], 1)
-        self.assertEqual(validation.counts["candidate_misconceptions"], 1)
-        self.assertEqual(validation.counts["accepted_misconceptions"], 0)
-        self.assertEqual(validation.counts["misconception_evidence"], 0)
-        self.assertEqual(validation.counts["skill_misconception_links"], 0)
+        self.assertEqual(validation.counts["candidate_misconceptions"], 0)
+        self.assertEqual(validation.counts["accepted_misconceptions"], 1)
+        self.assertEqual(validation.counts["misconception_evidence"], 432)
+        self.assertEqual(validation.counts["skill_misconception_links"], 1)
 
     def test_idempotent_load_does_not_create_duplicates(self) -> None:
         first = load_knowledge_core(db_path=self.db_path, artifacts=self.artifacts)
